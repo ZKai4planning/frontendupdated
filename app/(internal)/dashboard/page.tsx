@@ -59,7 +59,7 @@ export default function DashboardPage() {
                 Project Stages
               </h2>
               <span className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                STEP 2 OF 7
+                STEP 2 OF 5
               </span>
             </div>
 
@@ -97,18 +97,9 @@ export default function DashboardPage() {
                 label="Waiting for the agent update"
                 icon={FileText}
               />
-              <RoadmapLine />
 
-              <RoadmapStep
-                label="Review"
-                icon={Camera}
-              />
-              <RoadmapLine />
 
-              <RoadmapStep
-                label="Submit to council"
-                icon={FileText}
-              />
+             
             </div>
           </div>
 

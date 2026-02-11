@@ -113,7 +113,7 @@ export default function EligibilityCheckPage() {
                 Project Stages
               </h2>
               <span className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                STEP 4 OF 7
+                STEP 4 OF 5
               </span>
             </div>
 
@@ -126,23 +126,7 @@ export default function EligibilityCheckPage() {
               <RoadmapLine />
               <RoadmapStep label="Consultant Schedule" status="active" icon={Headset} />
               <RoadmapLine />
-              
-              <RoadmapStep
-                  label="Waiting for the agent update"
-                  icon={FileText}
-                />
-                <RoadmapLine />
-
-                <RoadmapStep
-                  label="Review"
-                  icon={Camera}
-                />
-                <RoadmapLine />
-
-                <RoadmapStep
-                  label="Submit to council"
-                  icon={FileText}
-                />
+              <RoadmapStep label="Waiting for the agent update" icon={FileText} />
             </div>
           </div>
         </div>
@@ -182,41 +166,57 @@ export default function EligibilityCheckPage() {
           ) : (
 
             /* ================= QUOTATION CARD ================= */
-            <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-lg">
+              <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-lg">
 
-              <h3 className="text-lg font-semibold mb-2">
-                Project Quotation
-              </h3>
+                <h3 className="text-lg font-semibold mb-2">
+                  Initial Quotation – Document Preparation 
+                </h3>
 
-              <p className="text-sm opacity-90 mb-4">
-                Based on your project details, we have prepared a quotation
-                for your Householder Planning Application.
-              </p>
+                <p className="text-sm opacity-90 mb-4">
+                  To begin preparing your planning application and unlock document
+                  upload access, an initial payment of 70% of the professional fee
+                  is required.
+                </p>
 
-              <div className="bg-blue-500/30 rounded-xl p-4 mb-5 text-sm space-y-3">
+                {/* QUOTATION BREAKDOWN */}
+                <div className="bg-blue-500/30 rounded-xl p-4 mb-5 text-sm space-y-3">
 
-                <div className="flex justify-between">
-                  <span>Service</span>
-                  <span className="font-semibold">
-                    Householder Planning Consent
-                  </span>
+                  <div className="flex justify-between">
+                    <span className="opacity-90">Total Professional Fee</span>
+                    <span className="font-semibold">£895</span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="opacity-90">Initial Payment (70%)</span>
+                    <span className="font-semibold text-lg">£626.50</span>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span className="opacity-90">Final Payment (30%)</span>
+                    <span className="font-semibold opacity-80">Due before submission</span>
+                  </div>
+
+                  <div className="border-t border-white/20 pt-3 space-y-1 text-xs opacity-90">
+                    {/* <p>✔ Consultant allocation (Agent X)</p>
+                    <p>✔ Eligibility & policy assessment</p> */}
+                    <p>✔ Application form preparation</p>
+                    <p>✔ Drawing review & QA checks</p>
+                  </div>
+
+                  <p className="text-xs opacity-75 mt-2">
+                    *Council application fees are payable separately to the Planning Portal.
+                  </p>
+
                 </div>
 
-                <div className="flex justify-between border-t border-white/20 pt-3">
-                  <span>Professional Fee</span>
-                  <span className="font-semibold text-lg">£626.50</span>
-                </div>
+                {/* <button
+      onClick={() => router.push("/initial-payment")}
+      className="w-full rounded-xl bg-white text-blue-600 font-semibold py-3 hover:bg-blue-50 transition"
+    >
+      Pay 70% & Begin Preparation
+    </button> */}
 
               </div>
-
-              {/* <button
-                onClick={() => router.push("/payment")}
-                className="w-full rounded-xl bg-white text-blue-600 font-semibold py-3 hover:bg-blue-50 transition"
-              >
-                Accept & Proceed to Payment
-              </button> */}
-
-            </div>
 
           )}
 

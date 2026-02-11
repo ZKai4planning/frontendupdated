@@ -887,7 +887,8 @@ export default function ServiceExpandPanel({
                  
                         <button
                           type="button"
-                          onClick={() => router.push("/pay")}
+                          // onClick={() => router.push("/pay")}
+                          onClick={() => setShowLogin(true)}
                           className="rounded-full bg-blue-500 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-400"
                         >
                           Apply for this Service
