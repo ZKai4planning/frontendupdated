@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import toast from "react-hot-toast"
 import { useRouter } from "next/navigation"
 
@@ -9,6 +9,7 @@ export function ClientLogin() {
   const router = useRouter()
 
   const [step, setStep] = useState<"REQUEST_OTP" | "VERIFY_OTP">("REQUEST_OTP")
+  const [isMobile, setIsMobile] = useState(false)
 
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
@@ -19,11 +20,16 @@ export function ClientLogin() {
 
   const identifier = email || phone
   const isOtpComplete = otp.every((d) => d !== "")
+  const isInputsDisabled = isMobile || step === "VERIFY_OTP"
 
   /* ================= SUBMIT HANDLER ================= */
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+
+    if (isMobile) {
+      return
+    }
 
     if (!email && !phone) {
       toast.error("Please enter email or phone number")
@@ -70,6 +76,22 @@ export function ClientLogin() {
     setTimeout(() => setResending(false), 3000)
   }
 
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const mediaQuery = window.matchMedia("(max-width: 767px)")
+    const handleChange = () => setIsMobile(mediaQuery.matches)
+
+    handleChange()
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener("change", handleChange)
+      return () => mediaQuery.removeEventListener("change", handleChange)
+    }
+
+    mediaQuery.addListener(handleChange)
+    return () => mediaQuery.removeListener(handleChange)
+  }, [])
+
   return (
     <div className="w-full  mx-auto p-6 sm:p-8 lg:p-10 flex flex-col justify-center">
       {/* HEADER */}
@@ -84,6 +106,12 @@ export function ClientLogin() {
         </p>
       </div>
 
+      {isMobile && (
+        <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+          For best experience, please sign in on desktop.
+        </div>
+      )}
+
       <form className="space-y-5" onSubmit={handleSubmit}>
         {/* FULL NAME */}
         <div>
@@ -93,7 +121,7 @@ export function ClientLogin() {
           <input
             type="text"
             value={fullName}
-            disabled={step === "VERIFY_OTP"}
+            disabled={isInputsDisabled}
             onChange={(e) => setFullName(e.target.value)}
             placeholder="Enter your full name"
             className="w-full h-12 sm:h-14 px-4 rounded-lg border text-black focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
@@ -108,7 +136,7 @@ export function ClientLogin() {
           <input
             type="tel"
             value={phone}
-            disabled={step === "VERIFY_OTP"}
+            disabled={isInputsDisabled}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="+44 7911 123456"
             className="w-full h-12 sm:h-14 px-4 rounded-lg border text-black focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
@@ -123,7 +151,7 @@ export function ClientLogin() {
           <input
             type="email"
             value={email}
-            disabled={step === "VERIFY_OTP"}
+            disabled={isInputsDisabled}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
             className="w-full h-12 sm:h-14 px-4 rounded-lg border text-black focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
@@ -156,6 +184,7 @@ export function ClientLogin() {
                     inputMode="numeric"
                     maxLength={1}
                     value={digit}
+                    disabled={isMobile}
                     onChange={(e) => {
                       const value = e.target.value.replace(/\D/, "")
                       if (!value) return
@@ -198,7 +227,7 @@ export function ClientLogin() {
         {/* SUBMIT BUTTON */}
         <button
           type="submit"
-          disabled={step === "VERIFY_OTP" && !isOtpComplete}
+          disabled={isMobile || (step === "VERIFY_OTP" && !isOtpComplete)}
           className="w-full bg-blue-500 text-white font-bold py-3 rounded-lg hover:bg-blue-600 transition disabled:bg-slate-300"
         >
           {step === "REQUEST_OTP" ? "Send OTP" : "Sign In"}

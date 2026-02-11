@@ -13,21 +13,19 @@ const WhatsAppButton = () => {
     <button
       onClick={handleClick}
       aria-label="Chat on WhatsApp"
+      className="
+        fixed z-[9999]
+        bottom-24 sm:bottom-5
+        h-12 w-12 sm:h-14 sm:w-14
+        rounded-full border-0
+        bg-[#25D366]
+        flex items-center justify-center
+        shadow-[0_2px_10px_rgba(0,0,0,0.3)]
+        transition hover:scale-105 active:scale-95
+      "
       style={{
-        position: "fixed",
-        bottom: "20px",
-        right: "20px",
-        backgroundColor: "#25D366",
-        border: "none",
-        borderRadius: "50%",
-        width: "60px",
-        height: "60px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
         cursor: "pointer",
-        boxShadow: "0 2px 10px rgba(0,0,0,0.3)",
-        zIndex: 9999,
+        right: "max(16px, calc((100vw - 1740px) / 2 + 16px))",
       }}
     >
       {/* WhatsApp SVG Icon */}

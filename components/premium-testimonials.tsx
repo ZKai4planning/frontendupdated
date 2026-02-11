@@ -292,7 +292,7 @@ const fadeInUp: Variants = {
 
         {/* Main Testimonial Display */}
         <div className="relative max-w-6xl mx-auto mb-16">
-          <div className="relative h-[500px] md:h-[400px] perspective-1000">
+          <div className="relative min-h-[640px] sm:min-h-[560px] md:min-h-[400px] md:h-[400px] perspective-1000">
             <AnimatePresence initial={false} custom={direction}>
               <motion.div
                 key={currentIndex}

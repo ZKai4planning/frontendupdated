@@ -226,7 +226,7 @@ export default function EligibilityCheckPage() {
 
       <div className="flex justify-end gap-3">
         <button
-          onClick={() => setShowConfirmPopup(false)}
+          onClick={() => setshowConfirmPopup(false)}
           className="rounded-xl border px-4 py-2 text-sm"
         >
           Go Back

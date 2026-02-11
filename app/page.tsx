@@ -653,6 +653,8 @@ const services: Service[] = [
 export default function Home() {
   const [expandedServiceId, setExpandedServiceId] = useState<string | null>(null)
   const expandedContainerRef = useRef<HTMLDivElement>(null)
+  const servicesSectionRef = useRef<HTMLElement>(null)
+  const [isMobile, setIsMobile] = useState(false)
 
   /* close expanded panel on outside click */
   useEffect(() => {
@@ -672,12 +674,49 @@ export default function Home() {
     }
   }, [expandedServiceId])
 
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const mediaQuery = window.matchMedia("(max-width: 767px)")
+    const handleChange = () => setIsMobile(mediaQuery.matches)
+
+    handleChange()
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener("change", handleChange)
+      return () => mediaQuery.removeEventListener("change", handleChange)
+    }
+
+    mediaQuery.addListener(handleChange)
+    return () => mediaQuery.removeListener(handleChange)
+  }, [])
+  
+  useEffect(() => {
+    if (isMobile) {
+      setExpandedServiceId(null)
+    }
+  }, [isMobile])
+
+  useEffect(() => {
+    if (!expandedServiceId) return
+    if (typeof window === "undefined") return
+
+    const mediaQuery = window.matchMedia("(min-width: 768px) and (max-width: 1023px)")
+    if (!mediaQuery.matches) return
+
+    requestAnimationFrame(() => {
+      servicesSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      })
+    })
+  }, [expandedServiceId])
+
   return (
     <main className="w-full">
       <LoginHeader />
 
       {/* ================= HERO ================= */}
-      <section className="relative w-full h-screen overflow-hidden">
+      <section className="relative w-full min-h-screen overflow-hidden">
         {/* ===== Background Video ===== */}
         <div className="absolute inset-0">
           <video
@@ -693,7 +732,7 @@ export default function Home() {
         </div>
 
         {/* ===== Content ===== */}
-        <div className="relative z-10 h-full flex items-center justify-center px-6 text-center -mt-12">
+        <div className="relative z-10 min-h-screen flex items-center justify-center px-6 text-center py-24 sm:py-28 md:py-32 sm:-mt-12">
           <div className="max-w-4xl">
 
             {/* ===== Animated Heading ===== */}
@@ -764,7 +803,7 @@ export default function Home() {
                     .getElementById("services")
                     ?.scrollIntoView({ behavior: "smooth" })
                 }
-                className="btn-1 px-10 py-4 font-semibold rounded-sm relative overflow-hidden"
+                className="btn-1 w-full sm:w-auto px-8 sm:px-10 py-4 font-semibold rounded-sm relative overflow-hidden"
               >
                 <span className="relative z-10">Explore Our Services</span>
               </motion.button>
@@ -775,7 +814,7 @@ export default function Home() {
                 onClick={() => {
                   window.open("https://calendly.com/pavank-karyahubsolutions/30min?month=2026-02", "_blank");
                 }}
-                className="px-20 py-4 border-2 border-white text-white bg-white/10 hover:bg-white/20 transition rounded-sm"
+                className="w-full sm:w-auto px-10 sm:px-20 py-4 border-2 border-white text-white bg-white/10 hover:bg-white/20 transition rounded-sm"
               >
                 Let's Talk
               </motion.button>
@@ -789,11 +828,12 @@ export default function Home() {
       {/* ================= SERVICES ================= */}
       <section
         id="services"
-        className="bg-[#050B18] text-white pt-36 h-[900px] relative"
+        ref={servicesSectionRef}
+        className="bg-[#050B18] text-white pt-24 sm:pt-28 md:pt-36 pb-16 lg:pb-0 lg:h-[900px] relative"
       >
         {!expandedServiceId && (
           <div className="text-center mb-12">
-            <h2 className="text-5xl lg:text-9xl font-bold mb-4">
+            <h2 className="text-3xl sm:text-5xl lg:text-9xl font-bold mb-4">
               Our Services
             </h2>
             {/* <p className="text-white/60 text-xl">
@@ -802,69 +842,111 @@ export default function Home() {
           </div>
         )}
 
-        <div className="max-w-[1740px] mx-auto px-10">
-  {expandedServiceId ? (
-    <div ref={expandedContainerRef} className="flex gap-2 h-[650px]">
-      {services.map((service, index) => (
-        <ServiceExpandPanel
-          key={service.id}
-          index={index} // ✅ REQUIRED PROP ADDED
-          service={service}
-          isExpanded={expandedServiceId === service.id}
-          onExpand={() => setExpandedServiceId(service.id)}
-          onClose={() => setExpandedServiceId(null)}
-        />
-      ))}
-    </div>
-  ) : (
-    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-      {services.map((service) => (
-        <div
-          key={service.id}
-          onClick={() => setExpandedServiceId(service.id)}
-          className="
-            group bg-white/5 backdrop-blur-xl
-            border border-white/10 p-6 rounded-2xl
-            cursor-pointer transition-all
-            hover:border-blue-400/60
-            hover:shadow-xl hover:shadow-blue-500/20
-            flex flex-col
-          "
-        >
-          {/* ===== TOP CONTENT ===== */}
-          <div>
-            <p className="text-xs font-bold text-blue-400 mb-2">
-              {service.label}
-            </p>
+        <div className="max-w-[1740px] mx-auto px-5 sm:px-6 md:px-10">
+          {isMobile ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+              {services.map((service) => (
+                <div
+                  key={service.id}
+                  className="
+                    group bg-white/5 backdrop-blur-xl
+                    border border-white/10 p-6 rounded-2xl
+                    transition-all
+                    flex flex-col
+                  "
+                >
+                  <div>
+                    <p className="text-xs font-bold text-blue-400 mb-2">
+                      {service.label}
+                    </p>
 
-            <h3 className="text-lg font-bold mb-3 leading-snug">
-              {service.subtitle}
-            </h3>
+                    <h3 className="text-lg font-bold mb-3 leading-snug">
+                      {service.subtitle}
+                    </h3>
 
-            <p className="text-sm text-white/60 leading-relaxed italic">
-              “{service.description.substring(0, 80)}…”
-            </p>
-          </div>
+                    <p className="text-sm text-white/60 leading-relaxed italic">
+                      "{service.description.substring(0, 80)}..."
+                    </p>
+                  </div>
 
-          {/* ===== CTA ===== */}
-          <span className="mt-auto pt-6 text-blue-400 font-semibold inline-flex items-center gap-1 relative self-start">
-            Get Started
-            <span className="transition-transform duration-300 group-hover:translate-x-2">
-              →
-            </span>
-            <span
-              className="
-                absolute left-0 -bottom-1 h-[2px] w-0
-                bg-blue-400 transition-all duration-300
-                group-hover:w-full
-              "
-            />
-          </span>
+                  <span className="mt-auto pt-6 text-blue-400 font-semibold inline-flex items-center gap-1 relative self-start">
+                    Get Started
+                    <span className="transition-transform duration-300 group-hover:translate-x-2">
+                      -&gt;
+                    </span>
+                    <span
+                      className="
+                        absolute left-0 -bottom-1 h-[2px] w-0
+                        bg-blue-400 transition-all duration-300
+                        group-hover:w-full
+                      "
+                    />
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : expandedServiceId ? (
+            <div ref={expandedContainerRef} className="flex gap-2 h-[650px] flex-col lg:flex-row">
+              {services.map((service, index) => (
+                <ServiceExpandPanel
+                  key={service.id}
+                  index={index} // REQUIRED PROP ADDED
+                  service={service}
+                  isExpanded={expandedServiceId === service.id}
+                  onExpand={() => setExpandedServiceId(service.id)}
+                  onClose={() => setExpandedServiceId(null)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+              {services.map((service) => (
+                <div
+                  key={service.id}
+                  onClick={() => setExpandedServiceId(service.id)}
+                  className="
+                    group bg-white/5 backdrop-blur-xl
+                    border border-white/10 p-6 rounded-2xl
+                    cursor-pointer transition-all
+                    hover:border-blue-400/60
+                    hover:shadow-xl hover:shadow-blue-500/20
+                    flex flex-col
+                  "
+                >
+                  {/* ===== TOP CONTENT ===== */}
+                  <div>
+                    <p className="text-xs font-bold text-blue-400 mb-2">
+                      {service.label}
+                    </p>
+
+                    <h3 className="text-lg font-bold mb-3 leading-snug">
+                      {service.subtitle}
+                    </h3>
+
+                    <p className="text-sm text-white/60 leading-relaxed italic">
+                      "{service.description.substring(0, 80)}..."
+                    </p>
+                  </div>
+
+                  {/* ===== CTA ===== */}
+                  <span className="mt-auto pt-6 text-blue-400 font-semibold inline-flex items-center gap-1 relative self-start">
+                    Get Started
+                    <span className="transition-transform duration-300 group-hover:translate-x-2">
+                      -&gt;
+                    </span>
+                    <span
+                      className="
+                        absolute left-0 -bottom-1 h-[2px] w-0
+                        bg-blue-400 transition-all duration-300
+                        group-hover:w-full
+                      "
+                    />
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      ))}
-    </div>
-  )}
-</div>
       </section>
 
       {/* <QuickAccessHub />

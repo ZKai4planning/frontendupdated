@@ -16,32 +16,33 @@ export function LoginHeader() {
           sticky top-0 z-50
           flex items-center justify-between
           border-b border-primary/10
-          px-10
+          px-4 sm:px-6 lg:px-10
           bg-[#050b18] dark:bg-slate-900/80
           backdrop-blur-md
         "
       >
-        <div className="flex items-center gap-3 text-primary">
+        <div className="flex items-center gap-3 text-primary min-w-0">
           <button
             onClick={() => window.location.href = "/"}
-            className="flex items-center gap-3"
+            className="flex items-center gap-2 sm:gap-3"
           >
             <Logo />
-            <h2 className=" text-white dark:text-white text-2xl font-bold tracking-tight">
+            <h2 className="text-white dark:text-white text-lg sm:text-2xl font-bold tracking-tight truncate">
               Ai4Planning
             </h2>
           </button>
         </div>
 
-        <div className="flex items-center gap-8">
-          <div className="h-6 w-px bg-slate-200 dark:bg-slate-700" />
+        <div className="flex items-center gap-3 sm:gap-6">
+          <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-slate-700" />
 
           {/* LOGIN BUTTON */}
           <button
             onClick={() => setShowLogin(true)}
             className="
-              text-[15px] font-bold text-white
+              text-xs sm:text-[15px] font-bold text-white
               uppercase tracking-widest
+              whitespace-nowrap
               hover:opacity-80 transition 
             "
           >

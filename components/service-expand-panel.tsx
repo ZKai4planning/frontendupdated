@@ -467,7 +467,7 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {motion } from "framer-motion"
 import { ClientLogin } from "@/components/clientloginform"
 import Image from "next/image"
@@ -607,6 +607,7 @@ export default function ServiceExpandPanel({
 }: ServiceExpandPanelProps) {
   const [showLogin, setShowLogin] = useState(false)
   const router = useRouter()
+  const panelRef = useRef<HTMLDivElement>(null)
   const [gridCells, setGridCells] = useState<GridCell[]>(generateGrid())
   const [selectedFeatureIndex, setSelectedFeatureIndex] = useState(0)
   const [showDetail, setShowDetail] = useState(false)
@@ -629,6 +630,22 @@ export default function ServiceExpandPanel({
       setBeamVisible(false)
     }
   }, [isExpanded, service.id])
+
+  useEffect(() => {
+    if (!isExpanded) return
+    if (typeof window === "undefined") return
+    const mediaQuery = window.matchMedia(
+      "(min-width: 768px) and (max-width: 1023px)"
+    )
+    if (!mediaQuery.matches) return
+
+    requestAnimationFrame(() => {
+      panelRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      })
+    })
+  }, [isExpanded])
 
   useEffect(() => {
     if (!showDetail) {
@@ -658,9 +675,9 @@ export default function ServiceExpandPanel({
       <motion.div
         layout
         initial={false}
+        ref={panelRef}
         style={{
           flex: mobile ? undefined : isExpanded ? "3 1 0%" : "0 0 64px",
-          width: mobile ? undefined : isExpanded ? "auto" : "64px",
         }}
         transition={{
           layout: {
@@ -675,12 +692,15 @@ export default function ServiceExpandPanel({
           border border-white/10
           rounded-2xl
           overflow-hidden
-          ${mobile ? "h-full w-full" : "h-full"}
+          ${isExpanded ? "md:order-first lg:order-none md:scroll-mt-24" : ""}
+          ${isExpanded
+            ? "h-[650px] md:h-[650px] lg:h-full w-full lg:w-auto"
+            : "h-16 md:h-20 lg:h-full w-full lg:w-16"}
         `}
       >
         {/* ================= MOBILE HEADER ================= */}
         {mobile && isExpanded && (
-          <div className="flex items-center justify-between p-5 border-b border-white/10">
+          <div className="relative z-20 flex items-center justify-between p-5 border-b border-white/10 md:hidden">
             <h3 className="font-bold text-lg">{service.title}</h3>
             <button
               onClick={handleClose}
@@ -712,7 +732,7 @@ export default function ServiceExpandPanel({
                 repeat: Infinity,
                 delay: index * 0.10, // subtle stagger
               }}
-              className="vertical-text font-bold text-white/50 uppercase tracking-[0.4em] text-xs rotate-180"
+              className="font-bold text-white/50 uppercase tracking-[0.4em] text-xs lg:[writing-mode:vertical-rl] lg:rotate-180"
             >
               {service.shortTitle}
             </motion.span>
@@ -722,13 +742,13 @@ export default function ServiceExpandPanel({
         {/* ================= EXPANDED CONTENT ================= */}
         {isExpanded && (
           <motion.div
-            className="absolute inset-0 flex h-full w-full"
+            className={`absolute inset-0 flex h-full w-full flex-col md:flex-row ${mobile ? "pt-16 md:pt-0 z-0" : ""}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
           >
-            {/* ================= LEFT IMAGE ================= */}
-            <div className="hidden md:flex w-[30%] items-center justify-center bg-white/5 border-r border-white/10">
+            {/* ================= LEFT IMAGE ================= */} 
+            <div className="hidden md:flex w-full md:w-[40%] lg:w-[30%] h-56 md:h-full items-center justify-center bg-white/5 border-b border-white/10 md:border-b-0 md:border-r">
               <div className="relative w-full h-full overflow-hidden">
                 <Image
                   src={service.image}
@@ -738,14 +758,28 @@ export default function ServiceExpandPanel({
                   priority
                 />
                 <div className="absolute inset-0 bg-blue-900/30" />
+                <div className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-[#050b18]/95 via-[#050b18]/65 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 p-4 lg:p-6">
+                  {/* <div className="inline-flex items-center rounded-full bg-blue-500/15 px-2.5 py-1 text-[9px] lg:text-[10px] font-semibold uppercase tracking-[0.2em] text-blue-200">
+                    {service.label}
+                  </div> */}
+                  <h3 className="mt-2 text-lg lg:text-2xl font-bold text-white">
+                    {service.title}
+                  </h3>
+                  <p className="mt-1 text-xs lg:text-sm text-white/70">
+                    {service.description}
+                  </p>
+                </div>
               </div>
             </div>
 
             {/* ================= RIGHT CONTENT ================= */}
-            <div className="relative flex-1 md:w-[70%] p-6 md:p-10 flex flex-col bg-white/5 overflow-y-auto">
+            <div className="relative flex-1 w-full md:w-[60%] lg:w-[70%] p-6 md:p-8 lg:p-10 flex flex-col bg-white/5 overflow-y-auto">
               <button
                 onClick={handleClose}
-                className="absolute top-6 right-6 z-20 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/70 transition hover:bg-white/20 hover:text-white"
+                className={`absolute top-6 right-6 z-20 h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/70 transition hover:bg-white/20 hover:text-white ${
+                  mobile ? "hidden md:inline-flex" : "inline-flex"
+                }`}
               >
                 <span className="material-symbols-outlined text-xl leading-none">
                   close
@@ -881,7 +915,10 @@ export default function ServiceExpandPanel({
                     </div>
                     <button
                       type="button"
-                      className="rounded-full border border-blue-400/40 bg-blue-500/10 px-4 py-2 text-xs font-semibold text-blue-200 transition hover:border-blue-300/60 hover:bg-blue-500/20"
+                        onClick={() => {
+                  window.open("https://calendly.com/pavank-karyahubsolutions/30min?month=2026-02", "_blank");
+                }}
+                      className="rounded-full border border-blue-400/40 bg-blue-500/10 px-4 py-2 text-xs font-semibold text-blue-200 transition hover:border-blue-300/60 hover:bg-blue-500/20 cursor-pointer"
                     >
                       I need help
                     </button>

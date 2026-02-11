@@ -207,7 +207,7 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {motion } from "framer-motion"
 import { ClientLogin } from "@/components/clientloginform"
 import Image from "next/image"
@@ -272,11 +272,28 @@ export default function ServiceExpandPanel({
   const [showLogin, setShowLogin] = useState(false)
   const router = useRouter()
   const [gridCells, setGridCells] = useState<GridCell[]>(generateGrid())
+  const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (isExpanded) {
       setGridCells(generateGrid())
     }
+  }, [isExpanded])
+
+  useEffect(() => {
+    if (!isExpanded) return
+    if (typeof window === "undefined") return
+    const mediaQuery = window.matchMedia(
+      "(min-width: 768px) and (max-width: 1023px)"
+    )
+    if (!mediaQuery.matches) return
+
+    requestAnimationFrame(() => {
+      panelRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      })
+    })
   }, [isExpanded])
 
   return (
@@ -285,6 +302,7 @@ export default function ServiceExpandPanel({
       <motion.div
         layout
         initial={false}
+        ref={panelRef}
         style={{
           flex: mobile ? undefined : isExpanded ? "3 1 0%" : "0 0 64px",
           width: mobile ? undefined : isExpanded ? "auto" : "64px",
@@ -302,6 +320,7 @@ export default function ServiceExpandPanel({
           border border-white/10
           rounded-2xl
           overflow-hidden
+          ${isExpanded ? "md:order-first lg:order-none md:scroll-mt-24" : ""}
           ${mobile ? "h-full w-full" : "h-full"}
         `}
       >
@@ -319,7 +338,7 @@ export default function ServiceExpandPanel({
         )}
 
         {/* ================= COLLAPSED STATE ================= */}
-        {!isExpanded && !mobile && (
+        {!isExpanded && (
           <button
             onClick={onExpand}
             className="absolute inset-0 flex items-center justify-center cursor-pointer"

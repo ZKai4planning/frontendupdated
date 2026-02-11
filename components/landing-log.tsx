@@ -17,7 +17,7 @@ import Image from "next/image"
 
 export function Logo() {
   return (
-    <div className="w-30 h-22 overflow-hidden">
+    <div className="w-[88px] h-[64px] sm:w-[120px] sm:h-[88px] overflow-hidden">
       <video
         src="/logovideo.mp4"
         autoPlay

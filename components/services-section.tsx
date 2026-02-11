@@ -260,6 +260,8 @@ const services: Service[] = [
 export default function ServicesSection() {
   const [expandedServiceId, setExpandedServiceId] = useState<string | null>(null)
   const expandedContainerRef = useRef<HTMLDivElement>(null)
+  const servicesSectionRef = useRef<HTMLElement>(null)
+  const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -278,10 +280,48 @@ export default function ServicesSection() {
     }
   }, [expandedServiceId])
 
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const mediaQuery = window.matchMedia("(max-width: 767px)")
+    const handleChange = () => setIsMobile(mediaQuery.matches)
+
+    handleChange()
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener("change", handleChange)
+      return () => mediaQuery.removeEventListener("change", handleChange)
+    }
+
+    mediaQuery.addListener(handleChange)
+    return () => mediaQuery.removeListener(handleChange)
+  }, [])
+  
+  useEffect(() => {
+    if (isMobile) {
+      setExpandedServiceId(null)
+    }
+  }, [isMobile])
+
+  useEffect(() => {
+    if (!expandedServiceId) return
+    if (typeof window === "undefined") return
+
+    const mediaQuery = window.matchMedia("(min-width: 768px) and (max-width: 1023px)")
+    if (!mediaQuery.matches) return
+
+    requestAnimationFrame(() => {
+      servicesSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      })
+    })
+  }, [expandedServiceId])
+
   return (
     <section
       id="services"
-      className="bg-[#050B18] text-white pt-36 h-[900px]"
+      ref={servicesSectionRef}
+      className="bg-[#050B18] text-white pt-24 sm:pt-28 md:pt-36 pb-16 md:pb-0 md:h-[900px]"
     >
       {/* {!expandedServiceId && (
         <div className="text-center mb-12">
@@ -289,8 +329,33 @@ export default function ServicesSection() {
         </div>
       )} */}
 
-      <div className="max-w-[1740px] mx-auto px-10">
-        {expandedServiceId ? (
+      <div className="max-w-[1740px] mx-auto px-5 sm:px-6 md:px-10">
+        {isMobile ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
+            {services.map(service => (
+              <div
+                key={service.id}
+                className="group bg-white/5 border border-white/10 p-6 rounded-2xl transition"
+              >
+                <p className="text-xs font-bold text-blue-400 mb-2">
+                  {service.label}
+                </p>
+
+                <h3 className="text-lg font-bold mb-3">
+                  {service.subtitle}
+                </h3>
+
+                <p className="text-sm text-white/60 italic">
+                  "{service.description.substring(0, 80)}..."
+                </p>
+
+                <span className="mt-6 inline-flex items-center text-blue-400 font-semibold">
+                  Get Started -&gt;
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : expandedServiceId ? (
           <div ref={expandedContainerRef} className="flex gap-2 h-[650px]">
             {services.map((service, index) => (
               <ServiceExpandPanel
@@ -320,11 +385,11 @@ export default function ServicesSection() {
                 </h3>
 
                 <p className="text-sm text-white/60 italic">
-                  “{service.description.substring(0, 80)}…”
+                  "{service.description.substring(0, 80)}..."
                 </p>
 
                 <span className="mt-6 inline-flex items-center text-blue-400 font-semibold">
-                  Get Started →
+                  Get Started -&gt;
                 </span>
               </div>
             ))}
