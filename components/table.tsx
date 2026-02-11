@@ -3,7 +3,7 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Roadmap from "@/components/roadmap"
+import Roadmap from "@/components/project-stages"
 
 export default function Table({
   onView,

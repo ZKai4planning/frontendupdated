@@ -12,6 +12,8 @@ import {
   Users,
   FileSearch,
   Headset,
+  FileText,
+  Camera,
 } from "lucide-react"
 
 /* ================= PAGE ================= */
@@ -54,10 +56,10 @@ export default function DashboardPage() {
           <div className="rounded-2xl border bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-semibold text-slate-800">
-                Project Roadmap
+                Project Stages
               </h2>
               <span className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                STEP 2 OF 12
+                STEP 2 OF 7
               </span>
             </div>
 
@@ -79,13 +81,6 @@ export default function DashboardPage() {
               <RoadmapLine />
 
               <RoadmapStep
-                label="Consultant Allocation"
-                icon={Users}
-              />
-
-              <RoadmapLine />
-
-              <RoadmapStep
                 label="Eligibility Check"
                 icon={FileSearch}
               />
@@ -94,6 +89,25 @@ export default function DashboardPage() {
               <RoadmapStep
                 label="Consultant Shedule"
                 icon={Headset}
+              />
+
+              <RoadmapLine />
+
+              <RoadmapStep
+                label="Waiting for the agent update"
+                icon={FileText}
+              />
+              <RoadmapLine />
+
+              <RoadmapStep
+                label="Review"
+                icon={Camera}
+              />
+              <RoadmapLine />
+
+              <RoadmapStep
+                label="Submit to council"
+                icon={FileText}
               />
             </div>
           </div>

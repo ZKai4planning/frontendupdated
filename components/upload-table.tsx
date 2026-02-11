@@ -3,7 +3,7 @@
 import { Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Roadmap from "@/components/roadmap"
+import Roadmap from "@/components/project-stages"
 
 export default function Table({
   onView,
@@ -78,12 +78,12 @@ export default function Table({
                 </span>
               </td>
               <td className="border-b px-4 py-3">
-                              <button
-                                  onClick={() => router.push("/upload-documents")}
-                                  className="rounded-lg border px-4 py-1.5 text-sm hover:bg-blue-600 bg-blue-500 text-white font-medium transition"
-                              >
-                                  Upload
-                              </button>
+                <button
+                  onClick={onView}
+                  className="rounded-lg border px-4 py-1.5 text-sm hover:bg-blue-600 bg-blue-500 text-white font-medium transition"
+                >
+                  Upload
+                </button>
 
               </td>
             </tr>

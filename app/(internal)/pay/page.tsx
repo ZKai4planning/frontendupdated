@@ -128,7 +128,7 @@ export default function PaymentUI() {
 
           {/* Submit */}
           <button
-            onClick={() => router.push("/eligibility-check")}
+            onClick={() => router.push("dashboard-eligibility")}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold transition"
           >
             Submit
