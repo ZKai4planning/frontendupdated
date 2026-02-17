@@ -131,7 +131,7 @@ export default function ProfileAutomationPage() {
 
           <div className="relative w-40 h-40 rounded-full border border-blue-500/40 bg-zinc-900 overflow-hidden z-10">
             <Image
-              src="/profile.jpg"
+              src="/profile-1.jpg"
               alt="AI Agent"
               fill
               priority

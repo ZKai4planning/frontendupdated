@@ -1,60 +1,35 @@
 "use client"
 
-import React, { useState, useEffect } from "react"
-import Table from "@/components/consultant-table"
-import { useRouter } from "next/navigation"
+import React from "react"
+import { useRouter, usePathname } from "next/navigation"
 import {
-  FileSearch,
-  Landmark,
   CheckCircle,
-  Headset,
-  Package,
-  User,
-  FileText,
-  Camera,
 } from "lucide-react"
-import { motion } from "framer-motion"
+import { PROJECT_FLOW } from "@/lib/project-flow"
 
-export default function EligibilityCheckPage() {
+export default function ConsultantSchedulePage() {
   const router = useRouter()
+  const pathname = usePathname()
 
-  /* ================= STATE ================= */
+  /* ================= SAFE CURRENT STEP DETECTION ================= */
 
-  const [showConfirmPopup, setShowConfirmPopup] = useState(false)
-  const [showQuotation, setShowQuotation] = useState(false)
+  const currentRoute = pathname.replace("/", "")
 
-  /* ================= TIMER FOR QUOTATION ================= */
+  const stepIndex = PROJECT_FLOW.findIndex(
+    step => step.route === currentRoute
+  )
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowQuotation(true)
-    }, 5000) // 5 seconds
-
-    return () => clearTimeout(timer)
-  }, [])
-
-  /* ================= PROJECT FLOW ================= */
-
-  const projectFlow = [
-    { label: "Profile", icon: User },
-    { label: "Service & Initial Payment", icon: Package },
-    { label: "Eligibility Check", icon: FileSearch },
-    { label: "Consultant Schedule", icon: Headset },
-    { label: "Upload Documents", icon: FileText },
-    { label: "Review", icon: CheckCircle },
-    { label: "Submit to Council", icon: Landmark },
-  ]
-
-  const currentProjectStep = 4
+  const currentProjectStep = stepIndex >= 0 ? stepIndex : 0
 
   const progress = Math.round(
-    ((currentProjectStep - 1) / (projectFlow.length - 1)) * 100
+    ((currentProjectStep + 1) / PROJECT_FLOW.length) * 100
   )
 
   return (
     <main className="min-h-screen bg-slate-50 px-5 py-8">
 
       {/* ================= HEADER ================= */}
+
       <div className="flex items-start justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
@@ -68,7 +43,7 @@ export default function EligibilityCheckPage() {
           <p className="text-sm text-slate-500 mt-1">
             Current Stage:{" "}
             <span className="font-medium text-slate-700">
-              {projectFlow[currentProjectStep - 1].label}
+              {PROJECT_FLOW[currentProjectStep]?.label}
             </span>
           </p>
         </div>
@@ -87,7 +62,7 @@ export default function EligibilityCheckPage() {
               strokeDasharray={`${2 * Math.PI * 16}`}
               strokeDashoffset={`${2 * Math.PI * 16 * (1 - progress / 100)}`}
               strokeLinecap="round"
-              style={{ transition: "stroke-dashoffset 0.8s ease" }}
+              style={{ transition: "stroke-dashoffset 0.6s ease" }}
             />
           </svg>
 
@@ -103,180 +78,115 @@ export default function EligibilityCheckPage() {
       </div>
 
       {/* ================= ROADMAP + RIGHT PANEL ================= */}
-      <div className="grid grid-cols-12 gap-6 mb-8">
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
 
         {/* LEFT ROADMAP */}
-        <div className="col-span-8">
+
+        <div className="lg:col-span-8">
           <div className="rounded-2xl border bg-white p-6 shadow-sm">
+
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-semibold text-slate-800">
                 Project Stages
               </h2>
+
               <span className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                STEP 4 OF 5
+                STEP {currentProjectStep + 1} OF {PROJECT_FLOW.length}
               </span>
             </div>
 
-            <div className="flex items-center justify-between">
-              <RoadmapStep label="Profile" status="completed" icon={User} />
-              <RoadmapLine />
-              <RoadmapStep label="Service & Initial Payment" status="completed" icon={Package} />
-              <RoadmapLine />
-              <RoadmapStep label="Eligibility Check" status="completed" icon={FileSearch} />
-              <RoadmapLine />
-              <RoadmapStep label="Consultant Schedule" status="active" icon={Headset} />
-              <RoadmapLine />
-              <RoadmapStep label="Waiting for the agent update" icon={FileText} />
+            <div className="flex items-center overflow-x-auto pb-2 min-h-[120px]">
+
+              {PROJECT_FLOW.map((stepItem, index) => {
+
+                const status =
+                  index < currentProjectStep
+                    ? "completed"
+                    : index === currentProjectStep
+                    ? "active"
+                    : undefined
+
+                return (
+                  <div key={stepItem.route} className="flex items-center">
+
+                    <RoadmapStep
+                      label={stepItem.label}
+                      icon={stepItem.icon}
+                      status={status}
+                      onClick={() => {
+                        if (
+                          index <= currentProjectStep &&
+                          stepItem.route !== "#"
+                        ) {
+                          router.push(`/${stepItem.route}`)
+                        }
+                      }}
+                    />
+
+                    {index !== PROJECT_FLOW.length - 1 && (
+                      <RoadmapLine />
+                    )}
+
+                  </div>
+                )
+              })}
+
             </div>
           </div>
         </div>
 
-        {/* RIGHT COLUMN */}
+        {/* RIGHT PANEL */}
+
         <div className="col-span-4 space-y-6">
+          <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-lg flex flex-col">
 
-          {!showQuotation ? (
-
-            /* ================= CONSULTANT CARD ================= */
-            <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-lg">
-              <h3 className="text-lg font-semibold mb-2">
-                Consultant Schedule
-              </h3>
-
-              <p className="text-sm opacity-90 mb-4">
-                Your assigned planning consultant will review your project
-                and guide you through the next steps.
-              </p>
-
-              <div className="bg-blue-500/30 rounded-xl p-4 text-sm space-y-2">
-                <div className="flex justify-between">
-                  <span>Consultant</span>
-                  <span className="font-semibold">Sarah</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Duration</span>
-                  <span className="font-semibold">15–20 Minutes</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Mode</span>
-                  <span className="font-semibold">Online Meeting</span>
-                </div>
-              </div>
-            </div>
-
-          ) : (
-
-            /* ================= QUOTATION CARD ================= */
-              <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-lg">
-
-                <h3 className="text-lg font-semibold mb-2">
-                  Initial Quotation – Document Preparation 
-                </h3>
-
-                <p className="text-sm opacity-90 mb-4">
-                  To begin preparing your planning application and unlock document
-                  upload access, an initial payment of 70% of the professional fee
-                  is required.
-                </p>
-
-                {/* QUOTATION BREAKDOWN */}
-                <div className="bg-blue-500/30 rounded-xl p-4 mb-5 text-sm space-y-3">
-
-                  <div className="flex justify-between">
-                    <span className="opacity-90">Total Professional Fee</span>
-                    <span className="font-semibold">£895</span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span className="opacity-90">Initial Payment (70%)</span>
-                    <span className="font-semibold text-lg">£626.50</span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span className="opacity-90">Final Payment (30%)</span>
-                    <span className="font-semibold opacity-80">Due before submission</span>
-                  </div>
-
-                  <div className="border-t border-white/20 pt-3 space-y-1 text-xs opacity-90">
-                    {/* <p>✔ Consultant allocation (Agent X)</p>
-                    <p>✔ Eligibility & policy assessment</p> */}
-                    <p>✔ Application form preparation</p>
-                    <p>✔ Drawing review & QA checks</p>
-                  </div>
-
-                  <p className="text-xs opacity-75 mt-2">
-                    *Council application fees are payable separately to the Planning Portal.
-                  </p>
-
-                </div>
-
-                {/* <button
-      onClick={() => router.push("/initial-payment")}
-      className="w-full rounded-xl bg-white text-blue-600 font-semibold py-3 hover:bg-blue-50 transition"
-    >
-      Pay 70% & Begin Preparation
-    </button> */}
-
-              </div>
-
-          )}
-
-        </div>
-      </div>
-
-      {/* ================= TABLE ================= */}
-      <div className="mt-10 mb-6">
-        <Table
-          onView={() => {
-            setShowConfirmPopup(true)
-            window.scrollTo({ top: 300, behavior: "smooth" })
-          }}
-        />
-      </div>
-
-      {/* ================= PAYMENT POPUP ================= */}
-      {showConfirmPopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 0.25, ease: "easeOut" }}
-            className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
-          >
-            <h3 className="text-lg font-semibold mb-2">
-              Complete your payment
+            <h3 className="text-lg font-semibold mb-4">
+              Consultant Schedule
             </h3>
 
-            <div className="mb-6 flex items-center gap-3">
-              <label className="text-sm text-slate-600 whitespace-nowrap">
-                Payment ID:
-              </label>
-              <input
-                type="text"
-                placeholder="Enter payment ID"
-                className="flex-1 rounded-xl border px-4 py-2 text-sm
-                focus:ring-2 focus:ring-blue-500 outline-none"
-              />
-            </div>
+            <p className="text-sm opacity-90 leading-relaxed mb-3">
+              Your assigned planning consultant will review your project and guide you through the next steps.
+              Consultant: <span className="font-semibold">Sarah</span>.
+            
+            </p>
 
-            <div className="flex justify-end gap-3">
+            <div className="mt-auto">
               <button
-                onClick={() => setShowConfirmPopup(false)}
-                className="rounded-xl border px-4 py-2 text-sm"
+                onClick={() => router.push("/dashboard-initialquotation")} 
+                className="w-full rounded-xl bg-white text-blue-600 font-semibold py-3
+                   hover:bg-blue-50 active:scale-[0.98] transition"
               >
-                Go Back
-              </button>
-
-              <button
-                onClick={() => router.push("/dashboard-upload")}
-                className="rounded-xl bg-green-600 text-white px-4 py-2 text-sm font-semibold"
-              >
-                Yes, Continue
+                Next Step →
               </button>
             </div>
-          </motion.div>
+
+          </div>
         </div>
-      )}
 
+      </div>
+
+<div className="w-full lg:max-w-md rounded-2xl bg-blue-500 p-6 text-white shadow-lg">
+
+        <p className="text-sm opacity-90 mb-4 leading-relaxed">
+          Hi Zafer, Thank you for choosing <span className="font-semibold">AI4Planning</span>.
+          We’ve assigned <span className="font-semibold">Sarah</span> as your personal planning
+          consultant. She’ll be in touch shortly to discuss your project requirements.
+        </p>
+
+        <h3 className="text-lg font-semibold mb-4">
+          Sarah will contact you
+        </h3>
+
+        <div className="rounded-xl bg-white/20 px-4 py-3 text-sm space-y-1">
+          <p className="font-semibold">
+            📅 Thursday, 5 February 2026
+          </p>
+          <p className="opacity-90">
+            🕒 09:30 AM (Consultation Time)
+          </p>
+        </div>
+      </div>
     </main>
   )
 }
@@ -287,20 +197,25 @@ function RoadmapStep({
   label,
   status,
   icon: Icon,
+  onClick,
 }: {
   label: string
   status?: "completed" | "active"
   icon: React.ElementType
+  onClick?: () => void
 }) {
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div
+      onClick={onClick}
+      className="flex flex-col items-center gap-2 min-w-[110px] cursor-pointer"
+    >
       <div
-        className={`w-10 h-10 rounded-full flex items-center justify-center
+        className={`w-10 h-10 rounded-full flex items-center justify-center duration-300
         ${
           status === "completed"
             ? "bg-blue-600 text-white"
             : status === "active"
-            ? "border-2 border-blue-600 text-blue-600 bg-white"
+            ? "border-2 border-blue-600 text-blue-600 bg-white animate-pulse"
             : "bg-slate-200 text-slate-500"
         }`}
       >
@@ -323,5 +238,5 @@ function RoadmapStep({
 }
 
 function RoadmapLine() {
-  return <div className="flex-1 h-[2px] bg-slate-200 mx-2" />
+  return <div className="h-[2px] bg-slate-200 mx-6 min-w-[45px] flex-1" />
 }

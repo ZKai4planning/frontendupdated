@@ -152,11 +152,11 @@ export default function ReviewPage() {
                                   Project Stages
                               </h2>
                               <span className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                                  STEP 6 OF 7
+                                  STEP 8 OF 9
                               </span>
                           </div>
 
-                          <div className="flex items-center justify-between">
+                          <div className="flex items-center justify-between min-h-[100px]">
                               <RoadmapStep
                                   label="Profile"
                                   status="completed"
@@ -186,11 +186,24 @@ export default function ReviewPage() {
                               <RoadmapLine />
 
                               <RoadmapStep
-                                  label="Waiting for the agent update"
+                                  label="First Quotation"
+                                  status="completed"
+                                  icon={Headset}
+                              />
+                              <RoadmapLine />
+
+                              <RoadmapStep
+                                  label="Upload Documents"
                                   status="completed"
                                   icon={FileText}
                               />
                               <RoadmapLine />
+                <RoadmapStep
+                  label="Final Quotation"
+                  status="completed"
+                  icon={FileText}
+                />
+                <RoadmapLine />
 
                               <RoadmapStep
                                   label="Review"
@@ -209,85 +222,23 @@ export default function ReviewPage() {
                   </div>
 
                   {/* ================= RIGHT COLUMN ================= */}
-                  <div className="col-span-4 space-y-6">
-
-          {!showPaymentCard ? (
-           <div className="col-span-4 space-y-6">
-                      <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-lg">
-
-                          <h3 className="text-lg font-semibold mb-2">
-                              Application Review in Progress
-                          </h3>
-
-                          <p className="text-sm opacity-90 mb-4">
-                              Your documents have been received and are currently under review.
-                              Our team is checking all drawings, forms, and supporting information
-                              to ensure the application meets local authority validation
-                              requirements before submission.
-                          </p>
-
-                          {/* WHAT WE ARE CHECKING */}
-                          <div className="bg-blue-500/30 rounded-xl p-4 mb-5 text-sm space-y-2">
-                              <p className="font-semibold">What we’re reviewing:</p>
-                              <ul className="list-disc list-inside space-y-1 opacity-95">
-                                  <li>Accuracy of existing and proposed drawings</li>
-                                  <li>Compliance with permitted development or planning policies</li>
-                                  <li>Required supporting documents and statements</li>
-                                  <li>Local council validation checklist</li>
-                              </ul>
-                          </div>
-
-                          <div className="text-sm opacity-90">
-                              Once complete, your consultant will confirm submission to the council
-                              and update you on the expected decision timeline.
-                          </div>
-
-                      </div>
-                  </div>
-          ) : (
+          <div className="col-span-4 space-y-6">
             <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-lg">
 
               <h3 className="text-lg font-semibold mb-2">
-                Final Payment – Submission Stage
+                Application Review in Progress
               </h3>
 
               <p className="text-sm opacity-90 mb-4">
-                Your documents are ready for council submission.
-                Please complete the final payment to proceed.
+                Your documents have been successfully received and are currently
+                undergoing a structured quality review. Our team is carefully
+                checking all drawings, forms, and supporting information to ensure
+                your application meets local authority validation requirements.
               </p>
 
-              <div className="bg-blue-500/30 rounded-xl p-4 mb-5 text-sm space-y-3">
-                <div className="flex justify-between">
-                  <span>Total Professional Fee</span>
-                  <span className="font-semibold">£895</span>
-                </div>
-
-                <div className="flex justify-between">
-                  <span>Initial Payment (70%)</span>
-                  <span className="font-semibold text-green-200">
-                    £626.50 – Paid
-                  </span>
-                </div>
-
-                <div className="flex justify-between border-t border-white/20 pt-3">
-                  <span>Final Balance (30%)</span>
-                  <span className="font-semibold text-lg">
-                    £268.50
-                  </span>
-                </div>
-              </div>
-
-              {/* <button
-                onClick={() => router.push("/final-payment")}
-                className="w-full rounded-xl bg-white text-blue-600 font-semibold py-3 hover:bg-blue-50 transition"
-              >
-                Pay Final Balance & Submit Application
-              </button> */}
-
             </div>
-          )}
+          </div>
 
-        </div>
 
 
               </div>
@@ -345,12 +296,12 @@ function RoadmapStep({
   return (
     <div className="flex flex-col items-center gap-2">
       <div
-        className={`w-10 h-10 rounded-full flex items-center justify-center
+        className={`w-10 h-10 rounded-full flex items-center justify-center duration-300
         ${
           status === "completed"
             ? "bg-blue-600 text-white"
             : status === "active"
-            ? "border-2 border-blue-600 text-blue-600 bg-white"
+            ? "border-2 border-blue-600 text-blue-600 bg-white animate-pulse"
             : "bg-slate-200 text-slate-500"
         }`}
       >

@@ -21,7 +21,7 @@ export default function HelpWidget() {
             {/* Header */}
             <div className="flex items-start justify-between mb-4">
               <div>
-                <p className="text-sm text-gray-400">Afternoon SubbaRao.</p>
+                <p className="text-sm text-gray-400">Afternoon Zafer Khan.</p>
                 <h3 className="text-base font-semibold">
                   How can we help?
                 </h3>

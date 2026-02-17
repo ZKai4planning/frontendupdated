@@ -1,12 +1,20 @@
 "use client"
 
-import { useState } from "react"
+import React, { useState } from "react"
+import Table from "@/components/upload-table"
 import {
-  UploadCloud,
-  FileText,
+  FileSearch,
+  Landmark,
   CheckCircle,
-  AlertCircle,
+  Headset,
+  Package,
+  User,
+  FileText,
+  Camera,
 } from "lucide-react"
+import { useRouter } from "next/navigation"
+
+/* ================= DOCUMENT TYPES ================= */
 
 type DocStatus = "pending" | "uploaded"
 
@@ -46,8 +54,35 @@ const REQUIRED_DOCUMENTS: DocumentItem[] = [
 
 /* ================= PAGE ================= */
 
-export default function UploadDocumentsPage() {
-  const [documents, setDocuments] = useState(REQUIRED_DOCUMENTS)
+export default function UploadDocumentsDashboard() {
+  const router = useRouter()
+
+
+  const [documents, setDocuments] =
+    useState<DocumentItem[]>(REQUIRED_DOCUMENTS)
+
+  const projectFlow = [
+      { label: "Profile", icon: User },
+      { label: "Service & Initial Payment", icon: Package },
+      { label: "Eligibility Check", icon: FileSearch },
+      { label: "Consultant Schedule", icon: Headset },
+      { label: "Upload Documents", icon: FileText },
+      { label: "Review", icon: CheckCircle },
+      { label: "Submit to Council", icon: Landmark },
+    ]
+  
+    // 🔁 Later replace from backend
+    const currentProjectStep = 5
+  
+    const progress = Math.round(
+      ((currentProjectStep - 1) / (projectFlow.length - 1)) * 100
+    )
+
+  const uploadedCount = documents.filter(
+    doc => doc.status === "uploaded"
+  ).length
+
+  const allUploaded = uploadedCount === documents.length
 
   const handleUpload = (id: string) => {
     setDocuments(prev =>
@@ -58,80 +93,223 @@ export default function UploadDocumentsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-8">
+    <main className="min-h-screen bg-slate-50 px-5 py-8">
 
       {/* ================= HEADER ================= */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">
-          Upload Project Documents
-        </h1>
-        <p className="text-sm text-slate-600 mt-1">
-          Upload the required documents so our planning team can
-          proceed with your application.
-        </p>
-      </div>
+      <div className="flex items-start justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">
+            Welcome back, Zafer Khan
+          </h1>
 
-      <div className="grid grid-cols-12 gap-6">
+          <p className="text-xl text-slate-600 mt-2">
+            Customer ID: <span className="font-medium">ABC123-089</span>
+          </p>
 
-        {/* ================= LEFT COLUMN ================= */}
-        <div className="col-span-8 space-y-4">
-          {documents.map(doc => (
-            <DocumentCard
-              key={doc.id}
-              doc={doc}
-              onUpload={() => handleUpload(doc.id)}
+          <p className="text-sm text-slate-500 mt-1">
+            Current Stage:{" "}
+            <span className="font-medium text-slate-700">
+              {projectFlow[currentProjectStep - 1].label}
+            </span>
+          </p>
+        </div>
+
+        {/* Progress Circle */}
+        <div className="flex items-center gap-3 bg-white rounded-xl border px-4 py-2 shadow-sm">
+          <svg width="40" height="40" viewBox="0 0 40 40" className="-rotate-90">
+            <circle
+              cx="20"
+              cy="20"
+              r="16"
+              fill="none"
+              stroke="#e2e8f0"
+              strokeWidth="4"
             />
-          ))}
-        </div>
+            <circle
+              cx="20"
+              cy="20"
+              r="16"
+              fill="none"
+              stroke="#2563eb"
+              strokeWidth="4"
+              strokeDasharray={`${2 * Math.PI * 16}`}
+              strokeDashoffset={`${2 * Math.PI * 16 * (1 - progress / 100)}`}
+              strokeLinecap="round"
+              style={{ transition: "stroke-dashoffset 0.8s ease" }}
+            />
+          </svg>
 
-        {/* ================= RIGHT COLUMN ================= */}
-        <div className="col-span-4 space-y-6">
-
-          {/* STATUS CARD */}
-          <div className="rounded-2xl bg-blue-600 p-6 text-white shadow-lg">
-            <p className="text-xs uppercase tracking-wide opacity-80 mb-2">
-              Upload Status
+          <div>
+            <p className="text-xl font-bold text-slate-900 leading-none">
+              {progress}%
             </p>
-
-            <h3 className="text-lg font-semibold mb-3">
-              Documents Required
-            </h3>
-
-            <p className="text-sm opacity-90 mb-4">
-              Please upload all required documents to avoid delays in
-              your planning review.
+            <p className="text-[10px] text-slate-400 mt-0.5">
+              Journey Progress
             </p>
-
-            <div className="rounded-xl bg-white/20 px-4 py-3 text-sm space-y-1">
-              <p className="font-semibold">
-                📄 {documents.filter(d => d.status === "uploaded").length} of{" "}
-                {documents.length} documents uploaded
-              </p>
-              <p className="opacity-90">
-                Our team will review your files once complete
-              </p>
-            </div>
-          </div>
-
-          {/* GUIDELINES */}
-          <div className="rounded-2xl border bg-white p-6 shadow-sm">
-            <h3 className="font-semibold text-slate-900 mb-3">
-              Upload Guidelines
-            </h3>
-            <ul className="text-sm text-slate-600 space-y-2">
-              <li>• Accepted formats: PDF, JPG, PNG</li>
-              <li>• Max file size: 10MB per file</li>
-              <li>• Ensure drawings are clear and readable</li>
-              <li>• You can replace files later if needed</li>
-            </ul>
           </div>
         </div>
       </div>
+
+      {/* ================= ROADMAP ================= */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
+
+  {/* ================= LEFT COLUMN ================= */}
+  <div className="lg:col-span-8 space-y-6">
+
+    <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
+      
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="font-semibold text-slate-800">
+          Project Stages
+        </h2>
+        <span className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+          STEP 6 OF 7
+        </span>
+      </div>
+
+      {/* Roadmap Container */}
+      <div className="overflow-x-auto">
+  <div className="flex items-center min-w-max pb-2 min-h-[100px]">
+
+
+          <RoadmapStep label="Profile" status="completed" icon={User} />
+          <RoadmapLine />
+
+          <RoadmapStep
+            label="Service & Initial Payment"
+            status="completed"
+            icon={Package}
+          />
+          <RoadmapLine />
+
+          <RoadmapStep
+            label="Eligibility Check"
+            status="completed"
+            icon={FileSearch}
+          />
+          <RoadmapLine />
+
+          <RoadmapStep
+            label="Consultant Schedule"
+            status="completed"
+            icon={Headset}
+          />
+          <RoadmapLine />
+
+          <RoadmapStep
+            label="Initial Quotation"
+            status="completed"
+            icon={FileText}
+          />
+          <RoadmapLine />
+
+          <RoadmapStep
+            label="Upload Documents"
+            status="active"
+            icon={FileText}
+          />
+          <RoadmapLine />
+
+          <RoadmapStep
+            label="Final Quotation"
+            icon={FileText}
+          />
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  {/* ================= RIGHT COLUMN ================= */}
+  <div className="lg:col-span-4 space-y-6">
+
+    <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-lg flex flex-col min-h-[200px]">
+
+      <h3 className="text-lg font-semibold mb-3">
+        Upload Supporting Documents
+      </h3>
+
+      <p className="text-sm opacity-90 leading-relaxed">
+        To proceed with your planning application, please upload your
+        existing and proposed drawings, site photographs, and any relevant
+        surveys. This allows your consultant to prepare the application
+        for council submission.
+      </p>
+
+    </div>
+  </div>
+
+</div>
+
+
+
+
+        <div className="grid grid-cols-12 gap-6 transition-all duration-500">
+
+          {/* LEFT — DOCUMENTS */}
+          <div className="col-span-8 space-y-4">
+            {documents.map(doc => (
+              <DocumentCard
+                key={doc.id}
+                doc={doc}
+                onUpload={() => handleUpload(doc.id)}
+              />
+            ))}
+          </div>
+
+          {/* RIGHT — STATUS */}
+          <div className="col-span-4 space-y-6">
+
+            <div className="rounded-2xl bg-blue-600 p-6 text-white shadow-lg">
+              <p className="text-xs uppercase tracking-wide opacity-80 mb-2">
+                Upload Status
+              </p>
+
+              <h3 className="text-lg font-semibold mb-3">
+                Documents Required
+              </h3>
+
+              <p className="text-sm opacity-90 mb-4">
+                Please upload all required documents to proceed.
+              </p>
+
+              <div className="rounded-xl bg-white/20 px-4 py-3 text-sm space-y-2">
+                <p className="font-semibold">
+                  📄 4 of {documents.length} uploaded
+                </p>
+
+                {!allUploaded && (
+                  <p className="text-yellow-200 text-sm">
+                   All documents uploaded
+                  </p>
+                )}
+
+                {allUploaded && (
+                  <p className="text-green-200 text-sm">
+                    All documents uploaded
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* <button
+              onClick={() => router.push("/dashboard-quotation1")}
+              className="w-full rounded-xl bg-green-600 text-white py-3 font-semibold
+              disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Continue 
+            </button> */}
+
+          </div>
+        </div>
+
+
     </main>
   )
 }
 
-/* ================= COMPONENTS ================= */
+/* ================= DOCUMENT CARD ================= */
 
 function DocumentCard({
   doc,
@@ -142,18 +320,21 @@ function DocumentCard({
 }) {
   return (
     <div className="rounded-2xl border bg-white p-6 shadow-sm flex items-center justify-between">
+
       <div className="flex items-start gap-4">
         <div
           className={`w-10 h-10 rounded-xl flex items-center justify-center
-            ${doc.status === "uploaded"
-              ? "bg-green-100 text-green-600"
-              : "bg-slate-100 text-slate-500"}
+            ${
+              doc.status === "uploaded"
+                ? "bg-green-100 text-green-600"
+                : "bg-green-100 text-green-600"
+            }
           `}
         >
           {doc.status === "uploaded" ? (
             <CheckCircle className="w-5 h-5" />
           ) : (
-            <FileText className="w-5 h-5" />
+            <CheckCircle className="w-5 h-5" />
           )}
         </div>
 
@@ -180,12 +361,61 @@ function DocumentCard({
             accept=".pdf,.jpg,.jpeg,.png"
             onChange={onUpload}
           />
-          <span className="rounded-xl border border-blue-600 text-blue-600 font-semibold px-4 py-2 text-sm hover:bg-blue-50 flex items-center gap-2">
-            <UploadCloud className="w-4 h-4" />
-            Upload
-          </span>
+          <span className="text-sm font-semibold text-green-600 flex items-center gap-1">
+          <CheckCircle className="w-4 h-4" />
+          Uploaded
+        </span>
         </label>
       )}
+
     </div>
   )
 }
+
+/* ================= ROADMAP ================= */
+
+function RoadmapStep({
+  label,
+  status,
+  icon: Icon,
+}: {
+  label: string
+  status?: "completed" | "active"
+  icon: React.ElementType
+}) {
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div
+        className={`w-10 h-10 rounded-full flex items-center justify-center duration-300
+        ${
+          status === "completed"
+            ? "bg-blue-600 text-white"
+            : status === "active"
+            ? "border-2 border-blue-600 text-blue-600 bg-white animate-pulse"
+            : "bg-slate-200 text-slate-500"
+        }`}
+      >
+        {status === "completed" ? (
+          <CheckCircle className="w-5 h-5" />
+        ) : (
+          <Icon className="w-5 h-5" />
+        )}
+      </div>
+
+      <span
+        className={`text-xs text-center ${
+          status ? "text-blue-600 font-medium" : "text-slate-400"
+        }`}
+      >
+        {label}
+      </span>
+    </div>
+  )
+}
+
+function RoadmapLine() {
+  return (
+    <div className="h-[2px] bg-slate-200 w-8 lg:flex-1 lg:w-auto" />
+  )
+}
+

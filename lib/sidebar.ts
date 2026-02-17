@@ -51,7 +51,7 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     icon: FiGrid,
     children: [
       { id: "all-projects", label: "Profile", href: "/profile-section" },
-      { id: "active-projects", label: "Orders & Invoices", href: "/projects/active" },
+      { id: "active-projects", label: "Orders & Invoices", href: "/order" },
       { id: "completed-projects", label: "Help Center", href: "/projects/completed" },
     ],
   },

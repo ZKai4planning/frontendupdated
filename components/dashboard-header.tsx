@@ -90,11 +90,29 @@
 // }
 "use client"
 
-import { Bell, ChevronDown, Folder } from "lucide-react"
+import { Bell, ChevronDown, Folder, ChevronLeft, ChevronRight } from "lucide-react"
 import Image from "next/image"
+import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 
-export default function DashboardHeader() {
+type Breadcrumb = {
+  label: string
+  href?: string
+}
+
+interface DashboardHeaderProps {
+  breadcrumbs: Breadcrumb[]
+  userName: string
+  collapsed: boolean
+  onToggle: () => void
+}
+
+export default function DashboardHeader({
+  breadcrumbs,
+  userName,
+  collapsed,
+  onToggle,
+}: DashboardHeaderProps) {
   const router = useRouter()
   const pathname = usePathname()
 
@@ -115,24 +133,38 @@ export default function DashboardHeader() {
     }
   }
 
-
   return (
-    <header className="w-full border-b bg-white h-18">
-      <div className="mx-auto max-w-8xl px-4">
+    <header className="w-full border-b bg-white h-18 sticky top-0 z-50">
+      <div className="mx-auto max-w-8xl px-6">
         <div className="flex h-16 items-center justify-between">
+
           {/* ================= LEFT ================= */}
-          <div className="flex items-center gap-10">
+          <div className="flex items-center gap-6">
+
+            {/* Sidebar Toggle */}
+            <button
+              onClick={onToggle}
+              className="p-2 rounded-md hover:bg-slate-100"
+              aria-label="Toggle Sidebar"
+            >
+              {collapsed ? (
+                <ChevronRight className="h-5 w-5" />
+              ) : (
+                <ChevronLeft className="h-5 w-5" />
+              )}
+            </button>
+
             {/* Logo */}
             {/* <div
               onClick={handleLogoClick}
               className="flex items-center gap-2 cursor-pointer select-none"
             >
-              <div className="h-14 w-14 rounded-md flex items-center justify-center overflow-hidden">
+              <div className="h-10 w-10 rounded-md flex items-center justify-center overflow-hidden">
                 <Image
                   src="/logo.png"
                   alt="PlanningAI Logo"
-                  width={48}
-                  height={48}
+                  width={40}
+                  height={40}
                   className="object-contain"
                   priority
                 />
@@ -142,10 +174,12 @@ export default function DashboardHeader() {
                 Ai4Planning
               </span>
             </div> */}
+
+           
           </div>
 
           {/* ================= RIGHT ================= */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
             {/* Project Selector */}
             <button className="flex items-center gap-2 rounded-xl border px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">
               <Folder className="h-4 w-4 text-blue-600" />
@@ -169,6 +203,7 @@ export default function DashboardHeader() {
               />
             </div>
           </div>
+
         </div>
       </div>
     </header>

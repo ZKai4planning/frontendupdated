@@ -56,8 +56,6 @@ const REQUIRED_DOCUMENTS: DocumentItem[] = [
 
 export default function UploadDocumentsDashboard() {
   const router = useRouter()
-  const [roadmap, setroadmap] = useState(false)
-  const [showDetailsForm, setShowDetailsForm] = useState(false)
 
   const [documents, setDocuments] =
     useState<DocumentItem[]>(REQUIRED_DOCUMENTS)
@@ -152,119 +150,96 @@ export default function UploadDocumentsDashboard() {
       </div>
 
       {/* ================= ROADMAP ================= */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 mb-8">
-        {/* LEFT — GREETING */}
-        <div className="grid grid-cols-12 gap-6">
-          {/* ================= LEFT COLUMN ================= */}
-          <div className="col-span-8 space-y-6">
-            {/* ===== Project Roadmap ===== */}
-            <div className="rounded-2xl border bg-white p-6 shadow-sm">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="font-semibold text-slate-800">
-                  Project Stages
-                </h2>
-                <span className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                  STEP 5 OF 7
-                </span>
-              </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
 
-              <div className="flex items-center justify-between">
-                <RoadmapStep
-                  label="Profile"
-                  status="completed"
-                  icon={User}
-                />
-                <RoadmapLine />
+  {/* ================= LEFT COLUMN ================= */}
+  <div className="lg:col-span-8 space-y-6">
 
-                <RoadmapStep
-                  label="Service & Intial Payment"
-                  status="completed"
-                  icon={Package}
-                />
-                <RoadmapLine />
-
-                <RoadmapStep
-                  label="Eligibility Check"
-                  status="completed"
-                  icon={FileSearch}
-                />
-                <RoadmapLine />
-
-                <RoadmapStep
-                  label="Consultant Shedule"
-                  status="completed"
-                  icon={Headset}
-                />
-                <RoadmapLine />
-
-                <RoadmapStep
-                  label="Waiting for the agent update"
-                  status="active"
-                  icon={FileText}
-                />
-                <RoadmapLine />
-
-                <RoadmapStep
-                  label="Review"
-                  icon={Camera}
-                />
-                <RoadmapLine />
-
-                <RoadmapStep
-                  label="Submit to council"
-                  icon={FileText}
-                />
-
-              </div>
-            </div>
-          </div>
-
-          {/* ================= RIGHT COLUMN ================= */}
-          <div className="col-span-4 space-y-6">
-            <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-lg">
-
-              <h3 className="text-lg font-semibold mb-2">
-                Upload Supporting Documents
-              </h3>
-
-              <p className="text-sm opacity-90 mb-4">
-                To proceed with your planning application, please upload your
-                existing and proposed drawings, site photographs, and any relevant
-                surveys. This allows your consultant to prepare the application
-                for council submission.
-              </p>
-
-              {/* REQUIRED DOCUMENT LIST */}
-              <div className="bg-blue-500/30 rounded-xl p-4 mb-5 text-sm space-y-2">
-                <p className="font-semibold">Recommended Documents:</p>
-                <ul className="list-disc list-inside space-y-1 opacity-95">
-                  <li>Existing floor plans</li>
-                  <li>Proposed floor plans</li>
-                  <li>Elevations (if available)</li>
-                  <li>Site photographs</li>
-                </ul>
-              </div>
-
-            </div>
-          </div>
-
-        </div>
+    <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
+      
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="font-semibold text-slate-800">
+          Project Stages
+        </h2>
+        <span className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+          STEP 6 OF 8
+        </span>
       </div>
 
-      {/* ================= TABLE ================= */}
-      <div className="mt-10 mb-6">
-        <Table
-          onView={() => {
-            setShowDetailsForm(true)
-            window.scrollTo({ top: 300, behavior: "smooth" })
-          }}
-          setroadmap={setroadmap}
-          showdetailsform={setShowDetailsForm}
-        />
+      {/* Roadmap Container */}
+      <div className="overflow-x-auto">
+        <div className="flex items-center justify-between overflow-x-auto pb-2 min-h-[100px]">
+                
+                              <RoadmapStep label="Profile" status="completed" icon={User} />
+                              <RoadmapLine />
+                
+                              <RoadmapStep
+                                label="Service & Initial Payment"
+                                status="completed"
+                                icon={Package}
+                              />
+                              <RoadmapLine />
+                
+                              <RoadmapStep label="Eligibility Check" status="completed" icon={FileSearch} />
+                              <RoadmapLine />
+                
+                              <RoadmapStep label="Consultant Schedule" status="completed" icon={Headset} />
+                              <RoadmapLine />
+                
+                              <RoadmapStep
+                                label="Initial Quotation"
+                                status="completed"
+                                icon={FileText}
+                              />
+                              <RoadmapLine />
+                
+                              <RoadmapStep
+                                label="Upload Documents"
+                                status="active"
+                                icon={FileText}
+                              /><RoadmapLine />
+        
+                              <RoadmapStep
+                                label="Final Quotation"
+                                icon={FileText}
+                              />
+                              <RoadmapLine />
+                
+                              <RoadmapStep
+                                label="Review"
+                                icon={FileText}
+                              />
+                              
+                            </div>
       </div>
 
-      {/* ================= UPLOAD SECTION ================= */}
-      {showDetailsForm && (
+    </div>
+  </div>
+
+  {/* ================= RIGHT COLUMN ================= */}
+  <div className="lg:col-span-4 space-y-6">
+
+    <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-lg flex flex-col min-h-[200px]">
+
+      <h3 className="text-lg font-semibold mb-3">
+        Upload Supporting Documents
+      </h3>
+
+      <p className="text-sm opacity-90 leading-relaxed">
+        To proceed with your planning application, please upload your
+        existing and proposed drawings, site photographs, and any relevant
+        surveys. This allows your consultant to prepare the application
+        for council submission.
+      </p>
+
+    </div>
+  </div>
+
+</div>
+
+
+
+
         <div className="grid grid-cols-12 gap-6 transition-all duration-500">
 
           {/* LEFT — DOCUMENTS */}
@@ -314,16 +289,16 @@ export default function UploadDocumentsDashboard() {
             </div>
 
             <button
-              onClick={() => router.push("/dashboard-review")}
+              onClick={() => router.push("/dashboard-finalquotation")}
               className="w-full rounded-xl bg-green-600 text-white py-3 font-semibold
               disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              Continue to Review →
+              Continue 
             </button>
 
           </div>
         </div>
-      )}
+
 
     </main>
   )
@@ -397,41 +372,51 @@ function RoadmapStep({
   label,
   status,
   icon: Icon,
+  onClick,
 }: {
   label: string
   status?: "completed" | "active"
   icon: React.ElementType
+  onClick?: () => void
 }) {
   return (
-    <div className="flex flex-col items-center gap-2">
-      <div
-        className={`w-10 h-10 rounded-full flex items-center justify-center
-        ${
-          status === "completed"
-            ? "bg-blue-600 text-white"
-            : status === "active"
-            ? "border-2 border-blue-600 text-blue-600 bg-white"
-            : "bg-slate-200 text-slate-500"
-        }`}
-      >
-        {status === "completed" ? (
-          <CheckCircle className="w-5 h-5" />
-        ) : (
-          <Icon className="w-5 h-5" />
-        )}
-      </div>
-
-      <span
-        className={`text-xs text-center ${
-          status ? "text-blue-600 font-medium" : "text-slate-400"
-        }`}
-      >
-        {label}
-      </span>
-    </div>
+    <div
+          onClick={onClick}
+          className="flex flex-col items-center gap-2 cursor-pointer group"
+        >
+          <div
+            className={`
+              w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200
+              ${
+                status === "completed"
+                  ? "bg-blue-600 text-white"
+                  : status === "active"
+                  ? "border-2 border-blue-600 text-blue-600 bg-white animate-pulse"
+                  : "bg-slate-200 text-slate-500"
+              }
+            `}
+          >
+            {status === "completed" ? (
+              <CheckCircle className="w-5 h-5" />
+            ) : (
+              <Icon className="w-5 h-5" />
+            )}
+          </div>
+    
+           <span
+            className={`text-xs text-center ${
+              status ? "text-blue-600 font-medium" : "text-slate-400"
+            }`}
+          >
+            {label}
+          </span>
+        </div>
   )
 }
 
 function RoadmapLine() {
-  return <div className="flex-1 h-[2px] bg-slate-200 mx-2" />
+  return (
+    <div className="h-[2px] bg-slate-200 w-8 lg:flex-1 lg:w-auto" />
+  )
 }
+

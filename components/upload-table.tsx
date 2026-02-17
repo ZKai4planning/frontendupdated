@@ -55,8 +55,8 @@ export default function Table({
             <tr className="hover:bg-slate-50">
               <td className="border-b px-4 py-3">1</td>
               <td className="border-b px-4 py-3">01-01-2022</td>
-              <td className="border-b px-4 py-3">
-                <span
+              <td className="border-b px-4 py-3 text-blue-600">
+                {/* <span
 
                   className="text-blue-600 hover:underline font-medium cursor-pointer"
                   onClick={() => {
@@ -68,7 +68,8 @@ export default function Table({
                 >
                   Residential- Homeowners 
                   & landlords 
-                </span>
+                </span> */}
+                Homeowners & landlords 
               </td>
               <td className="border-b px-4 py-3 text-blue-600">House Holder planning consent</td>
               <td className="border-b px-4 py-3">HSPC000-07</td>

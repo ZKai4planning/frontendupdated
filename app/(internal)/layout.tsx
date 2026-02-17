@@ -31,13 +31,13 @@ export default function DashboardLayout({
  
  
         <DashboardHeader
-          // collapsed={collapsed}
-          // onToggle={() => setCollapsed(p => !p)}
-          // userName="Vardhan"
-          // breadcrumbs={[
-          //   { label: "Dashboard", href: "/dashboard" },
-          //   { label: "Customers" },
-          // ]}
+          collapsed={collapsed}
+          onToggle={() => setCollapsed(p => !p)}
+          userName="Vardhan"
+          breadcrumbs={[
+            { label: "Dashboard", href: "/dashboard" },
+            { label: "Customers" },
+          ]}
         />
 
  

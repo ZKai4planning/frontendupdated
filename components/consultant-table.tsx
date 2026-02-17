@@ -50,7 +50,7 @@ export default function Table({
                 Homeowners, Landlords
               </td>
 
-              <td className="border-b px-4 py-3">
+              <td className="border-b px-4 py-3 text-blue-600">
                 Householder Planning Consent
               </td>
 
