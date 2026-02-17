@@ -296,7 +296,7 @@ export default function EligibilityCheckPage() {
                       window.scrollTo({ top: 0, behavior: "smooth" })
                     }, 3000)
                   }}
-                  className="rounded-xl bg-green-600 text-white px-5 py-2 text-sm font-semibold"
+                  className="rounded-xl bg-green-600 text-white px-5 py-2 text-sm font-semibold cursor-pointer"
                 >
                   Submit
                 </button>
@@ -492,7 +492,7 @@ function VerificationCalendar() {
           disabled={!selectedDate || !selectedSlot}
           onClick={() => router.push("/dashboard-consultant")}
           className="w-full rounded-xl bg-blue-600 text-white py-2.5 font-semibold
-          disabled:opacity-40 disabled:cursor-not-allowed"
+           cursor-pointer"
         >
           Confirm Consultation Booking
         </button>

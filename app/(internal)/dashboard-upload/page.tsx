@@ -291,7 +291,7 @@ export default function UploadDocumentsDashboard() {
             <button
               onClick={() => router.push("/dashboard-finalquotation")}
               className="w-full rounded-xl bg-green-600 text-white py-3 font-semibold
-              disabled:opacity-40 disabled:cursor-not-allowed"
+              disabled:opacity-40 cursor-pointer"
             >
               Continue 
             </button>

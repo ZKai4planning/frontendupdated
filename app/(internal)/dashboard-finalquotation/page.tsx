@@ -238,7 +238,7 @@ export default function EligibilityCheckPage() {
 
               <button
                 onClick={() => router.push("/dashboard-upload")}
-                className="rounded-xl bg-green-600 text-white px-4 py-2 text-sm font-semibold"
+                className="rounded-xl bg-green-600 text-white px-4 py-2 text-sm font-semibold cursor-pointer"
               >
                 Yes, Continue
               </button>
@@ -373,7 +373,7 @@ export default function EligibilityCheckPage() {
     {/* Submit Button */}
     <button
       onClick={() => router.push("dashboard-review")}
-      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold transition"
+      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold transition cursor-pointer"
     >
       Submit
     </button>

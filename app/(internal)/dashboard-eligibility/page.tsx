@@ -927,7 +927,7 @@ const handleFieldChange = (
               <button
                 disabled={step === 1}
                 onClick={prevStep}
-                className="rounded-xl border px-5 py-2 text-sm disabled:opacity-40"
+                className="rounded-xl border px-5 py-2 text-sm disabled:opacity-40 cursor-pointer"
               >
                 Back
               </button>
@@ -935,7 +935,7 @@ const handleFieldChange = (
               {step < 3 ? (
                 <button
                   onClick={nextStep}
-                  className="rounded-xl bg-blue-600 text-white px-5 py-2 text-sm font-semibold"
+                  className="rounded-xl bg-blue-600 text-white px-5 py-2 text-sm font-semibold cursor-pointer"
                 >
                   Next Step →
                 </button>
@@ -958,7 +958,7 @@ const handleFieldChange = (
       window.scrollTo({ top: 0, behavior: "smooth" })
     }, 4500)
   }}
-  className="rounded-xl bg-green-600 text-white px-5 py-2 text-sm font-semibold"
+  className="rounded-xl bg-green-600 text-white px-5 py-2 text-sm font-semibold cursor-pointer"
 >
   Submit
 </button>
@@ -1201,7 +1201,7 @@ function VerificationCalendar() {
           disabled={!selectedDate || !selectedSlot}
           onClick={() => router.push("/dashboard-consultant")}
           className="w-full rounded-xl bg-blue-600 text-white py-2.5 font-semibold
-          disabled:opacity-40 disabled:cursor-not-allowed"
+          disabled:opacity-40 cursor-pointer"
         >
           Confirm Consultation Booking
         </button>

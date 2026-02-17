@@ -99,38 +99,41 @@ export default function ConsultantSchedulePage() {
             <div className="flex items-center overflow-x-auto pb-2 min-h-[120px]">
 
               {PROJECT_FLOW.map((stepItem, index) => {
+  let status: "completed" | "active" | "upcoming" | undefined
 
-                const status =
-                  index < currentProjectStep
-                    ? "completed"
-                    : index === currentProjectStep
-                    ? "active"
-                    : undefined
+  if (index < currentProjectStep) {
+    status = "completed"
+  } else if (index === currentProjectStep) {
+    status = "active"
+  } else if (index === currentProjectStep + 1) {
+    status = "upcoming"
+  } else {
+    status = undefined
+  }
 
-                return (
-                  <div key={stepItem.route} className="flex items-center">
+  return (
+    <div key={stepItem.route} className="flex items-center">
+      <RoadmapStep
+        label={stepItem.label}
+        icon={stepItem.icon}
+        status={status}
+        onClick={() => {
+          if (
+            index <= currentProjectStep &&
+            stepItem.route !== "#"
+          ) {
+            router.push(`/${stepItem.route}`)
+          }
+        }}
+      />
 
-                    <RoadmapStep
-                      label={stepItem.label}
-                      icon={stepItem.icon}
-                      status={status}
-                      onClick={() => {
-                        if (
-                          index <= currentProjectStep &&
-                          stepItem.route !== "#"
-                        ) {
-                          router.push(`/${stepItem.route}`)
-                        }
-                      }}
-                    />
+      {index !== PROJECT_FLOW.length - 1 && (
+        <RoadmapLine />
+      )}
+    </div>
+  )
+})}
 
-                    {index !== PROJECT_FLOW.length - 1 && (
-                      <RoadmapLine />
-                    )}
-
-                  </div>
-                )
-              })}
 
             </div>
           </div>
@@ -155,7 +158,7 @@ export default function ConsultantSchedulePage() {
               <button
                 onClick={() => router.push("/dashboard-initialquotation")} 
                 className="w-full rounded-xl bg-white text-blue-600 font-semibold py-3
-                   hover:bg-blue-50 active:scale-[0.98] transition"
+                   hover:bg-blue-50 active:scale-[0.98] transition cursor-pointer"
               >
                 Next Step →
               </button>
@@ -200,7 +203,7 @@ function RoadmapStep({
   onClick,
 }: {
   label: string
-  status?: "completed" | "active"
+  status?: "completed" | "active" | "upcoming"
   icon: React.ElementType
   onClick?: () => void
 }) {
@@ -216,7 +219,9 @@ function RoadmapStep({
             ? "bg-blue-600 text-white"
             : status === "active"
             ? "border-2 border-blue-600 text-blue-600 bg-white animate-pulse"
-            : "bg-slate-200 text-slate-500"
+            : status === "upcoming"
+            ? "bg-white-100 text-blue-600 border border-blue-600 animate-bounce"
+            : "bg-slate-200 text-slate-400"
         }`}
       >
         {status === "completed" ? (
@@ -228,7 +233,13 @@ function RoadmapStep({
 
       <span
         className={`text-xs text-center ${
-          status ? "text-blue-600 font-medium" : "text-slate-400"
+          status === "completed"
+            ? "text-blue-600 font-medium"
+            : status === "active"
+            ? "text-blue-600 font-semibold"
+            : status === "upcoming"
+            ? "text-blue-600 font-medium"
+            : "text-slate-400"
         }`}
       >
         {label}
@@ -236,6 +247,7 @@ function RoadmapStep({
     </div>
   )
 }
+
 
 function RoadmapLine() {
   return <div className="h-[2px] bg-slate-200 mx-6 min-w-[45px] flex-1" />
