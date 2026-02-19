@@ -28,28 +28,28 @@ interface DocumentItem {
 const REQUIRED_DOCUMENTS: DocumentItem[] = [
   {
     id: "site-plan",
-    title: "Existing Site Plan",
-    description: "Scaled site plan showing current property layout.",
+    title: "Site Plan",
+    description: "Scaled location/site plan with boundaries.",
     status: "pending",
   },
   {
     id: "proposed-drawings",
-    title: "Proposed Drawings",
-    description: "Architectural drawings for the proposed extension.",
+    title: "Application Form",
+    description: "Completed planning application form.",
     status: "pending",
   },
-  {
-    id: "ownership-proof",
-    title: "Proof of Ownership",
-    description: "Land registry title or ownership confirmation.",
-    status: "pending",
-  },
-  {
-    id: "photos",
-    title: "Property Photographs",
-    description: "Clear photos of the property and surrounding context.",
-    status: "pending",
-  },
+  // {
+  //   id: "ownership-proof",
+  //   title: "Proof of Ownership",
+  //   description: "Land registry title or ownership confirmation.",
+  //   status: "pending",
+  // },
+  // {
+  //   id: "photos",
+  //   title: "Property Photographs",
+  //   description: "Clear photos of the property and surrounding context.",
+  //   status: "pending",
+  // },
 ]
 
 /* ================= PAGE ================= */

@@ -329,8 +329,8 @@
   transition: all 0.6s ease;
   display: block;
   object-fit: cover;
-  height: 400px;
-  width: 300px;
+  height: 350px;
+  width: 250px;
   cursor: pointer;
   /* Safari-specific optimizations */
   -webkit-backface-visibility: hidden;

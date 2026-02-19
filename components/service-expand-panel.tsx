@@ -1062,7 +1062,7 @@ const handleFormSubmit = () => {
 
 
 
-                      <div className="mt-6 flex items-center justify-center gap-4 rounded-2xl  px-4 py-3">
+                      <div className="mt-6 flex items-center justify-center gap-4 rounded-2xl  px-4 py-3 mb-8">
                  
                         <button
                           type="button"
@@ -1073,11 +1073,7 @@ const handleFormSubmit = () => {
                           Apply for this Service
                         </button>
                       </div>
-                    </div>
-                  </div>
-                  </div>
-
-                  <div className="mt-auto flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-gradient-to-r from-white/10 via-white/5 to-transparent px-5 py-4">
+                      <div className="mt-auto flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-gradient-to-r from-white/10 via-white/5 to-transparent px-2 py-4">
                     <div className="flex items-center gap-3">
                       <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/20 text-blue-300">
                         <span className="material-symbols-outlined text-xl">
@@ -1086,11 +1082,11 @@ const handleFormSubmit = () => {
                       </span>
                       <div>
                         <p className="text-sm font-semibold text-white">
-                          Not sure where to start?
+                          Talk to an expert?
                         </p>
-                        <p className="text-xs text-white/60">
+                        {/* <p className="text-xs text-white/60">
                           Get personalised guidance for your unique project.
-                        </p>
+                        </p> */}
                       </div>
                     </div>
                     <button
@@ -1101,6 +1097,11 @@ const handleFormSubmit = () => {
                       I need help
                     </button>
                   </div>
+                    </div>
+                  </div>
+                  </div>
+
+                  
                 </>
               ) : (
                 <>

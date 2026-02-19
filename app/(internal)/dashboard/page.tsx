@@ -114,7 +114,7 @@ export default function DashboardPage() {
               <button
                 onClick={() => router.push("/services")}
                 className="w-full rounded-xl bg-white text-blue-600 font-semibold py-3
-                           hover:bg-blue-50 active:scale-[0.98] transition"
+                           hover:bg-blue-50 active:scale-[0.98] transition cursor-pointer"
               >
                 Choose Your Service
               </button>

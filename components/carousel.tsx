@@ -131,7 +131,7 @@ const Carousel: React.FC = () => {
     const diff = i - currentIndex;
     const dragOffset = isDragging ? dragDistance * 0.3 : 0;
 
-    return `${base} translateX(${diff * 260 + dragOffset}px) scale(${
+    return `${base} translateX(${diff * 150 + dragOffset}px) scale(${
       diff === 0 ? 1 : 0.85
     }) rotateY(${diff * -25}deg)`;
   };
@@ -197,7 +197,9 @@ const Carousel: React.FC = () => {
                 height={420}
                 className={styles.image}
               />
-              <div className={styles.imageText}>{texts[i]}</div>
+              {position === 0 && (
+                <div className={styles.imageText}>{texts[i]}</div>
+              )}
             </Link>
           );
         })}
