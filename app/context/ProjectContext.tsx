@@ -27,7 +27,8 @@ export type ProjectData = {
   /* ✅ UPDATED ELIGIBILITY TYPE */
   eligibility?: {
     /* 🔹 Dynamic form storage (used by Eligibility page) */
-    formData?: Record<string, string>
+    formData?: Record<string, string | string[]>
+    aiFilled?: Record<string, boolean>
 
     /* 🔹 Structured fields (future use / admin / backend) */
     propertyDetails?: {
@@ -81,17 +82,17 @@ export function ProjectProvider({
 }) {
   const [data, setData] = useState<ProjectData>({})
 
-  /* Load from localStorage */
+  /* Load from sessionStorage */
   useEffect(() => {
-    const saved = localStorage.getItem("project-data")
+    const saved = sessionStorage.getItem("project-data")
     if (saved) {
       setData(JSON.parse(saved))
     }
   }, [])
 
-  /* Save to localStorage */
+  /* Save to sessionStorage */
   useEffect(() => {
-    localStorage.setItem("project-data", JSON.stringify(data))
+    sessionStorage.setItem("project-data", JSON.stringify(data))
   }, [data])
 
   const updateSection = (
@@ -109,7 +110,7 @@ export function ProjectProvider({
 
   const resetProject = () => {
     setData({})
-    localStorage.removeItem("project-data")
+    sessionStorage.removeItem("project-data")
   }
 
   return (
