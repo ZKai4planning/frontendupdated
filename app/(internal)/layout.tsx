@@ -7,6 +7,7 @@ import GetStarted from "../../components/onGetStarted"
 import HelpWidget from "../../components/helpwidget"
 import { DashboardFooter } from "../../components/dashboard-footer"
 import { FiX } from "react-icons/fi"
+
  
 export default function DashboardLayout({
   children,

@@ -25,7 +25,7 @@ const WhatsAppButton = () => {
       "
       style={{
         cursor: "pointer",
-        right: "max(16px, calc((100vw - 1740px) / 2 + 16px))",
+        right: "max(16px, calc((100vw - 1740px) / 5 + 2px))",
       }}
     >
       {/* WhatsApp SVG Icon */}

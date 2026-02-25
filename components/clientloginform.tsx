@@ -64,6 +64,12 @@ export function ClientLogin() {
       return
     }
 
+     if (otpCode === "345678") {
+      toast.success("OTP verified — welcome back")
+      router.push("/profile1")
+      return
+    }
+
     toast.error("Invalid OTP")
   }
 
