@@ -370,7 +370,7 @@
 
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { Suspense, useEffect, useRef, useState } from "react"
 import { motion } from "framer-motion"
 
 import ServiceExpandPanel from "@/components/service-expand-panel"
@@ -383,6 +383,7 @@ import { OurTeams } from "@/components/ourteams"
 import WhatsAppButton from "@/components/whatsppp-button"
 import { CookieConsent } from "@/components/cookie-consent"
 import { header } from "framer-motion/client"
+import PricingCards from "@/components/pricingcards"
 /* ================= TYPES ================= */
 
 export interface Service {
@@ -951,6 +952,19 @@ export default function Home() {
 
       {/* <QuickAccessHub />
       <PlanningExpertSection /> */}
+      <section className="bg-[#050B18] text-white py-16">
+        <div className="text-center mb-12">
+          <h2 className="text-3xl sm:text-5xl lg:text-7xl font-bold mb-4">
+            Our Plans
+          </h2>
+          <p className="text-white/60 text-xl">
+            Choose the plan that’s right for you and get started today.
+          </p>
+        </div>
+        <Suspense fallback={<div className="p-10 text-center">Loading...</div>}>
+      <PricingCards />
+      </Suspense>
+      </section>
       <OurTeams />
       <PremiumTestimonials /> 
       <WhatsAppButton />

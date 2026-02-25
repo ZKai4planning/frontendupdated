@@ -54,21 +54,21 @@ export function CookieConsent() {
   const [isVisible, setIsVisible] = useState(false);
   useEffect(() => {
     // Check if the user has already accepted or managed the cookie consent
-    const hasConsented = localStorage.getItem("cookieConsent")
+    const hasConsented = sessionStorage.getItem("cookieConsent")
     if (!hasConsented) {
       setIsVisible(true)
     }
   }, [])
   const handleAccept = () => {
-    // Set the flag in localStorage and hide the consent popup
-    localStorage.setItem("cookieConsent", "true")
+    // Set the flag in sessionStorage and hide the consent popup
+    sessionStorage.setItem("cookieConsent", "true")
     setIsVisible(false)
   }
  
   const handleManageCookies = () => {
     // Optionally, you can handle "Manage Cookies" differently, e.g., redirect to a settings page
     // For now, we'll treat it the same as "Accept" to hide the popup
-    localStorage.setItem("cookieConsent", "true")
+    sessionStorage.setItem("cookieConsent", "true")
     setIsVisible(false)
   }
   if (!isVisible) return null;
