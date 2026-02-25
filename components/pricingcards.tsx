@@ -1,6 +1,6 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { Check, MessageCircle } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -125,15 +125,18 @@ export default function PricingCards() {
   return (
     <div className="w-full py-12 px-4">
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {plans.map((plan) => (
-          <Card
-            key={plan.name}
-            className={`relative rounded-2xl border transition-all duration-300 shadow-sm hover:shadow-lg ${
-              plan.highlighted
-                ? "bg-zinc-900 text-white border-zinc-800 scale-105"
-                : "bg-white"
-            }`}
-          >
+        {plans.map((plan) => {
+          const isBronze = plan.name === "Bronze";
+          const isDisabled = !isBronze;
+          return (
+            <Card
+              key={plan.name}
+              className={`relative rounded-2xl border transition-all duration-300 shadow-sm ${
+                isBronze
+                  ? "bg-[#0B1224] text-white border-blue-500/40 shadow-blue-500/20"
+                  : "bg-[#0B1224]/60 text-white/60 border-white/10"
+              }`}
+            >
             {plan.badge && (
              
                 <div className="absolute top-4 right-4 bg-zinc-800 text-white text-xs px-2 py-1 rounded-full">
@@ -147,7 +150,7 @@ export default function PricingCards() {
               </CardTitle>
               <p
                 className={`text-sm ${
-                  plan.highlighted ? "text-zinc-400" : "text-muted-foreground"
+                  isBronze ? "text-zinc-400" : "text-white/50"
                 }`}
               >
                 {plan.description}
@@ -162,12 +165,14 @@ export default function PricingCards() {
 
               <Button
                 className={`mt-4 w-full rounded-xl ${
-                  plan.highlighted
+                  isBronze
                     ? "bg-white text-black hover:bg-gray-200"
-                    : ""
+                    : "bg-white/20 text-white/60"
                 }`}
-                variant={plan.highlighted ? "secondary" : "default"}
+                variant={isBronze ? "secondary" : "default"}
+                disabled={isDisabled}
                 onClick={() => {
+                  if (isDisabled) return;
                   setSelectedPlan(plan);
                   setShowSuccess(false);
                 }}
@@ -176,22 +181,32 @@ export default function PricingCards() {
               </Button>
             </CardHeader>
 
-            <CardContent>
+            <CardContent className="flex flex-col h-full">
               <ul className="space-y-3 text-sm">
                 {plan.features.map((feature, i) => (
                   <li key={i} className="flex items-start gap-2">
-                    <Check className="w-4 h-4 mt-0.5 text-green-500" />
+                    <Check
+                      className={`w-4 h-4 mt-0.5 ${
+                        isBronze ? "text-green-400" : "text-white/40"
+                      }`}
+                    />
                     <span>{feature}</span>
                   </li>
                 ))}
               </ul>
 
-           <Link href="https://api.whatsapp.com/send/?phone=8500443532&text=Hello%21+I+have+a+query.&type=phone_number&app_absent=0" className="block mt-6 text-xs opacity-60 hover:opacity-100 transition-opacity">
-              <p className="text-xs mt-6 opacity-60">Have a Question? Connect with us</p>
-            </Link>
+              <Link
+                href="https://api.whatsapp.com/send/?phone=+44776862279
+ &text=Hello%21+I+have+a+query.&type=phone_number&app_absent=0"
+                className="mt-auto pt-6 text-xs opacity-80 hover:opacity-100 transition-opacity flex items-center gap-2"
+              >
+                <MessageCircle className="w-4 h-4 text-green-400" />
+                <span>Have a Question?   Connect with us</span>
+              </Link>
             </CardContent>
           </Card>
-        ))}
+          );
+        })}
       </div>
 
       {selectedPlan && !showSuccess && (

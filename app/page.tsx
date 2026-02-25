@@ -383,7 +383,7 @@ import { OurTeams } from "@/components/ourteams"
 import WhatsAppButton from "@/components/whatsppp-button"
 import { CookieConsent } from "@/components/cookie-consent"
 import { header } from "framer-motion/client"
-import PricingCards from "@/components/pricingcards"
+import PricingCardsLanding from "@/components/pricingcards-landing"
 /* ================= TYPES ================= */
 
 export interface Service {
@@ -962,8 +962,8 @@ export default function Home() {
           </p>
         </div>
         <Suspense fallback={<div className="p-10 text-center">Loading...</div>}>
-      <PricingCards />
-      </Suspense>
+          <PricingCardsLanding />
+        </Suspense>
       </section>
       <OurTeams />
       <PremiumTestimonials /> 
