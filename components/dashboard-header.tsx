@@ -90,10 +90,11 @@
 // }
 "use client"
 
-import { Bell, ChevronDown, Folder, ChevronLeft, ChevronRight } from "lucide-react"
+import { Bell, ChevronDown, Folder, ChevronLeft, ChevronRight, FileText, LogOut, User } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
+import { useEffect, useRef, useState } from "react"
 
 type Breadcrumb = {
   label: string
@@ -115,6 +116,26 @@ export default function DashboardHeader({
 }: DashboardHeaderProps) {
   const router = useRouter()
   const pathname = usePathname()
+  const [isProfileOpen, setIsProfileOpen] = useState(false)
+  const profileRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    setIsProfileOpen(false)
+  }, [pathname])
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!profileRef.current) return
+      if (!profileRef.current.contains(event.target as Node)) {
+        setIsProfileOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [])
 
   const handleLogoClick = () => {
     if (pathname === "/services") {
@@ -194,13 +215,71 @@ export default function DashboardHeader({
             </button>
 
             {/* Avatar */}
-            <div className="relative h-9 w-9 overflow-hidden rounded-full border-2 border-blue-600">
-              <Image
-                src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=200&auto=format&fit=crop"
-                alt="User Avatar"
-                fill
-                className="object-cover"
-              />
+            <div className="relative" ref={profileRef}>
+              <button
+                type="button"
+                onClick={() => setIsProfileOpen((prev) => !prev)}
+                className="relative h-9 w-9 overflow-hidden rounded-full border-2 border-blue-600"
+                aria-haspopup="menu"
+                aria-expanded={isProfileOpen}
+                aria-label="Open profile menu"
+              >
+                <Image
+                  src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=200&auto=format&fit=crop"
+                  alt="User Avatar"
+                  fill
+                  className="object-cover"
+                />
+              </button>
+
+              {isProfileOpen && (
+                <div
+                  role="menu"
+                  className="absolute right-0 mt-3 w-56 rounded-xl border border-slate-200 bg-white shadow-lg"
+                >
+                  <div className="px-4 py-3 border-b border-slate-100">
+                    <p className="text-sm font-semibold text-slate-900">
+                      {userName}
+                    </p>
+                    <p className="text-xs text-slate-500 truncate">
+                      zaferkhan@ai4planning.com
+                    </p>
+                  </div>
+
+                  <div className="py-2">
+                    <Link
+                      role="menuitem"
+                      href="/profile-section"
+                      onClick={() => setIsProfileOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      <User className="h-4 w-4 text-slate-500" />
+                      Profile
+                    </Link>
+                    <Link
+                      role="menuitem"
+                      href="/order"
+                      onClick={() => setIsProfileOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      <FileText className="h-4 w-4 text-slate-500" />
+                      Orders & Invoices
+                    </Link>
+                  </div>
+
+                  <div className="border-t border-slate-100 py-2">
+                    <Link
+                      role="menuitem"
+                      href="/"
+                      onClick={() => setIsProfileOpen(false)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                    >
+                      <LogOut className="h-4 w-4 text-red-500" />
+                      Logout
+                    </Link>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

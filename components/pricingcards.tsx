@@ -15,7 +15,7 @@ const plans = [
     description: "Essential",
     button: "Get Started",
     highlighted: false,
-    credits: 50,
+    credits:10,
     features: [
       "~30% Self-Service",
       "Basic AI guidance",
@@ -39,7 +39,7 @@ const plans = [
       "Structured document support",
       "Active Agent guidance",
       "Chat / scheduled consultation",
-      "Faster response",
+      "Higher Response Time",
 
     ],
   },
@@ -54,7 +54,7 @@ const plans = [
     credits: 250,
     features: [
        "~60–70% Self-Service",
-      "Full AI toolkit",
+      "Higher level of AI Tool kit",
       "Advanced document generation",
       "Priority Agent consultation (1–2 sessions)",
       "Comprehensive review & coordination",
@@ -71,7 +71,7 @@ const plans = [
     credits: 500,
     features: [
       "10–20% Self-Service (minimal effort required)",
-      "All AI features + priority future automations",
+      "Most Advances AI features",
       "Dedicated Agent throughout the process",
       "Agent manages communication & coordination",
       "Milestone approvals & final documentation handled",
@@ -196,7 +196,7 @@ export default function PricingCards() {
               </ul>
 
               <Link
-                href="https://api.whatsapp.com/send/?phone=+44776862279
+                href="https://api.whatsapp.com/send/?phone=+447777788885
  &text=Hello%21+I+have+a+query.&type=phone_number&app_absent=0"
                 className="mt-auto pt-6 text-xs opacity-80 hover:opacity-100 transition-opacity flex items-center gap-2"
               >

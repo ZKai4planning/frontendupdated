@@ -1872,7 +1872,9 @@ function SelectField({
   const remainingChecks = Math.max(effectiveTotalChecks - effectiveUsedChecks, 0)
   const hasCredits = remainingChecks > 0
   const isYesNoField = options.includes("Yes") && options.includes("No")
-  const showAICheck = showZynopsis && isYesNoField
+  const aiDismissed = Boolean(data.eligibility?.aiDismissed?.[label])
+  const showAiTrigger = showZynopsis && isYesNoField
+  const showAICheck = showAiTrigger && !aiDismissed
 
   const handleApplyResults = (result: AICheckResult) => {
     const mappedValue = mapAICheckToFieldValue(label, result)
@@ -1900,6 +1902,7 @@ function SelectField({
         onChange={e =>
           updateSection("eligibility", {
             formData: { ...(data.eligibility?.formData || {}), [label]: e.target.value },
+            aiDismissed: { ...(data.eligibility?.aiDismissed || {}), [label]: false },
           })
         }
         className="mt-1 w-full rounded-xl border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 transition-shadow"
@@ -1907,14 +1910,18 @@ function SelectField({
         <option value="">Select…</option>
         {options.map(o => <option key={o}>{o}</option>)}
       </select>
-      {!hasPlan && showAICheck && <ChoosePlanCta label={label} />}
-      {hasPlan && !hasCredits && showAICheck && <UpgradePlanCta label={label} />}
+      {!hasPlan && showAiTrigger && <ChoosePlanCta label={label} />}
+      {hasPlan && !hasCredits && showAiTrigger && <UpgradePlanCta label={label} />}
       {hasPlan && hasCredits && showAICheck && (
         <AICheck
           isUnsure={showZynopsis}
           fieldLabel={label}
           onApply={handleApplyResults}
-          onSkip={() => {}}
+          onSkip={() =>
+            updateSection("eligibility", {
+              aiDismissed: { ...(data.eligibility?.aiDismissed || {}), [label]: true },
+            })
+          }
           planType={effectivePlan ?? "bronze"}
           usedChecks={effectiveUsedChecks}
           totalChecks={effectiveTotalChecks}
@@ -1957,6 +1964,8 @@ function RadioGroupField({
   const remainingChecks = Math.max(effectiveTotalChecks - effectiveUsedChecks, 0)
   const hasCredits = remainingChecks > 0
   const aiFilled = Boolean(data.eligibility?.aiFilled?.[label])
+  const aiDismissed = Boolean(data.eligibility?.aiDismissed?.[label])
+  const showAICheck = showZynopsis && !aiDismissed
 
   const handleApplyResults = (result: AICheckResult) => {
     const mappedValue = mapAICheckToFieldValue(label, result)
@@ -2012,6 +2021,7 @@ function RadioGroupField({
               updateSection("eligibility", {
                 ...(data.eligibility || {}),
                 formData: { ...(data.eligibility?.formData || {}), [label]: o },
+                aiDismissed: { ...(data.eligibility?.aiDismissed || {}), [label]: false },
               })
             }
             className={`flex-1 min-w-fit rounded-xl border px-4 py-2 text-sm transition-all ${
@@ -2027,12 +2037,16 @@ function RadioGroupField({
 
       {!hasPlan && showZynopsis && <ChoosePlanCta label={label} />}
       {hasPlan && !hasCredits && showZynopsis && <UpgradePlanCta label={label} />}
-      {hasPlan && hasCredits && (
+      {hasPlan && hasCredits && showAICheck && (
         <AICheck
           isUnsure={showZynopsis}
           fieldLabel={label}
           onApply={handleApplyResults}
-          onSkip={() => {}}
+          onSkip={() =>
+            updateSection("eligibility", {
+              aiDismissed: { ...(data.eligibility?.aiDismissed || {}), [label]: true },
+            })
+          }
           planType={effectivePlan ?? "bronze"}
           usedChecks={effectiveUsedChecks}
           totalChecks={effectiveTotalChecks}

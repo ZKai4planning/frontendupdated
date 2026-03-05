@@ -4,6 +4,9 @@ import type React from "react"
 import { useEffect, useState } from "react"
 import toast from "react-hot-toast"
 import { useRouter } from "next/navigation"
+import axios from "axios"
+import axiosInstance from "@/lib/axiosinstance"
+import { useAuthStore } from "@/lib/zustand"
 
 export function ClientLogin() {
   const router = useRouter()
@@ -17,29 +20,134 @@ export function ClientLogin() {
 
   const [otp, setOtp] = useState<string[]>(Array(6).fill(""))
   const [resending, setResending] = useState(false)
+  const [isSending, setIsSending] = useState(false)
+  const [isVerifying, setIsVerifying] = useState(false)
 
-  const identifier = email || phone
+  const setToken = useAuthStore((state) => state.setToken)
+  const setUserId = useAuthStore((state) => state.setUserId)
+
+  const identifier = email
   const isOtpComplete = otp.every((d) => d !== "")
-  const isInputsDisabled = isMobile || step === "VERIFY_OTP"
+  const isInputsDisabled =
+    isMobile || step === "VERIFY_OTP" || isSending || resending || isVerifying
+  const blockedEmailDomains = new Set([
+    "example.com",
+    "example.org",
+    "example.net",
+    "text.com",
+  ])
+
+  const isDisallowedPhoneNumber = (value: string) => {
+    const trimmed = value.trim()
+    if (!/^\+44\d{10}$/.test(trimmed)) return false
+
+    const digits = trimmed.slice(3)
+    if (/^(\d)\1{9}$/.test(digits)) return true
+
+    const ascending = "0123456789"
+    const descending = "9876543210"
+    if (digits === ascending || digits === ascending.slice(1) + "0") return true
+    if (digits === descending) return true
+
+    return false
+  }
+
+  const getRouteForNextStep = (nextStep?: string) => {
+    switch ((nextStep ?? "").toUpperCase()) {
+      case "DASHBOARD":
+        return "/dashboard"
+      case "PROFILE":
+        return "/profile"
+      case "PROFILE1":
+        return "/profile1"
+      case "PAYMENT":
+        return "/payment"
+      default:
+        return "/dashboard"
+    }
+  }
 
   /* ================= SUBMIT HANDLER ================= */
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
     if (isMobile) {
       return
     }
 
-    if (!email && !phone) {
-      toast.error("Please enter email or phone number")
+    if (!email) {
+      toast.error("Please enter your email")
+      return
+    }
+
+    const emailDomain = email.trim().toLowerCase().split("@")[1] ?? ""
+    if (emailDomain && blockedEmailDomains.has(emailDomain)) {
+      toast.error("Please use a real email address")
+      return
+    }
+
+    if (!fullName.trim()) {
+      toast.error("Please enter your full name")
+      return
+    }
+
+    if (!/^[A-Za-z\s]+$/.test(fullName.trim())) {
+      toast.error("Full name can only contain letters and spaces")
+      return
+    }
+
+    if (phone && !/^\+44\d{10}$/.test(phone.trim())) {
+      toast.error("Please enter a UK phone number in the format +44XXXXXXXXXX")
+      return
+    }
+
+    if (phone && isDisallowedPhoneNumber(phone)) {
+      toast.error("Please enter a valid UK phone number")
       return
     }
 
     /* ===== STEP 1: REQUEST OTP ===== */
     if (step === "REQUEST_OTP") {
-      toast.success(`OTP sent to ${identifier}`)
-      setTimeout(() => setStep("VERIFY_OTP"), 300)
+      try {
+        setIsSending(true)
+        const res = await axiosInstance.post("/auth/send-otp", {
+          identifier: email,
+          phoneNumber: phone,
+          fullName: fullName.trim(),
+        })
+
+        const data = res.data as {
+          message?: string
+          token?: string
+          userId?: string | number
+          user_id?: string | number
+          id?: string | number
+        }
+
+        if (data?.token) {
+          setToken(data.token)
+        }
+
+        const responseUserId =
+          data?.userId ?? data?.user_id ?? data?.id ?? null
+
+        if (responseUserId !== null && responseUserId !== undefined) {
+          setUserId(String(responseUserId))
+        }
+
+        toast.success(data?.message || `OTP sent to ${identifier}`)
+        setTimeout(() => setStep("VERIFY_OTP"), 300)
+      } catch (error) {
+        const message =
+          axios.isAxiosError(error) &&
+          (error.response?.data as { message?: string } | undefined)?.message
+            ? (error.response?.data as { message?: string }).message
+            : "Network error while sending OTP. Please try again."
+        toast.error(message)
+      } finally {
+        setIsSending(false)
+      }
       return
     }
 
@@ -51,35 +159,65 @@ export function ClientLogin() {
       return
     }
 
-    // 🔀 OTP-based routing logic
-    if (otpCode === "123456") {
-      toast.success("OTP verified — redirecting to payment")
-      router.push("/profile")
-      return
-    }
+    try {
+      setIsVerifying(true)
+      const res = await axiosInstance.post("/auth/verify-otp", {
+        identifier: email,
+        otp: otpCode,
+      })
 
-    if (otpCode === "234567") {
-      toast.success("OTP verified — welcome back")
-      router.push("/dashboard")
-      return
-    }
+      const data = res.data as {
+        message?: string
+        token?: string
+        nextStep?: string
+      }
 
-     if (otpCode === "345678") {
-      toast.success("OTP verified — welcome back")
-      router.push("/profile1")
-      return
-    }
+      if (data?.token) {
+        setToken(data.token)
+      }
 
-    toast.error("Invalid OTP")
+      const nextRoute = getRouteForNextStep(data?.nextStep)
+
+      toast.success(data?.message || "OTP verified")
+      router.push(nextRoute)
+    } catch (error) {
+      const message =
+        axios.isAxiosError(error) &&
+        (error.response?.data as { message?: string } | undefined)?.message
+          ? (error.response?.data as { message?: string }).message
+          : "OTP verification failed. Please try again."
+      toast.error(message)
+    } finally {
+      setIsVerifying(false)
+    }
   }
 
   /* ================= RESEND OTP ================= */
 
-  const handleResendOtp = () => {
+  const handleResendOtp = async () => {
     if (!identifier) return
-    setResending(true)
-    toast.success(`OTP resent to ${identifier}`)
-    setTimeout(() => setResending(false), 3000)
+
+    try {
+      setResending(true)
+      const res = await axiosInstance.post("/auth/send-otp", {
+        identifier: email,
+        phoneNumber: phone,
+        fullName: fullName.trim(),
+      })
+
+      const data = res.data as { message?: string }
+
+      toast.success(data?.message || `OTP resent to ${identifier}`)
+    } catch (error) {
+      const message =
+        axios.isAxiosError(error) &&
+        (error.response?.data as { message?: string } | undefined)?.message
+          ? (error.response?.data as { message?: string }).message
+          : "Network error while resending OTP. Please try again."
+      toast.error(message)
+    } finally {
+      setResending(false)
+    }
   }
 
   useEffect(() => {
@@ -143,7 +281,26 @@ export function ClientLogin() {
             type="tel"
             value={phone}
             disabled={isInputsDisabled}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => {
+              const raw = e.target.value.replace(/\s+/g, "")
+
+              if (!raw) {
+                setPhone("")
+                return
+              }
+
+              const digits = raw.replace(/\D/g, "")
+
+              let local = digits
+              if (digits.startsWith("44")) {
+                local = digits.slice(2)
+              } else if (digits.startsWith("0")) {
+                local = digits.slice(1)
+              }
+
+              const limited = local.slice(0, 10)
+              setPhone(`+44${limited}`)
+            }}
             placeholder="+44 7911 123456"
             className="w-full h-12 sm:h-14 px-4 rounded-lg border text-black focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
           />
@@ -233,10 +390,22 @@ export function ClientLogin() {
         {/* SUBMIT BUTTON */}
         <button
           type="submit"
-          disabled={isMobile || (step === "VERIFY_OTP" && !isOtpComplete)}
+          disabled={
+            isMobile ||
+            isSending ||
+            isVerifying ||
+            resending ||
+            (step === "VERIFY_OTP" && !isOtpComplete)
+          }
           className="w-full bg-blue-500 text-white font-bold py-3 rounded-lg hover:bg-blue-600 transition disabled:bg-slate-300"
         >
-          {step === "REQUEST_OTP" ? "Send OTP" : "Sign In"}
+          {step === "REQUEST_OTP"
+            ? isSending
+              ? "Sending..."
+              : "Send OTP"
+            : isVerifying
+              ? "Verifying..."
+              : "Sign In"}
         </button>
       </form>
     </div>

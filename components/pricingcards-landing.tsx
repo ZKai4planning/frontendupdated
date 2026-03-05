@@ -35,7 +35,7 @@ const plans = [
       "Structured document support",
       "Active Agent guidance",
       "Chat / scheduled consultation",
-      "Faster response",
+      "higher respsone time",
     ],
   },
   {
@@ -48,7 +48,7 @@ const plans = [
     badge: "Most popular",
     features: [
       "~60–70% Self-Service",
-      "Full AI toolkit",
+      "Higher level of AI Tool kit",
       "Advanced document generation",
       "Priority Agent consultation (1–2 sessions)",
       "Comprehensive review & coordination",
@@ -64,7 +64,7 @@ const plans = [
     highlighted: false,
     features: [
       "10–20% Self-Service (minimal effort required)",
-      "All AI features + priority future automations",
+      "Most Advances AI features",
       "Dedicated Agent throughout the process",
       "Agent manages communication & coordination",
       "Milestone approvals & final documentation handled",
@@ -146,7 +146,7 @@ export default function PricingCardsLanding() {
                 <MessageCircle className="w-4 h-4 text-green-400" />
                 
                 <span>Have a Question?    
-                  <Link href="https://api.whatsapp.com/send/?phone=+44776862279
+                  <Link href="https://api.whatsapp.com/send/?phone=+447777788885
  &text=Hello%21+I+have+a+query.&type=phone_number&app_absent=0" className="text-green-400 hover:underline ml-2">
                     Connect with us
                   </Link>
