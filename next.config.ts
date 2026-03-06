@@ -19,6 +19,11 @@ const nextConfig: NextConfig = {
         hostname: "www.portmann.ag",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+        pathname: "/**",
+      },
     ],
   },
 }
