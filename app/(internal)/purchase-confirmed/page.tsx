@@ -44,7 +44,7 @@ export default function PurchaseConfirmedPage() {
 
           {/* Primary CTA */}
           <button
-            onClick={() => router.push("/eligibility-check")}
+            onClick={() => router.push("/dashboard?stage=eligibility")}
             className="w-full bg-blue-600 text-white font-semibold py-4 rounded-xl
                        hover:bg-blue-500 transition flex items-center justify-center gap-2"
           >

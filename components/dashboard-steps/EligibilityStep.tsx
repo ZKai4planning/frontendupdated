@@ -3,7 +3,7 @@
 import { useProject } from "@/app/context/ProjectContext"
 
 import React, { Suspense, useEffect, useState, useRef } from "react"
-import { useRouter, usePathname, useSearchParams } from "next/navigation"
+import { useRouter, usePathname, useSearchParams, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
   Info,
@@ -976,18 +976,31 @@ function EligibilityCheckPage() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const params = useParams()
   const { data, updateSection } = useProject()
   const savedFormData = data.eligibility?.formData || {}
 
-  const currentRoute = pathname.replace("/", "")
-  const currentProjectStep = PROJECT_FLOW.findIndex(s => s.route === currentRoute)
+  const stageParam =
+    typeof params?.stage === "string"
+      ? params.stage
+      : Array.isArray(params?.stage)
+        ? params.stage[0]
+        : undefined
+
+  const stageFromQuery = searchParams.get("stage")
+  const pathnameStage = pathname.split("/").filter(Boolean).pop()
+  const currentRoute = stageFromQuery ?? stageParam ?? pathnameStage ?? ""
+  const currentProjectStepIndex = PROJECT_FLOW.findIndex(s =>
+    s.route === currentRoute ||
+    s.legacyRoutes?.includes(currentRoute)
+  )
+  const currentProjectStep = currentProjectStepIndex >= 0 ? currentProjectStepIndex : 0
   const progress = Math.round((currentProjectStep / (PROJECT_FLOW.length - 1)) * 100)
   const currentStepCard = PROJECT_FLOW[currentProjectStep]?.nextCard
   const currentStepCta =
-    currentStepCard?.ctaPath ??
-    (currentStepCard?.ctaStage
+    currentStepCard?.ctaStage
       ? `/dashboard?stage=${currentStepCard.ctaStage}`
-      : undefined)
+      : currentStepCard?.ctaPath
 
   const [step, setStep] = useState<Step>(1)
   const [showVerification, setShowVerification] = useState(false)
@@ -1149,7 +1162,11 @@ function EligibilityCheckPage() {
                       label={stepItem.label}
                       icon={stepItem.icon}
                       status={status}
-                      onClick={() => { if (index <= currentProjectStep) router.push(`/${stepItem.route}`) }}
+                      onClick={() => {
+                        if (index <= currentProjectStep) {
+                          router.push(`/dashboard?stage=${stepItem.route}`)
+                        }
+                      }}
                     />
                     {index !== PROJECT_FLOW.length - 1 && <RoadmapLine />}
                   </div>
@@ -2101,7 +2118,7 @@ function ChoosePlanCta({ label }: { label: string }) {
 
   const handleClick = () => {
     const params = new URLSearchParams()
-    params.set("returnTo", "/dashboard-eligibility")
+    params.set("returnTo", "/dashboard?stage=eligibility")
     params.set("returnStep", String(step))
     params.set("returnField", fieldId)
     router.push(`/subscription?${params.toString()}`)
@@ -2125,7 +2142,7 @@ function UpgradePlanCta({ label }: { label: string }) {
 
   const handleClick = () => {
     const params = new URLSearchParams()
-    params.set("returnTo", "/dashboard-eligibility")
+    params.set("returnTo", "/dashboard?stage=eligibility")
     params.set("returnStep", String(step))
     params.set("returnField", fieldId)
     router.push(`/subscription?${params.toString()}`)
@@ -2198,7 +2215,7 @@ function VerificationCalendar() {
         </div>
         <button
           disabled={!selectedDate || !selectedSlot}
-          onClick={() => router.push("/dashboard-consultant")}
+          onClick={() => router.push("/dashboard?stage=consultant")}
           className="w-full rounded-xl bg-blue-600 text-white py-2.5 font-semibold disabled:opacity-40 cursor-pointer"
         >
           Confirm Consultation Booking

@@ -144,12 +144,12 @@ export default function DashboardHeader({
     }
 
     if (pathname === "/eligibility-check") {
-      router.push("/dashboard-eligibility")
+      router.push("/dashboard?stage=eligibility")
       return
     }
 
     if (pathname === "/upload-documents") {
-      router.push("/dashboard-upload")
+      router.push("/dashboard?stage=upload")
       return
     }
   }

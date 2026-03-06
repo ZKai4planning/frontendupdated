@@ -61,7 +61,7 @@ export function ClientLogin() {
       case "PROFILE1":
         return "/profile1"
       case "PAYMENT":
-        return "/payment"
+        return "/dashboard?stage=payment"
       default:
         return "/dashboard"
     }
@@ -94,6 +94,10 @@ export function ClientLogin() {
 
     if (!/^[A-Za-z\s]+$/.test(fullName.trim())) {
       toast.error("Full name can only contain letters and spaces")
+      return
+    }
+    if (fullName.trim().length < 2 || fullName.trim().length > 50) {
+      toast.error("Full name must be between 2 and 50 characters")
       return
     }
 

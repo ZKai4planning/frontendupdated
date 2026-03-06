@@ -1,6 +1,14 @@
 "use client"
 
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
+import PaymentStep from "@/components/dashboard-steps/PaymentStep"
+import EligibilityStep from "@/components/dashboard-steps/EligibilityStep"
+import ConsultantStep from "@/components/dashboard-steps/ConsultantStep"
+import InitialQuotationStep from "@/components/dashboard-steps/InitialQuotationStep"
+import UploadDocumentsStep from "@/components/dashboard-steps/UploadDocumentsStep"
+import FinalQuotationStep from "@/components/dashboard-steps/FinalQuotationStep"
+import ReviewStep from "@/components/dashboard-steps/ReviewStep"
+import { PROJECT_FLOW } from "@/lib/project-flow"
 import {
   CheckCircle,
   CreditCard,
@@ -15,8 +23,51 @@ import {
 
 /* ================= PAGE ================= */
 
+const STAGE_COMPONENTS = {
+  payment: PaymentStep,
+  eligibility: EligibilityStep,
+  consultant: ConsultantStep,
+  "initial-quotation": InitialQuotationStep,
+  upload: UploadDocumentsStep,
+  "final-quotation": FinalQuotationStep,
+  review: ReviewStep,
+} as const
+
+type StageKey = keyof typeof STAGE_COMPONENTS
+
 export default function DashboardPage() {
+  const searchParams = useSearchParams()
+  const stage = searchParams.get("stage") ?? "overview"
+  const StageComponent = (stage !== "overview"
+    ? STAGE_COMPONENTS[stage as StageKey]
+    : undefined)
+
+  if (stage !== "overview" && StageComponent) {
+    return <StageComponent />
+  }
+
+  return <DashboardOverview />
+}
+
+function DashboardOverview() {
   const router = useRouter()
+  const nextStepCard = PROJECT_FLOW.find(step => step.route === "payment")?.nextCard
+  const nextStepCta =
+    nextStepCard?.ctaPath ??
+    (nextStepCard?.ctaStage ? `/dashboard?stage=${nextStepCard.ctaStage}` : undefined)
+
+  const overviewSteps = [
+    { label: "Profile", status: "completed" as const, icon: User, stage: "overview" },
+    {
+      label: "Service & Initial Payment",
+      status: "active" as const,
+      icon: Package,
+      stage: "payment",
+    },
+    { label: "Eligibility Check", icon: FileSearch, stage: "eligibility" },
+    { label: "Consultant Schedule", icon: Headset, stage: "consultant" },
+    { label: "Awaiting Agent Response", icon: FileText, stage: "initial-quotation" },
+  ]
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
@@ -67,27 +118,17 @@ export default function DashboardPage() {
 
             {/* Scrollable on mobile */}
             <div className="flex items-center justify-between overflow-x-auto pb-2 min-h-[120px]">
-
-              <RoadmapStep label="Profile" status="completed" icon={User} />
-              <RoadmapLine />
-
-              <RoadmapStep
-                label="Service & Initial Payment"
-                status="active"
-                icon={Package}
-              />
-              <RoadmapLine />
-
-              <RoadmapStep label="Eligibility Check" icon={FileSearch} />
-              <RoadmapLine />
-
-              <RoadmapStep label="Consultant Schedule" icon={Headset} />
-              <RoadmapLine />
-
-              <RoadmapStep
-                label="Awaiting Agent Response"
-                icon={FileText}
-              />
+              {overviewSteps.map((step, index) => (
+                <div key={step.label} className="flex items-center">
+                  <RoadmapStep
+                    label={step.label}
+                    status={step.status}
+                    icon={step.icon}
+                    onClick={() => router.push(`/dashboard?stage=${step.stage}`)}
+                  />
+                  {index !== overviewSteps.length - 1 && <RoadmapLine />}
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -96,28 +137,32 @@ export default function DashboardPage() {
         <div className="lg:col-span-4 space-y-6">
 
           <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-lg flex flex-col min-h-[200px]">
-
-            <p className="text-xs uppercase tracking-wide opacity-80 mb-2">
-              Critical Next Step
-            </p>
+            {nextStepCard?.eyebrow && (
+              <p className="text-xs uppercase tracking-wide opacity-80 mb-2">
+                {nextStepCard.eyebrow}
+              </p>
+            )}
 
             <h3 className="text-lg font-semibold mb-3">
-              Select Service & Commit
+              {nextStepCard?.title ?? "Select Service & Commit"}
             </h3>
 
-            <p className="text-sm opacity-90 mb-6">
-              Choose your package to trigger payment. This is required to unlock
-              your Human Lead Architect.
-            </p>
+            {nextStepCard?.description && (
+              <p className="text-sm opacity-90 mb-6">
+                {nextStepCard.description}
+              </p>
+            )}
 
             <div className="mt-auto">
-              <button
-                onClick={() => router.push("/services")}
-                className="w-full rounded-xl bg-white text-blue-600 font-semibold py-3
+              {nextStepCard?.ctaLabel && nextStepCta && (
+                <button
+                  onClick={() => router.push(nextStepCta)}
+                  className="w-full rounded-xl bg-white text-blue-600 font-semibold py-3
                            hover:bg-blue-50 active:scale-[0.98] transition cursor-pointer"
-              >
-                Choose Your Service
-              </button>
+                >
+                  {nextStepCard.ctaLabel}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -213,13 +258,15 @@ function RoadmapStep({
   label,
   status,
   icon: Icon,
+  onClick,
 }: {
   label: string
   status?: "completed" | "active"
   icon: React.ElementType
+  onClick?: () => void
 }) {
   return (
-    <div className="flex flex-col items-center gap-2 min-w-[90px]">
+    <div onClick={onClick} className="flex flex-col items-center gap-2 min-w-[90px]">
       <div
         className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300
     ${status === "completed"

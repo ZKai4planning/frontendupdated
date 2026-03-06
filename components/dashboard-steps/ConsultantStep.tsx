@@ -1,7 +1,7 @@
 "use client"
 
 import React from "react"
-import { useRouter, usePathname } from "next/navigation"
+import { useRouter, usePathname, useParams, useSearchParams } from "next/navigation"
 import {
   CheckCircle,
 } from "lucide-react"
@@ -10,13 +10,25 @@ import { PROJECT_FLOW } from "@/lib/project-flow"
 export default function ConsultantSchedulePage() {
   const router = useRouter()
   const pathname = usePathname()
+  const params = useParams()
+  const searchParams = useSearchParams()
 
   /* ================= SAFE CURRENT STEP DETECTION ================= */
 
-  const currentRoute = pathname.replace("/", "")
+  const stageParam =
+    typeof params?.stage === "string"
+      ? params.stage
+      : Array.isArray(params?.stage)
+        ? params.stage[0]
+        : undefined
 
-  const stepIndex = PROJECT_FLOW.findIndex(
-    step => step.route === currentRoute
+  const stageFromQuery = searchParams.get("stage")
+  const pathnameStage = pathname.split("/").filter(Boolean).pop()
+  const currentRoute = stageFromQuery ?? stageParam ?? pathnameStage ?? ""
+
+  const stepIndex = PROJECT_FLOW.findIndex(step =>
+    step.route === currentRoute ||
+    step.legacyRoutes?.includes(currentRoute)
   )
 
   const currentProjectStep = stepIndex >= 0 ? stepIndex : 0
@@ -26,10 +38,9 @@ export default function ConsultantSchedulePage() {
   )
   const currentStepCard = PROJECT_FLOW[currentProjectStep]?.nextCard
   const currentStepCta =
-    currentStepCard?.ctaPath ??
-    (currentStepCard?.ctaStage
+    currentStepCard?.ctaStage
       ? `/dashboard?stage=${currentStepCard.ctaStage}`
-      : undefined)
+      : currentStepCard?.ctaPath
 
   return (
     <main className="min-h-screen bg-slate-50 px-5 py-8">
@@ -128,7 +139,7 @@ export default function ConsultantSchedulePage() {
             index <= currentProjectStep &&
             stepItem.route !== "#"
           ) {
-            router.push(`/${stepItem.route}`)
+            router.push(`/dashboard?stage=${stepItem.route}`)
           }
         }}
       />

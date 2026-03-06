@@ -475,7 +475,7 @@ export default function ServiceExpandPanel({
 
               <div className="mt-auto">
   <button
-  onClick={() => router.push("/pay")}
+  onClick={() => router.push("/dashboard?stage=payment")}
   className={`
     ${service.id === "Service-01" ? "fixed bottom-6 z-50" : ""}
     bg-blue-500 hover:bg-blue-400

@@ -65,7 +65,7 @@ export default function ProfileAutomationPage() {
       redirectedRef.current = true;
 
       setTimeout(() => {
-        router.push("/pay");
+        router.push("/dashboard?stage=payment");
       }, 700);
     }
   }, [progress, router]);
