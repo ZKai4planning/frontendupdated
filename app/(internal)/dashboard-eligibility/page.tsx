@@ -20,6 +20,7 @@ import {
   Zap,
 } from "lucide-react"
 import { PROJECT_FLOW } from "@/lib/project-flow"
+import { useUserIdentity } from "@/lib/use-user-identity"
 
 type Step = 1 | 2 | 3 | 4 | 5
 type PlanType = "bronze" | "silver" | "gold" | "platinum"
@@ -977,6 +978,8 @@ function EligibilityCheckPage() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { data, updateSection } = useProject()
+  const { fullName } = useUserIdentity()
+  const displayName = fullName || "User"
   const savedFormData = data.eligibility?.formData || {}
 
   const currentRoute = pathname.replace("/", "")
@@ -1100,7 +1103,7 @@ function EligibilityCheckPage() {
       {/* HEADER */}
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Welcome back, Zafer Khan</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Welcome back, {displayName}</h1>
           <p className="text-xl text-slate-600 mt-2">
             Customer ID: <span className="font-medium">ABC123-089</span>
           </p>

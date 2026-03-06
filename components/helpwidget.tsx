@@ -8,9 +8,12 @@ import {
   FiStar,
   FiX,
 } from "react-icons/fi"
+import { useUserIdentity } from "@/lib/use-user-identity"
  
 export default function HelpWidget() {
   const [open, setOpen] = useState(false)
+  const { fullName } = useUserIdentity()
+  const displayName = fullName || "User"
  
   return (
     <>
@@ -21,7 +24,7 @@ export default function HelpWidget() {
             {/* Header */}
             <div className="flex items-start justify-between mb-4">
               <div>
-                <p className="text-sm text-gray-400">Afternoon Zafer Khan.</p>
+                <p className="text-sm text-gray-400">Afternoon {displayName}.</p>
                 <h3 className="text-base font-semibold">
                   How can we help?
                 </h3>

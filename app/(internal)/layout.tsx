@@ -34,7 +34,7 @@ export default function DashboardLayout({
         <DashboardHeader
           collapsed={collapsed}
           onToggle={() => setCollapsed(p => !p)}
-          userName="Zafer"
+          userName="User"
           breadcrumbs={[
             { label: "Dashboard", href: "/dashboard" },
             { label: "Customers" },

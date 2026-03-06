@@ -13,6 +13,7 @@ import {
   Camera,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useUserIdentity } from "@/lib/use-user-identity"
 
 /* ================= DOCUMENT TYPES ================= */
 
@@ -56,6 +57,8 @@ const REQUIRED_DOCUMENTS: DocumentItem[] = [
 
 export default function UploadDocumentsDashboard() {
   const router = useRouter()
+  const { fullName } = useUserIdentity()
+  const displayName = fullName || "User"
 
   const [documents, setDocuments] =
     useState<DocumentItem[]>(REQUIRED_DOCUMENTS)
@@ -98,7 +101,7 @@ export default function UploadDocumentsDashboard() {
       <div className="flex items-start justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
-            Welcome back, Zafer Khan
+            Welcome back, {displayName}
           </h1>
 
           <p className="text-xl text-slate-600 mt-2">

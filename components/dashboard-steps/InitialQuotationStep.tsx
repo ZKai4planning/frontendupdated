@@ -16,9 +16,12 @@ import {
   UploadCloud,
 } from "lucide-react"
 import { motion } from "framer-motion"
+import { useUserIdentity } from "@/lib/use-user-identity"
 
 export default function EligibilityCheckPage() {
   const router = useRouter()
+  const { fullName } = useUserIdentity()
+  const displayName = fullName || "User"
 
   /* ================= STATE ================= */
 
@@ -63,7 +66,7 @@ export default function EligibilityCheckPage() {
       <div className="flex items-start justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
-            Welcome back, Zafer Khan
+            Welcome back, {displayName}
           </h1>
 
           <p className="text-xl text-slate-600 mt-2">

@@ -6,12 +6,16 @@ import {
   CheckCircle,
 } from "lucide-react"
 import { PROJECT_FLOW } from "@/lib/project-flow"
+import { useUserIdentity } from "@/lib/use-user-identity"
 
 export default function ConsultantSchedulePage() {
   const router = useRouter()
   const pathname = usePathname()
   const params = useParams()
   const searchParams = useSearchParams()
+  const { fullName, firstName } = useUserIdentity()
+  const displayName = fullName || "User"
+  const displayFirstName = firstName || "User"
 
   /* ================= SAFE CURRENT STEP DETECTION ================= */
 
@@ -50,7 +54,7 @@ export default function ConsultantSchedulePage() {
       <div className="flex items-start justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
-            Welcome back, Zafer Khan
+            Welcome back, {displayName}
           </h1>
 
           <p className="text-xl text-slate-600 mt-2">
@@ -191,7 +195,7 @@ export default function ConsultantSchedulePage() {
 <div className="w-full lg:max-w-md rounded-2xl bg-blue-500 p-6 text-white shadow-lg">
 
         <p className="text-sm opacity-90 mb-4 leading-relaxed">
-          Hi Zafer, Thank you for choosing <span className="font-semibold">AI4Planning</span>.
+          Hi {displayFirstName}, Thank you for choosing <span className="font-semibold">AI4Planning</span>.
           We’ve assigned <span className="font-semibold">Sarah</span> as your personal planning
           consultant. She’ll be in touch shortly to discuss your project requirements.
         </p>

@@ -5,6 +5,7 @@ import type { ChangeEvent, FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import axiosInstance from "@/lib/axiosinstance";
+import { USER_IDENTITY_UPDATED_EVENT } from "@/lib/use-user-identity";
 import { useAuthStore } from "@/lib/zustand";
 
 type PhoneModel = {
@@ -96,6 +97,9 @@ const pickPictureUrl = (...records: Record<string, unknown>[]): string => {
   const keys = [
     "profilePictureUrl",
     "profilePicture",
+    "profilePic",
+    "photoUrl",
+    "photo",
     "avatarUrl",
     "avatar",
     "imageUrl",
@@ -109,6 +113,45 @@ const pickPictureUrl = (...records: Record<string, unknown>[]): string => {
         return value;
       }
     }
+
+    const user = asRecord(record.user);
+    for (const key of keys) {
+      const value = user[key];
+      if (typeof value === "string" && value.trim()) {
+        return value;
+      }
+    }
+
+    const profile = asRecord(record.profile);
+    for (const key of keys) {
+      const value = profile[key];
+      if (typeof value === "string" && value.trim()) {
+        return value;
+      }
+    }
+  }
+
+  return "";
+};
+
+const pickEmail = (...records: Record<string, unknown>[]): string => {
+  const keys = ["email", "mail", "userEmail"];
+
+  for (const record of records) {
+    for (const key of keys) {
+      const value = record[key];
+      if (typeof value === "string" && value.trim()) {
+        return value;
+      }
+    }
+
+    const user = asRecord(record.user);
+    for (const key of keys) {
+      const value = user[key];
+      if (typeof value === "string" && value.trim()) {
+        return value;
+      }
+    }
   }
 
   return "";
@@ -116,7 +159,7 @@ const pickPictureUrl = (...records: Record<string, unknown>[]): string => {
 
 const normalizeProfileResponse = (
   responseData: unknown
-): { profile: ProfileModel; pictureUrl: string } => {
+): { profile: ProfileModel; pictureUrl: string; email: string } => {
   const responseObject = asRecord(responseData);
   const payload = Object.keys(asRecord(responseObject.data)).length
     ? asRecord(responseObject.data)
@@ -155,6 +198,7 @@ const normalizeProfileResponse = (
   return {
     profile: normalizedProfile,
     pictureUrl: pickPictureUrl(source, payload, responseObject),
+    email: pickEmail(source, payload, responseObject),
   };
 };
 
@@ -174,6 +218,7 @@ export default function ProfileSectionPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [profileEmail, setProfileEmail] = useState("");
 
   const resolvedUserId = useMemo(() => {
     if (storeUserId) return storeUserId;
@@ -221,6 +266,7 @@ export default function ProfileSectionPage() {
         const normalized = normalizeProfileResponse(response.data);
         setProfile(normalized.profile);
         setFormProfile(normalized.profile);
+        if (normalized.email) setProfileEmail(normalized.email);
 
         if (normalized.pictureUrl) {
           setServerPictureUrl(normalized.pictureUrl);
@@ -306,6 +352,7 @@ export default function ProfileSectionPage() {
       setProfile(formProfile);
       setIsEditMode(false);
       setSuccessMessage("Profile details updated successfully.");
+      window.dispatchEvent(new Event(USER_IDENTITY_UPDATED_EVENT));
     } catch (error) {
       setErrorMessage(getErrorMessage(error, "Failed to update profile details."));
     } finally {
@@ -347,7 +394,7 @@ export default function ProfileSectionPage() {
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    const endpoint = `/profile/${encodeURIComponent(resolvedUserId)}`;
+    const endpoint = `/profile/${encodeURIComponent(resolvedUserId)}/picture`;
     const payload = new FormData();
     payload.append("profilePicture", selectedFile);
 
@@ -378,6 +425,7 @@ export default function ProfileSectionPage() {
         setServerPictureUrl(normalized.pictureUrl);
         setProfilePictureUrl(normalized.pictureUrl);
       }
+      if (normalized.email) setProfileEmail(normalized.email);
 
       if (previewUrl) {
         URL.revokeObjectURL(previewUrl);
@@ -386,6 +434,7 @@ export default function ProfileSectionPage() {
 
       setSelectedFile(null);
       setSuccessMessage("Profile picture uploaded successfully.");
+      window.dispatchEvent(new Event(USER_IDENTITY_UPDATED_EVENT));
     } catch (error) {
       setErrorMessage(getErrorMessage(error, "Failed to upload profile picture."));
     } finally {
@@ -438,6 +487,9 @@ export default function ProfileSectionPage() {
                   {profile.fullName || "Your Profile"}
                 </h1>
                 <p className="text-sm text-slate-500">
+                  {profileEmail || "No email available"}
+                </p>
+                <p className="text-xs text-slate-400">
                   View your profile and edit when needed.
                 </p>
               </div>

@@ -47,7 +47,7 @@ export const PROJECT_FLOW = [
     nextCard: {
       title: "Eligibility Check",
       description:
-        "Hi Zafer Khan, before we prepare your planning application, we conduct an Eligibility Check to confirm whether your project requires planning permission or qualifies under permitted development rights.",
+        "Hi there, before we prepare your planning application, we conduct an Eligibility Check to confirm whether your project requires planning permission or qualifies under permitted development rights.",
       highlights: [
         "1. We review property details, location constraints and project scope.",
       ],

@@ -1,15 +1,19 @@
 "use client"
 
 import { useParams } from "next/navigation"
+import { useUserIdentity } from "@/lib/use-user-identity"
 
 export default function InvoicePage() {
   const params = useParams()
+  const { fullName, email } = useUserIdentity()
+  const displayName = fullName || "User"
+  const displayEmail = email || "No email available"
   const invoiceId = params.id
 
   const invoice = {
     id: invoiceId,
-    client: "Zafer Khan",
-    email: "zafer.khan@example.com",
+    client: displayName,
+    email: displayEmail,
     service: "Householder Planning Consent",
     date: "12 Feb 2026",
     subtotal: '£40',

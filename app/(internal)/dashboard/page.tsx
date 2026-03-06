@@ -9,6 +9,7 @@ import UploadDocumentsStep from "@/components/dashboard-steps/UploadDocumentsSte
 import FinalQuotationStep from "@/components/dashboard-steps/FinalQuotationStep"
 import ReviewStep from "@/components/dashboard-steps/ReviewStep"
 import { PROJECT_FLOW } from "@/lib/project-flow"
+import { useUserIdentity } from "@/lib/use-user-identity"
 import {
   CheckCircle,
   CreditCard,
@@ -51,6 +52,8 @@ export default function DashboardPage() {
 
 function DashboardOverview() {
   const router = useRouter()
+  const { fullName } = useUserIdentity()
+  const displayName = fullName || "User"
   const nextStepCard = PROJECT_FLOW.find(step => step.route === "payment")?.nextCard
   const nextStepCta =
     nextStepCard?.ctaPath ??
@@ -77,7 +80,7 @@ function DashboardOverview() {
 
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
-            Welcome back, Zafer Khan
+            Welcome back, {displayName}
           </h1>
 
           <p className="text-sm sm:text-base text-slate-600 mt-2">

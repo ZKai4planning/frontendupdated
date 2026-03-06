@@ -7,6 +7,7 @@ import Logo from "@/components/logo"
 import Link from "next/link"
 import { useState } from "react"
 import { usePathname } from "next/navigation"
+import { useUserIdentity } from "@/lib/use-user-identity"
  
 /* ---------------- Divider ---------------- */
 function SidebarDivider({ label }: { label: string }) {
@@ -33,9 +34,9 @@ export default function Sidebar({
 }) {
   const [openGroup, setOpenGroup] = useState<string | null>(null)
   const pathname = usePathname()
- 
-  const userName = "Zafer Khan"
-  const email = "zaferkhan@ai4planning.com"
+  const { fullName, email, initials } = useUserIdentity()
+  const userName = fullName || "User"
+  const userEmail = email || "No email available"
  
   return (
     <aside
@@ -206,14 +207,14 @@ export default function Sidebar({
           <div className="px-4 py-3 border-t border-slate-200">
             <div className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-semibold text-sm">
-                {userName.charAt(0)}
+                {initials}
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-medium truncate">
                   {userName}
                 </p>
                 <p className="text-xs text-slate-400 truncate">
-                  {email}
+                  {userEmail}
                 </p>
               </div>
             </div>

@@ -95,6 +95,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { useRouter, usePathname } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
+import { useUserIdentity } from "@/lib/use-user-identity"
 
 type Breadcrumb = {
   label: string
@@ -118,6 +119,10 @@ export default function DashboardHeader({
   const pathname = usePathname()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const profileRef = useRef<HTMLDivElement | null>(null)
+  const { fullName, email, profilePictureUrl } = useUserIdentity()
+  const displayName = fullName || userName || "User"
+  const displayEmail = email || "No email available"
+  const avatarSrc = profilePictureUrl || "/profile.jpg"
 
   useEffect(() => {
     setIsProfileOpen(false)
@@ -224,12 +229,7 @@ export default function DashboardHeader({
                 aria-expanded={isProfileOpen}
                 aria-label="Open profile menu"
               >
-                <Image
-                  src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?q=80&w=200&auto=format&fit=crop"
-                  alt="User Avatar"
-                  fill
-                  className="object-cover"
-                />
+                <img src={avatarSrc} alt="User Avatar" className="h-full w-full object-cover" />
               </button>
 
               {isProfileOpen && (
@@ -239,10 +239,10 @@ export default function DashboardHeader({
                 >
                   <div className="px-4 py-3 border-b border-slate-100">
                     <p className="text-sm font-semibold text-slate-900">
-                      {userName}
+                      {displayName}
                     </p>
                     <p className="text-xs text-slate-500 truncate">
-                      zaferkhan@ai4planning.com
+                      {displayEmail}
                     </p>
                   </div>
 
