@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import PaymentStep from "@/components/dashboard-steps/PaymentStep"
 import EligibilityStep from "@/components/dashboard-steps/EligibilityStep"
@@ -37,6 +38,14 @@ const STAGE_COMPONENTS = {
 type StageKey = keyof typeof STAGE_COMPONENTS
 
 export default function DashboardPage() {
+  return (
+    <Suspense fallback={<DashboardOverview />}>
+      <DashboardContent />
+    </Suspense>
+  )
+}
+
+function DashboardContent() {
   const searchParams = useSearchParams()
   const stage = searchParams.get("stage") ?? "overview"
   const StageComponent = (stage !== "overview"

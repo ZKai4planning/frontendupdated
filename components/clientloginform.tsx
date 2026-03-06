@@ -67,6 +67,18 @@ export function ClientLogin() {
     }
   }
 
+  const getAxiosErrorMessage = (
+    error: unknown,
+    fallbackMessage: string
+  ): string => {
+    if (!axios.isAxiosError(error)) return fallbackMessage
+    const apiMessage = (error.response?.data as { message?: string } | undefined)
+      ?.message
+    return typeof apiMessage === "string" && apiMessage.trim()
+      ? apiMessage
+      : fallbackMessage
+  }
+
   /* ================= SUBMIT HANDLER ================= */
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -143,11 +155,10 @@ export function ClientLogin() {
         toast.success(data?.message || `OTP sent to ${identifier}`)
         setTimeout(() => setStep("VERIFY_OTP"), 300)
       } catch (error) {
-        const message =
-          axios.isAxiosError(error) &&
-          (error.response?.data as { message?: string } | undefined)?.message
-            ? (error.response?.data as { message?: string }).message
-            : "Network error while sending OTP. Please try again."
+        const message = getAxiosErrorMessage(
+          error,
+          "Network error while sending OTP. Please try again."
+        )
         toast.error(message)
       } finally {
         setIsSending(false)
@@ -185,11 +196,10 @@ export function ClientLogin() {
       toast.success(data?.message || "OTP verified")
       router.push(nextRoute)
     } catch (error) {
-      const message =
-        axios.isAxiosError(error) &&
-        (error.response?.data as { message?: string } | undefined)?.message
-          ? (error.response?.data as { message?: string }).message
-          : "OTP verification failed. Please try again."
+      const message = getAxiosErrorMessage(
+        error,
+        "OTP verification failed. Please try again."
+      )
       toast.error(message)
     } finally {
       setIsVerifying(false)
@@ -213,11 +223,10 @@ export function ClientLogin() {
 
       toast.success(data?.message || `OTP resent to ${identifier}`)
     } catch (error) {
-      const message =
-        axios.isAxiosError(error) &&
-        (error.response?.data as { message?: string } | undefined)?.message
-          ? (error.response?.data as { message?: string }).message
-          : "Network error while resending OTP. Please try again."
+      const message = getAxiosErrorMessage(
+        error,
+        "Network error while resending OTP. Please try again."
+      )
       toast.error(message)
     } finally {
       setResending(false)

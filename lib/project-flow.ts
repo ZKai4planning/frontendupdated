@@ -1,11 +1,9 @@
 import {
-  User,
+  type LucideIcon,
   Package,
   FileSearch,
   Headset,
   FileText,
-  CheckCircle,
-  Landmark,
 } from "lucide-react"
 
 export type ProjectFlowCard = {
@@ -18,7 +16,15 @@ export type ProjectFlowCard = {
   ctaPath?: string
 }
 
-export const PROJECT_FLOW = [
+export type ProjectFlowStep = {
+  label: string
+  icon: LucideIcon
+  route: string
+  legacyRoutes?: string[]
+  nextCard?: ProjectFlowCard
+}
+
+export const PROJECT_FLOW: ProjectFlowStep[] = [
   {
     label: "Profile",
     icon: Package,
