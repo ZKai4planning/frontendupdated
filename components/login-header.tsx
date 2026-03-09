@@ -34,10 +34,10 @@ export function LoginHeader() {
         </div>
 
         <div className="flex items-center gap-3 sm:gap-6">
-          <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-slate-700" />
+          {/* <div className="hidden sm:block h-6 w-px bg-slate-200 dark:bg-slate-700" /> */}
 
           {/* LOGIN BUTTON */}
-          <button
+          {/* <button
             onClick={() => setShowLogin(true)}
             className="
               text-xs sm:text-[15px] font-bold text-white
@@ -47,7 +47,7 @@ export function LoginHeader() {
             "
           >
             Sign In
-          </button>
+          </button> */}
         </div>
       </header>
 

@@ -37,7 +37,7 @@ export function LoginHeader() {
           <div className="h-6 w-px bg-slate-200 dark:bg-slate-700" />
 
           {/* LOGIN BUTTON */}
-          <button
+          {/* <button
             onClick={() => setShowLogin(true)}
             className="
               text-[14px] font-bold text-white
@@ -46,7 +46,7 @@ export function LoginHeader() {
             "
           >
             Sign In
-          </button>
+          </button> */}
         </div>
       </header>
 
