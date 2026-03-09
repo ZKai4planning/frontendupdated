@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import Link from "next/link"
 import { Mail, Phone, MapPin } from "lucide-react"
@@ -122,7 +122,7 @@ export default function Footer() {
         {/* Bottom Section */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-6 text-sm text-white/60">
           <p>
-            © {new Date().getFullYear()} AI4Planning. All rights reserved.
+            &copy; {new Date().getFullYear()} AI4Planning. All rights reserved.
           </p>
 
           <div className="flex items-center gap-6">
