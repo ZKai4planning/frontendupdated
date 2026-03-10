@@ -1018,7 +1018,8 @@ function EligibilityCheckPage() {
       : currentStepCard?.ctaPath
 
   const [step, setStep] = useState<Step>(1)
-  const [showVerification, setShowVerification] = useState(false)
+  const hasSubmittedEligibility = Boolean(data.eligibility?.completedAt)
+  const [showVerification, setShowVerification] = useState(hasSubmittedEligibility)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [pendingScrollId, setPendingScrollId] = useState<string | null>(null)
   const [planType, setPlanType] = useState<ActivePlanType>(null)
@@ -1634,6 +1635,8 @@ function EligibilityCheckPage() {
               </>
             )}
 
+              </fieldset>
+
               {/* NAVIGATION */}
               <div className="flex justify-between mt-8 pt-4 border-t">
 
@@ -1665,20 +1668,22 @@ function EligibilityCheckPage() {
 
               {/* ⭐ RIGHT SIDE */}
               {step < TOTAL_STEPS ? (
-                <div className="flex gap-2"> {/* wrapper keeps them right */}
-                  <button
-                    onClick={() => {
-                      updateSection("eligibility", {
-                        ...(data.eligibility || {}),
-                        isDraft: true,
-                        draftSavedAt: new Date().toISOString(),
-                      })
-                      alert("Draft saved ✅")
-                    }}
-                    className="rounded-xl border px-5 py-2 text-sm cursor-pointer transition-colors bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    Save as Draft
-                  </button>
+                <div className="flex gap-2">
+                  {!isReadOnly && (
+                    <button
+                      onClick={() => {
+                        updateSection("eligibility", {
+                          ...(data.eligibility || {}),
+                          isDraft: true,
+                          draftSavedAt: new Date().toISOString(),
+                        })
+                        alert("Draft saved ✅")
+                      }}
+                      className="rounded-xl border px-5 py-2 text-sm cursor-pointer transition-colors bg-green-600 hover:bg-green-700 text-white"
+                    >
+                      Save as Draft
+                    </button>
+                  )}
 
                   <button
                     onClick={nextStep}
@@ -1687,9 +1692,11 @@ function EligibilityCheckPage() {
                     Next Step →
                   </button>
                 </div>
-              ) : (
+              ) : !isReadOnly ? (
                 <button
+                  disabled={hasSubmittedEligibility || isAnalyzing}
                   onClick={() => {
+                    if (hasSubmittedEligibility || isAnalyzing) return
                     setIsAnalyzing(true)
                     setTimeout(() => {
                       setIsAnalyzing(false)
@@ -1702,20 +1709,20 @@ function EligibilityCheckPage() {
                       window.scrollTo({ top: 0, behavior: "smooth" })
                     }, 4500)
                   }}
-                  className="rounded-xl bg-green-600 text-white px-5 py-2 text-sm font-semibold cursor-pointer hover:bg-green-700 transition-colors"
+                  className="rounded-xl bg-green-600 text-white px-5 py-2 text-sm font-semibold cursor-pointer hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Submit
+                  {hasSubmittedEligibility ? "Submitted" : "Submit"}
                 </button>
-              )}
+              ) : null
+              }
               </div>
-              </fieldset>
             </div>
           </div>
 
           {/* RIGHT: VERIFICATION CALENDAR */}
             {showVerification && (
               <div className="col-span-4 space-y-6">
-                <VerificationCalendar />
+                <VerificationCalendar disabled={!hasSubmittedEligibility || isReadOnly} />
               </div>
             )}
           </div>
@@ -2184,7 +2191,7 @@ function UpgradePlanCta({ label }: { label: string }) {
 /* ─────────────────────────────────────────────
    VERIFICATION CALENDAR
 ───────────────────────────────────────────── */
-function VerificationCalendar() {
+function VerificationCalendar({ disabled = false }: { disabled?: boolean }) {
   const router = useRouter()
   const TIME_SLOTS = ["09:30 AM", "11:00 AM", "01:45 PM", "04:30 PM"]
   const today = new Date()
@@ -2235,9 +2242,9 @@ function VerificationCalendar() {
           ))}
         </div>
         <button
-          disabled={!selectedDate || !selectedSlot}
+          disabled={disabled || !selectedDate || !selectedSlot}
           onClick={() => router.push("/dashboard?stage=consultant")}
-          className="w-full rounded-xl bg-blue-600 text-white py-2.5 font-semibold disabled:opacity-40 cursor-pointer"
+          className="w-full rounded-xl bg-blue-600 text-white py-2.5 font-semibold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
         >
           Confirm Consultation Booking
         </button>
