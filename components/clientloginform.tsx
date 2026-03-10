@@ -98,6 +98,18 @@ export function ClientLogin() {
       return
     }
 
+    const atIndex = identifier.indexOf("@")
+    if (atIndex <= 0) {
+      toast.error("Please enter a valid email address")
+      return
+    }
+
+    const localPart = identifier.slice(0, atIndex)
+    if (!/^[a-z0-9.]+$/i.test(localPart)) {
+      toast.error("Before @, use only letters, numbers, and periods (.)")
+      return
+    }
+
     const emailDomain = identifier.toLowerCase().split("@")[1] ?? ""
     if (emailDomain && blockedEmailDomains.has(emailDomain)) {
       toast.error("Please use a real email address")
