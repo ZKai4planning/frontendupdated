@@ -10,6 +10,7 @@ import {
   Package,
   CheckCircle,
 } from "lucide-react"
+import axiosInstance from "@/lib/axiosinstance"
 
 
 export type ProjectFlowCard = {
@@ -34,118 +35,7 @@ export type ProjectFlowStep = {
 /* how many stages show initially */
 export const INITIAL_VISIBLE_PROJECT_STAGES = 4
 
-export const PROJECT_FLOW: ProjectFlowStep[] = [
-  {
-    id: "service-payment",
-    label: "Service & Initial Payment",
-    icon: CreditCard,
-    route: "payment",
-    legacyRoutes: ["pay"],
-    nextCard: {
-      eyebrow: "Critical Next Step",
-      title: "Select Service & Commit",
-      description:
-        "Choose your package to trigger payment. This is required to unlock your Human Lead Architect.",
-      ctaLabel: "Choose Your Service",
-      ctaPath: "/services",
-    },
-  },
-  {
-    id: "eligibility-check",
-    label: "Eligibility Check",
-    icon: FileSearch,
-    route: "eligibility",
-    legacyRoutes: ["dashboard-eligibility"],
-    nextCard: {
-      title: "Eligibility Check",
-      description:
-        "Hi there, before we prepare your planning application, we conduct an Eligibility Check to confirm whether your project requires planning permission or qualifies under permitted development rights.",
-      highlights: [
-        "1. We review property details, location constraints and project scope.",
-      ],
-    },
-  },
-  {
-    id: "consultant-schedule",
-    label: "Consultant Schedule",
-    icon: Headset,
-    route: "consultant",
-    legacyRoutes: ["dashboard-consultant"],
-    nextCard: {
-      title: "Consultant Schedule",
-      description:
-        "Your assigned planning consultant will review your project and guide you through the next steps. Consultant: Sarah.",
-      ctaLabel: "Next Step →",
-      ctaStage: "initial-quotation",
-    },
-  },
-  {
-    id: "agent-response",
-    label: "Updating Agent Response",
-    icon: FileText,
-    route: "agent-response",
-    legacyRoutes: ["dashboard-initialquotation"],
-    nextCard: {
-      title: "Awaiting Agent Response",
-      description:
-        "Our planning team is reviewing your project and preparing the initial quotation. You will be notified once it is ready.",
-    },
-  },
-  {
-    id: "initial-quotation",
-    label: "Initial Quotation",
-    icon: FileText,
-    route: "initial-quotation",
-    legacyRoutes: ["dashboard-initialquotation"],
-    nextCard: {
-      title: "Initial Quotation",
-      description:
-        "Your personalised planning quotation is ready. Review scope, fees, and next actions before proceeding.",
-      ctaLabel: "Next Step →",
-      ctaStage: "upload",
-    },
-  },
-  {
-    id: "upload-documents",
-    label: "Upload Documents",
-    icon: FileText,
-    route: "upload",
-    legacyRoutes: ["dashboard-upload", "upload-documents"],
-    nextCard: {
-      title: "Upload Documents",
-      description:
-        "Upload plans, supporting reports, and required documentation so the consultant can finalise your package.",
-      ctaLabel: "Next Step →",
-      ctaStage: "final-quotation",
-    },
-  },
-  {
-    id: "final-quotation",
-    label: "Final Quotation",
-    icon: Package,
-    route: "final-quotation",
-    legacyRoutes: ["dashboard-finalquotation"],
-    nextCard: {
-      title: "Final Quotation",
-      description:
-        "Your final quotation includes complete planning support based on uploaded documents and consultant review.",
-      ctaLabel: "Next Step →",
-      ctaStage: "review",
-    },
-  },
-  {
-    id: "review",
-    label: "Review",
-    icon: CheckCircle,
-    route: "review",
-    legacyRoutes: ["dashboard-review"],
-    nextCard: {
-      title: "Review",
-      description:
-        "Confirm all details before final submission to council.",
-    },
-  },
-]
+export let PROJECT_FLOW: ProjectFlowStep[] = []
 
 /*
 Normalize both positive and negative indexes.
@@ -182,9 +72,16 @@ export function getRoadmapProjectFlow(currentProjectStep: number) {
   const initialQuotationIndex = PROJECT_FLOW.findIndex(
     (step) => step.route === "initial-quotation"
   )
+  const agentResponseIndex = PROJECT_FLOW.findIndex(
+    (step) => step.route === "agent-response"
+  )
 
-  if (initialQuotationIndex >= 0 && safeIndex >= initialQuotationIndex) {
-    return visibleFlow.filter((step) => step.id !== "agent-response")
+  if (
+    initialQuotationIndex >= 0 &&
+    agentResponseIndex >= 0 &&
+    safeIndex >= initialQuotationIndex
+  ) {
+    return visibleFlow.filter((step) => step.route !== "agent-response")
   }
 
   return visibleFlow
@@ -232,4 +129,109 @@ export function getJourneyProgressPercent(currentProjectStep: number) {
   }
 
   return Math.round(((roadmapIndex + 1) / roadmapFlow.length) * 100)
+}
+
+type ProjectStageApiCard = {
+  eyebrow?: string
+  title?: string
+  description?: string
+  highlights?: string[]
+  ctaLabel?: string
+  ctaStage?: string
+  ctaPath?: string
+}
+
+type ProjectStageApiItem = {
+  stageId: string
+  label: string
+  route: string
+  legacyRoutes?: string[]
+  icon?: string
+  priority?: number
+  status?: boolean
+  nextCard?: ProjectStageApiCard
+}
+
+type ProjectStagesApiResponse = {
+  success?: boolean
+  message?: string
+  data?: ProjectStageApiItem[]
+}
+
+const ICON_BY_NAME: Record<string, LucideIcon> = {
+  CreditCard,
+  FileSearch,
+  Headset,
+  FileText,
+  Package,
+  CheckCircle,
+}
+
+const ICON_BY_ROUTE: Record<string, LucideIcon> = {
+  payment: CreditCard,
+  eligibility: FileSearch,
+  consultant: Headset,
+  "agent-response": FileText,
+  "initial-quotation": FileText,
+  upload: FileText,
+  "upload-documents": FileText,
+  "final-quotation": Package,
+  review: CheckCircle,
+}
+
+function mapApiNextCard(card?: ProjectStageApiCard): ProjectFlowCard | undefined {
+  if (!card) return undefined
+  if (!card.title && !card.description && !card.ctaLabel && !card.ctaPath && !card.ctaStage) {
+    return undefined
+  }
+
+  return {
+    eyebrow: card.eyebrow,
+    title: card.title ?? "Next Step",
+    description: card.description,
+    highlights: card.highlights ?? [],
+    ctaLabel: card.ctaLabel,
+    ctaStage: card.ctaStage,
+    ctaPath: card.ctaPath,
+  }
+}
+
+function mapApiItemToFlowStep(item: ProjectStageApiItem): ProjectFlowStep {
+  const route = item.route?.trim() || "payment"
+  const icon =
+    (item.icon ? ICON_BY_NAME[item.icon] : undefined) ??
+    ICON_BY_ROUTE[route] ??
+    FileText
+
+  return {
+    id: item.stageId || route,
+    label: item.label || route,
+    route,
+    legacyRoutes: item.legacyRoutes ?? [],
+    icon,
+    nextCard: mapApiNextCard(item.nextCard),
+  }
+}
+
+export async function fetchProjectStages(): Promise<ProjectFlowStep[]> {
+  const response = await axiosInstance.get<ProjectStagesApiResponse>("/project-stage")
+  const list = response.data?.data ?? []
+
+  const activeStages = list
+    .filter((item) => item?.status !== false)
+    .sort((a, b) => (a.priority ?? Number.MAX_SAFE_INTEGER) - (b.priority ?? Number.MAX_SAFE_INTEGER))
+    .map(mapApiItemToFlowStep)
+
+  return activeStages
+}
+
+export async function hydrateProjectFlowFromApi() {
+  try {
+    const flowFromApi = await fetchProjectStages()
+    PROJECT_FLOW = flowFromApi
+    return PROJECT_FLOW
+  } catch {
+    PROJECT_FLOW = []
+    return PROJECT_FLOW
+  }
 }

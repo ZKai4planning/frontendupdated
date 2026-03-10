@@ -112,7 +112,8 @@ const foundIndex = PROJECT_FLOW.findIndex(
 step => step.route === currentStage
 )
 
-const currentStageIndex = normalizeProjectStepIndex(foundIndex)
+const currentStageIndex =
+foundIndex >= 0 ? normalizeProjectStepIndex(foundIndex) : 0
 
 const currentIndex = resolveProjectProgressIndex(
 currentStageIndex,

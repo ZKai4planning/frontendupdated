@@ -90,8 +90,8 @@ export function CookieConsent() {
   if (!isVisible) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:p-6 bg-black/20 animate-in fade-in duration-300">
-      <div className="w-full max-w-4xl rounded-2xl border border-zinc-700/50 bg-zinc-900 shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-end justify-start  bg-black/20 animate-in fade-in duration-300">
+      <div className="w-full max-w-3xl rounded-2xl border border-zinc-700/50 bg-zinc-900 shadow-2xl overflow-hidden">
 
         {!showDetails ? (
           // --- ENHANCED INITIAL BANNER ---
@@ -124,7 +124,7 @@ export function CookieConsent() {
                 <div className="pt-1">
                   <Link
                     href="/privacy"
-                    className="text-[11px] sm:text-xs text-emerald-400 hover:text-emerald-300 underline underline-offset-2 transition-colors flex items-center gap-1 group"
+                    className="text-[11px] sm:text-xs text-blue-400 hover:text-blue-500 underline underline-offset-2 transition-colors flex items-center gap-1 group"
                   >
                     Read our full Privacy Policy
                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="transform transition-transform group-hover:translate-x-0.5">
@@ -141,7 +141,7 @@ export function CookieConsent() {
                 </div>
 
                 <Button
-                  className="w-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold shadow-lg shadow-emerald-900/30 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-emerald-900/40 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
+                  className="w-full bg-blue-400 hover:bg-blue-500 text-zinc-950 font-semibold shadow-lg shadow-emerald-900/30 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-emerald-900/40 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
                   onClick={handleAcceptAll}
                 >
                   Accept All

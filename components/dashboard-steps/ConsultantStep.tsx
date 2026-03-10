@@ -134,6 +134,8 @@ export default function ConsultantSchedulePage() {
                     ? "completed"
                     : stepItemIndex === currentProjectStep
                       ? "active"
+                      : stepItemIndex === currentProjectStep + 1
+                        ? "upcoming"
                       : undefined
 
                 return (
@@ -243,7 +245,7 @@ function RoadmapStep({
             : status === "active"
             ? "border-2 border-blue-600 text-blue-600 bg-white animate-pulse"
             : status === "upcoming"
-            ? "border border-blue-300 text-blue-500 bg-blue-50"
+            ? "border border-blue-600 text-blue-600 bg-blue-50 animate-bounce"
             : "bg-slate-200 text-slate-400"
         }`}
       >

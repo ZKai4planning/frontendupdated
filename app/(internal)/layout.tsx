@@ -1,12 +1,13 @@
 "use client"
  
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Sidebar from "../../components/sidebar"
 import DashboardHeader from "../../components/dashboard-header"
 import GetStarted from "../../components/onGetStarted"
 import HelpWidget from "../../components/helpwidget"
 import { DashboardFooter } from "../../components/dashboard-footer"
 import { FiX } from "react-icons/fi"
+import { hydrateProjectFlowFromApi } from "@/lib/project-flow"
 
  
 export default function DashboardLayout({
@@ -16,6 +17,20 @@ export default function DashboardLayout({
 }) {
   const [collapsed, setCollapsed] = useState(false)
   const [showGetStarted, setShowGetStarted] = useState(false)
+  const [, setProjectFlowVersion] = useState(0)
+
+  useEffect(() => {
+    let mounted = true
+
+    hydrateProjectFlowFromApi().finally(() => {
+      if (!mounted) return
+      setProjectFlowVersion((value) => value + 1)
+    })
+
+    return () => {
+      mounted = false
+    }
+  }, [])
  
   return (
     <div className="h-screen flex bg-gray-100 overflow-hidden">
