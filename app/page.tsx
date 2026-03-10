@@ -56,9 +56,7 @@ export default function Home() {
         setLoading(true);
         // Using axiosInstance with query params
         const response = await axiosInstance.get<ApiResponse>('/services', {
-          params: {
-            includeDeleted: true,
-          },
+         
         });
 
         if (response.data.success && response.data.data) {

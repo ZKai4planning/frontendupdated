@@ -26,7 +26,7 @@ export function ClientLogin() {
   const setToken = useAuthStore((state) => state.setToken)
   const setUserId = useAuthStore((state) => state.setUserId)
 
-  const identifier = email
+  const identifier = email.trim()
   const isOtpComplete = otp.every((d) => d !== "")
   const isInputsDisabled =
     isMobile || step === "VERIFY_OTP" || isSending || resending || isVerifying
@@ -57,9 +57,11 @@ export function ClientLogin() {
       case "DASHBOARD":
         return "/dashboard"
       case "PROFILE":
-        return "/profile"
+        return "/profile-setup"
       case "PROFILE1":
-        return "/profile1"
+        return "/profile-setup"
+      case "PROFILE_SETUP":
+        return "/profile-setup"
       case "PAYMENT":
         return "/dashboard?stage=payment"
       default:
@@ -84,53 +86,38 @@ export function ClientLogin() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
-    if (isMobile) {
-      return
-    }
+  
 
-    if (!email) {
+    if (!identifier) {
       toast.error("Please enter your email")
       return
     }
 
-    const emailDomain = email.trim().toLowerCase().split("@")[1] ?? ""
+    if (identifier.startsWith(".")) {
+      toast.error("Email cannot start with a dot (.)")
+      return
+    }
+
+    const emailDomain = identifier.toLowerCase().split("@")[1] ?? ""
     if (emailDomain && blockedEmailDomains.has(emailDomain)) {
       toast.error("Please use a real email address")
       return
     }
 
-    if (!fullName.trim()) {
-      toast.error("Please enter your full name")
-      return
-    }
 
-    if (!/^[A-Za-z\s]+$/.test(fullName.trim())) {
-      toast.error("Full name can only contain letters and spaces")
-      return
-    }
-    if (fullName.trim().length < 3 || fullName.trim().length > 50) {
-      toast.error("Full name must be between 3 and 50 characters")
-      return
-    }
 
-    if (phone && !/^\+44\d{10}$/.test(phone.trim())) {
-      toast.error("Please enter a UK phone number in the format +44XXXXXXXXXX")
-      return
-    }
 
-    if (phone && isDisallowedPhoneNumber(phone)) {
-      toast.error("Please enter a valid UK phone number")
-      return
-    }
+ 
+
+
 
     /* ===== STEP 1: REQUEST OTP ===== */
     if (step === "REQUEST_OTP") {
       try {
         setIsSending(true)
         const res = await axiosInstance.post("/auth/send-otp", {
-          identifier: email,
-          phoneNumber: phone,
-          fullName: fullName.trim(),
+          identifier,
+         
         })
 
         const data = res.data as {
@@ -177,7 +164,7 @@ export function ClientLogin() {
     try {
       setIsVerifying(true)
       const res = await axiosInstance.post("/auth/verify-otp", {
-        identifier: email,
+        identifier,
         otp: otpCode,
       })
 
@@ -214,7 +201,7 @@ export function ClientLogin() {
     try {
       setResending(true)
       const res = await axiosInstance.post("/auth/send-otp", {
-        identifier: email,
+        identifier,
         phoneNumber: phone,
         fullName: fullName.trim(),
       })
@@ -271,53 +258,7 @@ export function ClientLogin() {
 
       <form className="space-y-5" onSubmit={handleSubmit}>
         {/* FULL NAME */}
-        <div>
-          <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">
-            Full Name
-          </label>
-          <input
-            type="text"
-            value={fullName}
-            disabled={isInputsDisabled}
-            onChange={(e) => setFullName(e.target.value)}
-            placeholder="Enter your full name"
-            className="w-full h-12 sm:h-14 px-4 rounded-lg border text-black focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
-          />
-        </div>
-
-        {/* PHONE */}
-        <div>
-          <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">
-            Phone
-          </label>
-          <input
-            type="tel"
-            value={phone}
-            disabled={isInputsDisabled}
-            onChange={(e) => {
-              const raw = e.target.value.replace(/\s+/g, "")
-
-              if (!raw) {
-                setPhone("")
-                return
-              }
-
-              const digits = raw.replace(/\D/g, "")
-
-              let local = digits
-              if (digits.startsWith("44")) {
-                local = digits.slice(2)
-              } else if (digits.startsWith("0")) {
-                local = digits.slice(1)
-              }
-
-              const limited = local.slice(0, 10)
-              setPhone(`+44${limited}`)
-            }}
-            placeholder="+44 7911 123456"
-            className="w-full h-12 sm:h-14 px-4 rounded-lg border text-black focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
-          />
-        </div>
+   
 
         {/* EMAIL */}
         <div>
