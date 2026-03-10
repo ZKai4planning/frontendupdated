@@ -7,54 +7,16 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import axiosInstance from "@/lib/axiosinstance";
+import {
+  EMPTY_PROFILE,
+  type AddressModel,
+  type PhoneModel,
+  type ProfileFieldErrors,
+  type ProfileFieldPath,
+  type ProfileModel,
+  validateProfileInput,
+} from "@/lib/profile-validation";
 import { useAuthStore } from "@/lib/zustand";
-
-type PhoneModel = {
-  countryCode: string;
-  number: string;
-};
-
-type AddressModel = {
-  doorNo: string;
-  street: string;
-  locality: string;
-  city: string;
-  state: string;
-  country: string;
-  postalCode: string;
-};
-
-type ProfileModel = {
-  fullName: string;
-  bio: string;
-  council: string;
-  phone: PhoneModel;
-  landline: PhoneModel;
-  address: AddressModel;
-};
-
-const EMPTY_PROFILE: ProfileModel = {
-  fullName: "",
-  bio: "",
-  council: "",
-  phone: {
-    countryCode: "+44",
-    number: "",
-  },
-  landline: {
-    countryCode: "+44",
-    number: "",
-  },
-  address: {
-    doorNo: "",
-    street: "",
-    locality: "",
-    city: "",
-    state: "",
-    country: "",
-    postalCode: "",
-  },
-};
 
 const inputClassName =
   "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
@@ -134,6 +96,7 @@ export default function ProfileSetupPage() {
   const storeUserId = useAuthStore((state) => state.userId);
 
   const [formProfile, setFormProfile] = useState<ProfileModel>(EMPTY_PROFILE);
+  const [fieldErrors, setFieldErrors] = useState<ProfileFieldErrors>({});
   const [isFetching, setIsFetching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSkipping, setIsSkipping] = useState(false);
@@ -173,6 +136,7 @@ export default function ProfileSetupPage() {
 
         const normalized = normalizeProfileResponse(response.data);
         setFormProfile(normalized);
+        setFieldErrors({});
       } catch (error) {
         if (isCancelled) return;
 
@@ -194,11 +158,32 @@ export default function ProfileSetupPage() {
     };
   }, [resolvedUserId]);
 
+  const getInputClassName = (field: ProfileFieldPath) =>
+    `${inputClassName} ${
+      fieldErrors[field] ? "border-red-500 focus:border-red-500 focus:ring-red-100" : ""
+    }`;
+
+  const clearFieldError = (field: ProfileFieldPath) => {
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const renderFieldError = (field: ProfileFieldPath) => {
+    const message = fieldErrors[field];
+    if (!message) return null;
+    return <p className="mt-1 text-xs text-red-600">{message}</p>;
+  };
+
   const handleRootChange = (field: "fullName" | "bio" | "council", value: string) => {
     setFormProfile((prev) => ({
       ...prev,
       [field]: value,
     }));
+    clearFieldError(field);
   };
 
   const handlePhoneChange = (
@@ -213,6 +198,11 @@ export default function ProfileSetupPage() {
         [key]: value,
       },
     }));
+    const path =
+      field === "phone"
+        ? (`phone.${key}` as ProfileFieldPath)
+        : (`landline.${key}` as ProfileFieldPath);
+    clearFieldError(path);
   };
 
   const handleAddressChange = (key: keyof AddressModel, value: string) => {
@@ -223,6 +213,7 @@ export default function ProfileSetupPage() {
         [key]: value,
       },
     }));
+    clearFieldError(`address.${key}` as ProfileFieldPath);
   };
 
   const goToDashboard = () => {
@@ -243,21 +234,31 @@ export default function ProfileSetupPage() {
       return;
     }
 
+    const validation = validateProfileInput(formProfile);
+    setFormProfile(validation.sanitizedProfile);
+
+    if (!validation.isValid) {
+      setFieldErrors(validation.fieldErrors);
+      toast.error(validation.firstError ?? "Please fix the highlighted profile fields.");
+      return;
+    }
+
+    setFieldErrors({});
     setIsSaving(true);
 
     const endpoint = `/profile/${encodeURIComponent(resolvedUserId)}`;
 
     try {
       try {
-        await axiosInstance.put(endpoint, formProfile);
+        await axiosInstance.put(endpoint, validation.sanitizedProfile);
       } catch (error) {
         if (!shouldTryNextMethod(error)) throw error;
 
         try {
-          await axiosInstance.patch(endpoint, formProfile);
+          await axiosInstance.patch(endpoint, validation.sanitizedProfile);
         } catch (patchError) {
           if (!shouldTryNextMethod(patchError)) throw patchError;
-          await axiosInstance.post(endpoint, formProfile);
+          await axiosInstance.post(endpoint, validation.sanitizedProfile);
         }
       }
 
@@ -313,9 +314,12 @@ export default function ProfileSetupPage() {
                       id="fullName"
                       value={formProfile.fullName}
                       onChange={(event) => handleRootChange("fullName", event.target.value)}
-                      className={inputClassName}
+                      className={getInputClassName("fullName")}
                       placeholder="Full name"
+                      maxLength={80}
+                      aria-invalid={Boolean(fieldErrors.fullName)}
                     />
+                    {renderFieldError("fullName")}
                   </div>
 
                   <div>
@@ -326,9 +330,12 @@ export default function ProfileSetupPage() {
                       id="council"
                       value={formProfile.council}
                       onChange={(event) => handleRootChange("council", event.target.value)}
-                      className={inputClassName}
+                      className={getInputClassName("council")}
                       placeholder="Council"
+                      maxLength={120}
+                      aria-invalid={Boolean(fieldErrors.council)}
                     />
+                    {renderFieldError("council")}
                   </div>
 
                   <div className="md:col-span-2">
@@ -339,9 +346,12 @@ export default function ProfileSetupPage() {
                       id="bio"
                       value={formProfile.bio}
                       onChange={(event) => handleRootChange("bio", event.target.value)}
-                      className={`${inputClassName} min-h-24`}
+                      className={`${getInputClassName("bio")} min-h-24`}
                       placeholder="Short bio"
+                      maxLength={600}
+                      aria-invalid={Boolean(fieldErrors.bio)}
                     />
+                    {renderFieldError("bio")}
                   </div>
                 </div>
               </section>
@@ -356,9 +366,12 @@ export default function ProfileSetupPage() {
                       onChange={(event) =>
                         handlePhoneChange("phone", "countryCode", event.target.value)
                       }
-                      className={inputClassName}
+                      className={getInputClassName("phone.countryCode")}
                       placeholder="+44"
+                      maxLength={5}
+                      aria-invalid={Boolean(fieldErrors["phone.countryCode"])}
                     />
+                    {renderFieldError("phone.countryCode")}
                   </div>
 
                   <div>
@@ -366,9 +379,13 @@ export default function ProfileSetupPage() {
                     <input
                       value={formProfile.phone.number}
                       onChange={(event) => handlePhoneChange("phone", "number", event.target.value)}
-                      className={inputClassName}
+                      className={getInputClassName("phone.number")}
                       placeholder="9100012345"
+                      maxLength={15}
+                      inputMode="numeric"
+                      aria-invalid={Boolean(fieldErrors["phone.number"])}
                     />
+                    {renderFieldError("phone.number")}
                   </div>
 
                   <div>
@@ -380,9 +397,12 @@ export default function ProfileSetupPage() {
                       onChange={(event) =>
                         handlePhoneChange("landline", "countryCode", event.target.value)
                       }
-                      className={inputClassName}
+                      className={getInputClassName("landline.countryCode")}
                       placeholder="+44"
+                      maxLength={5}
+                      aria-invalid={Boolean(fieldErrors["landline.countryCode"])}
                     />
+                    {renderFieldError("landline.countryCode")}
                   </div>
 
                   <div>
@@ -392,9 +412,13 @@ export default function ProfileSetupPage() {
                       onChange={(event) =>
                         handlePhoneChange("landline", "number", event.target.value)
                       }
-                      className={inputClassName}
+                      className={getInputClassName("landline.number")}
                       placeholder="4023456789"
+                      maxLength={15}
+                      inputMode="numeric"
+                      aria-invalid={Boolean(fieldErrors["landline.number"])}
                     />
+                    {renderFieldError("landline.number")}
                   </div>
                 </div>
               </section>
@@ -407,9 +431,12 @@ export default function ProfileSetupPage() {
                     <input
                       value={formProfile.address.doorNo}
                       onChange={(event) => handleAddressChange("doorNo", event.target.value)}
-                      className={inputClassName}
+                      className={getInputClassName("address.doorNo")}
                       placeholder="12-3-45"
+                      maxLength={30}
+                      aria-invalid={Boolean(fieldErrors["address.doorNo"])}
                     />
+                    {renderFieldError("address.doorNo")}
                   </div>
 
                   <div>
@@ -417,9 +444,12 @@ export default function ProfileSetupPage() {
                     <input
                       value={formProfile.address.street}
                       onChange={(event) => handleAddressChange("street", event.target.value)}
-                      className={inputClassName}
+                      className={getInputClassName("address.street")}
                       placeholder="Street Road"
+                      maxLength={120}
+                      aria-invalid={Boolean(fieldErrors["address.street"])}
                     />
+                    {renderFieldError("address.street")}
                   </div>
 
                   <div>
@@ -427,9 +457,12 @@ export default function ProfileSetupPage() {
                     <input
                       value={formProfile.address.locality}
                       onChange={(event) => handleAddressChange("locality", event.target.value)}
-                      className={inputClassName}
+                      className={getInputClassName("address.locality")}
                       placeholder="Locality"
+                      maxLength={120}
+                      aria-invalid={Boolean(fieldErrors["address.locality"])}
                     />
+                    {renderFieldError("address.locality")}
                   </div>
 
                   <div>
@@ -437,9 +470,12 @@ export default function ProfileSetupPage() {
                     <input
                       value={formProfile.address.city}
                       onChange={(event) => handleAddressChange("city", event.target.value)}
-                      className={inputClassName}
+                      className={getInputClassName("address.city")}
                       placeholder="City"
+                      maxLength={80}
+                      aria-invalid={Boolean(fieldErrors["address.city"])}
                     />
+                    {renderFieldError("address.city")}
                   </div>
 
                   <div>
@@ -447,9 +483,12 @@ export default function ProfileSetupPage() {
                     <input
                       value={formProfile.address.state}
                       onChange={(event) => handleAddressChange("state", event.target.value)}
-                      className={inputClassName}
+                      className={getInputClassName("address.state")}
                       placeholder="State"
+                      maxLength={80}
+                      aria-invalid={Boolean(fieldErrors["address.state"])}
                     />
+                    {renderFieldError("address.state")}
                   </div>
 
                   <div>
@@ -457,9 +496,12 @@ export default function ProfileSetupPage() {
                     <input
                       value={formProfile.address.country}
                       onChange={(event) => handleAddressChange("country", event.target.value)}
-                      className={inputClassName}
+                      className={getInputClassName("address.country")}
                       placeholder="Country"
+                      maxLength={80}
+                      aria-invalid={Boolean(fieldErrors["address.country"])}
                     />
+                    {renderFieldError("address.country")}
                   </div>
 
                   <div className="md:col-span-2">
@@ -467,9 +509,12 @@ export default function ProfileSetupPage() {
                     <input
                       value={formProfile.address.postalCode}
                       onChange={(event) => handleAddressChange("postalCode", event.target.value)}
-                      className={inputClassName}
+                      className={getInputClassName("address.postalCode")}
                       placeholder="500016"
+                      maxLength={12}
+                      aria-invalid={Boolean(fieldErrors["address.postalCode"])}
                     />
+                    {renderFieldError("address.postalCode")}
                   </div>
                 </div>
               </section>
