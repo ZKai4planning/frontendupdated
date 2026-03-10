@@ -19,7 +19,14 @@ import {
   AlertCircle,
   Zap,
 } from "lucide-react"
-import { PROJECT_FLOW } from "@/lib/project-flow"
+import {
+  PROJECT_FLOW,
+  getRoadmapProjectFlow,
+  getProjectStepIndexById,
+  getJourneyProgressPercent,
+  normalizeProjectStepIndex,
+  resolveProjectProgressIndex,
+} from "@/lib/project-flow"
 import { useUserIdentity } from "@/lib/use-user-identity"
 
 type Step = 1 | 2 | 3 | 4 | 5
@@ -991,15 +998,20 @@ function EligibilityCheckPage() {
         : undefined
 
   const stageFromQuery = searchParams.get("stage")
+  const progressParam = searchParams.get("progress")
+  const isReadOnly = searchParams.get("readonly") === "1"
   const pathnameStage = pathname.split("/").filter(Boolean).pop()
   const currentRoute = stageFromQuery ?? stageParam ?? pathnameStage ?? ""
   const currentProjectStepIndex = PROJECT_FLOW.findIndex(s =>
     s.route === currentRoute ||
     s.legacyRoutes?.includes(currentRoute)
   )
-  const currentProjectStep = currentProjectStepIndex >= 0 ? currentProjectStepIndex : 0
-  const progress = Math.round((currentProjectStep / (PROJECT_FLOW.length - 1)) * 100)
-  const currentStepCard = PROJECT_FLOW[currentProjectStep]?.nextCard
+  const currentStageIndex =
+    currentProjectStepIndex >= 0 ? normalizeProjectStepIndex(currentProjectStepIndex) : 0
+  const currentProjectStep = resolveProjectProgressIndex(currentStageIndex, progressParam)
+  const visibleProjectFlow = getRoadmapProjectFlow(currentProjectStep)
+  const progress = getJourneyProgressPercent(currentProjectStep)
+  const currentStepCard = PROJECT_FLOW[currentStageIndex]?.nextCard
   const currentStepCta =
     currentStepCard?.ctaStage
       ? `/dashboard?stage=${currentStepCard.ctaStage}`
@@ -1123,7 +1135,7 @@ function EligibilityCheckPage() {
           <p className="text-sm text-slate-500 mt-1">
             Current Stage:{" "}
             <span className="font-medium text-slate-700">
-              {PROJECT_FLOW[currentProjectStep]?.label}
+              {PROJECT_FLOW[currentStageIndex]?.label}
             </span>
           </p>
         </div>
@@ -1146,19 +1158,20 @@ function EligibilityCheckPage() {
 
       {/* ROADMAP */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
-        <div className="lg:col-span-8">
+        <div className="lg:col-span-8 space-y-6">
           <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-semibold text-slate-800">Project Stages</h2>
               <span className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                STEP {currentProjectStep + 1} OF {PROJECT_FLOW.length}
+                STEP {currentProjectStep + 1} OF {visibleProjectFlow.length}
               </span>
             </div>
             <div className="flex items-center justify-between overflow-x-auto pb-2 min-h-[120px]">
-              {PROJECT_FLOW.map((stepItem, index) => {
+              {visibleProjectFlow.map((stepItem, index) => {
+                const stepItemIndex = getProjectStepIndexById(stepItem.id)
                 const status =
-                  index < currentProjectStep ? "completed" :
-                  index === currentProjectStep ? "active" : undefined
+                  stepItemIndex < currentProjectStep ? "completed" :
+                  stepItemIndex === currentProjectStep ? "active" : undefined
                 return (
                   <div key={stepItem.route} className="flex items-center">
                     <RoadmapStep
@@ -1166,12 +1179,15 @@ function EligibilityCheckPage() {
                       icon={stepItem.icon}
                       status={status}
                       onClick={() => {
-                        if (index <= currentProjectStep) {
-                          router.push(`/dashboard?stage=${stepItem.route}`)
+                        if (stepItemIndex <= currentProjectStep) {
+                          const readonlyParam = stepItemIndex < currentProjectStep ? "&readonly=1" : ""
+                          router.push(
+                            `/dashboard?stage=${stepItem.route}&progress=${currentProjectStep}${readonlyParam}`
+                          )
                         }
                       }}
                     />
-                    {index !== PROJECT_FLOW.length - 1 && <RoadmapLine />}
+                    {index !== visibleProjectFlow.length - 1 && <RoadmapLine />}
                   </div>
                 )
               })}
@@ -1229,6 +1245,12 @@ function EligibilityCheckPage() {
                   <StepLabel key={i} active={step === i + 1}>{label}</StepLabel>
                 ))}
               </div>
+              {isReadOnly && (
+                <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Read-only mode: completed step data is view-only.
+                </div>
+              )}
+              <fieldset disabled={isReadOnly} className={isReadOnly ? "opacity-85" : undefined}>
 
             {/* ── STEP 1: Applicant & Property (rows 001–007) ── */}
             {step === 1 && (
@@ -1310,8 +1332,8 @@ function EligibilityCheckPage() {
                       rows={3}
                       placeholder="Summarise the proposal, including size, number of storeys and position…"
                       className="w-full rounded-xl border px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
-                      defaultValue={savedFormData["Description of Proposed Works"] || ""}
-                      onBlur={e =>
+                      value={asStringValue(savedFormData["Description of Proposed Works"])}
+                      onChange={e =>
                         updateSection("eligibility", {
                           formData: { ...savedFormData, "Description of Proposed Works": e.target.value },
                         })
@@ -1466,18 +1488,17 @@ function EligibilityCheckPage() {
                     options={["Yes", "No", "Don't know"]}
                     consultTrigger="We strongly recommend pre-application advice. Book a session with Agent X."
                   />
-                  <Input label="Pre-Application Reference Number" syncOnValueChange />
-                  <Input label="Date of Pre-App Advice" syncOnValueChange />
-                  <Input label="Officer Name" syncOnValueChange />
+                  <Input label="Pre-Application Reference Number" />
+                  <Input label="Date of Pre-App Advice" />
+                  <Input label="Officer Name" />
                   <div className="col-span-2">
                     <FieldLabel label="Summary of Pre-App Advice Received" wrapperClassName="mb-1" />
                     <textarea
-                      key={asStringValue(savedFormData["Summary of Pre-App Advice Received"])}
                       rows={2}
                       placeholder="Briefly describe any advice received from the LPA…"
                       className="w-full rounded-xl border px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
-                      defaultValue={asStringValue(savedFormData["Summary of Pre-App Advice Received"])}
-                      onBlur={e =>
+                      value={asStringValue(savedFormData["Summary of Pre-App Advice Received"])}
+                      onChange={e =>
                         updateSection("eligibility", {
                           formData: { ...savedFormData, "Summary of Pre-App Advice Received": e.target.value },
                         })
@@ -1536,8 +1557,8 @@ function EligibilityCheckPage() {
                       rows={2}
                       placeholder="List any other known owners or agricultural tenants…"
                       className="w-full rounded-xl border px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
-                      defaultValue={savedFormData["Other Owners Details"] || ""}
-                      onBlur={e =>
+                      value={asStringValue(savedFormData["Other Owners Details"])}
+                      onChange={e =>
                         updateSection("eligibility", {
                           formData: { ...savedFormData, "Other Owners Details": e.target.value },
                         })
@@ -1687,6 +1708,7 @@ function EligibilityCheckPage() {
                 </button>
               )}
               </div>
+              </fieldset>
             </div>
           </div>
 
@@ -1853,18 +1875,15 @@ function Input({
   placeholder,
   tooltip,
   questionNumber,
-  syncOnValueChange = false,
 }: {
   label: string
   placeholder?: string
   tooltip?: string
   questionNumber?: number
-  syncOnValueChange?: boolean
 }) {
   const { data, updateSection } = useProject()
   const value = asStringValue(data.eligibility?.formData?.[label])
   const fieldId = getFieldId(label)
-  const inputKey = syncOnValueChange ? `${label}-${value}` : undefined
 
   return (
     <div id={fieldId}>
@@ -1875,10 +1894,9 @@ function Input({
         wrapperClassName="mb-0"
       />
       <input
-        key={inputKey}
-        defaultValue={value}
+        value={value}
         placeholder={placeholder}
-        onBlur={e =>
+        onChange={e =>
           updateSection("eligibility", {
             formData: { ...(data.eligibility?.formData || {}), [label]: e.target.value },
           })
@@ -2289,7 +2307,10 @@ function RoadmapStep({ label, status, icon: Icon, onClick }: {
   label: string; status?: "completed" | "active"; icon: React.ElementType; onClick?: () => void
 }) {
   return (
-    <div onClick={onClick} className="flex flex-col items-center gap-2 cursor-pointer group min-w-[100px]">
+    <div
+      onClick={onClick}
+      className={`flex flex-col items-center gap-2 min-w-[110px] ${onClick ? "cursor-pointer" : ""}`}
+    >
       <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 ${
         status === "completed" ? "bg-blue-600 text-white" :
         status === "active" ? "border-2 border-blue-600 text-blue-600 bg-white animate-pulse" :
@@ -2305,6 +2326,6 @@ function RoadmapStep({ label, status, icon: Icon, onClick }: {
 }
 
 function RoadmapLine() {
-  return <div className="h-[2px] bg-slate-200 mx-3 min-w-[40px] flex-1" />
+  return <div className="flex-1 h-[2px] bg-slate-200 mx-2 min-w-[120px]" />
 }
 

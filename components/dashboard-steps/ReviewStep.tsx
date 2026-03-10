@@ -1,18 +1,19 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
   CheckCircle,
-  FileText,
-  Landmark,
-  User,
-  Package,
-  FileSearch,
-  Headset,
-  Camera,
 } from "lucide-react"
 import { useUserIdentity } from "@/lib/use-user-identity"
+import {
+  PROJECT_FLOW,
+  getRoadmapProjectFlow,
+  getProjectStepIndexById,
+  getJourneyProgressPercent,
+  normalizeProjectStepIndex,
+  resolveProjectProgressIndex,
+} from "@/lib/project-flow"
 
 /* ================= TYPES ================= */
 
@@ -56,6 +57,9 @@ const UPLOADED_DOCUMENTS: DocumentItem[] = [
 
 export default function ReviewPage() {
   const router = useRouter()
+  const pathname = usePathname()
+  const params = useParams()
+  const searchParams = useSearchParams()
   const { fullName } = useUserIdentity()
   const displayName = fullName || "User"
   const [showPaymentCard, setShowPaymentCard] = useState(false)
@@ -68,21 +72,28 @@ export default function ReviewPage() {
     return () => clearTimeout(timer)
   }, [])
 
-  const projectFlow = [
-    { label: "Profile", icon: User },
-    { label: "Service & Initial Payment", icon: Package },
-    { label: "Eligibility Check", icon: FileSearch },
-    { label: "Consultant Schedule", icon: Headset },
-    { label: "Upload Documents", icon: FileText },
-    { label: "Review", icon: Camera },
-    { label: "Submit to Council", icon: Landmark },
-  ]
+  const stageParam =
+    typeof params?.stage === "string"
+      ? params.stage
+      : Array.isArray(params?.stage)
+      ? params.stage[0]
+      : undefined
 
-  const currentProjectStep = 6
+  const stageFromQuery = searchParams.get("stage")
+  const progressParam = searchParams.get("progress")
+  const pathnameStage = pathname.split("/").filter(Boolean).pop()
+  const currentRoute = stageFromQuery ?? stageParam ?? pathnameStage ?? ""
 
-  const progress = Math.round(
-    ((currentProjectStep - 1) / (projectFlow.length - 1)) * 100
+  const stepIndex = PROJECT_FLOW.findIndex(step =>
+    step.route === currentRoute || step.legacyRoutes?.includes(currentRoute)
   )
+  const fallbackIndex = PROJECT_FLOW.findIndex(step => step.route === "review")
+  const resolvedStepIndex = stepIndex >= 0 ? stepIndex : fallbackIndex
+  const currentStageIndex = normalizeProjectStepIndex(resolvedStepIndex)
+  const currentProjectStep = resolveProjectProgressIndex(currentStageIndex, progressParam)
+  const visibleProjectFlow = getRoadmapProjectFlow(currentProjectStep)
+
+  const progress = getJourneyProgressPercent(currentProjectStep)
 
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-8">
@@ -101,7 +112,7 @@ export default function ReviewPage() {
           <p className="text-sm text-slate-500 mt-1">
             Current Stage:{" "}
             <span className="font-medium text-slate-700">
-              {projectFlow[currentProjectStep - 1].label}
+              {PROJECT_FLOW[currentStageIndex]?.label}
             </span>
           </p>
         </div>
@@ -155,71 +166,39 @@ export default function ReviewPage() {
                                   Project Stages
                               </h2>
                               <span className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                                  STEP 8 OF 9
+                                  STEP {currentProjectStep + 1} OF {visibleProjectFlow.length}
                               </span>
                           </div>
 
-                          <div className="flex items-center justify-between min-h-[100px]">
-                              <RoadmapStep
-                                  label="Profile"
-                                  status="completed"
-                                  icon={User}
-                              />
-                              <RoadmapLine />
+                          <div className="flex items-center justify-between min-h-[100px] overflow-x-auto pb-2">
+                              {visibleProjectFlow.map((stepItem, index) => {
+                                const stepItemIndex = getProjectStepIndexById(stepItem.id)
+                                const status =
+                                  stepItemIndex < currentProjectStep
+                                    ? "completed"
+                                    : stepItemIndex === currentProjectStep
+                                    ? "active"
+                                    : undefined
 
-                              <RoadmapStep
-                                  label="Service & Intial Payment"
-                                  status="completed"
-                                  icon={Package}
-                              />
-                              <RoadmapLine />
-
-                              <RoadmapStep
-                                  label="Eligibility Check"
-                                  status="completed"
-                                  icon={FileSearch}
-                              />
-                              <RoadmapLine />
-
-                              <RoadmapStep
-                                  label="Consultant Shedule"
-                                  status="completed"
-                                  icon={Headset}
-                              />
-                              <RoadmapLine />
-
-                              <RoadmapStep
-                                  label="First Quotation"
-                                  status="completed"
-                                  icon={Headset}
-                              />
-                              <RoadmapLine />
-
-                              <RoadmapStep
-                                  label="Upload Documents"
-                                  status="completed"
-                                  icon={FileText}
-                              />
-                              <RoadmapLine />
-                <RoadmapStep
-                  label="Final Quotation"
-                  status="completed"
-                  icon={FileText}
-                />
-                <RoadmapLine />
-
-                              <RoadmapStep
-                                  label="Review"
-                                  status="active"
-                                  icon={Camera}
-                              />
-                              <RoadmapLine />
-
-                              <RoadmapStep
-                                  label="Submit to Council"
-                                  icon={FileText}
-                              />
-
+                                return (
+                                  <div key={stepItem.id} className="flex items-center">
+                                    <RoadmapStep
+                                      label={stepItem.label}
+                                      status={status}
+                                      icon={stepItem.icon}
+                                      onClick={() => {
+                                        if (stepItemIndex <= currentProjectStep && stepItem.route !== "#") {
+                                          const readonlyParam = stepItemIndex < currentProjectStep ? "&readonly=1" : ""
+                                          router.push(
+                                            `/dashboard?stage=${stepItem.route}&progress=${currentProjectStep}${readonlyParam}`
+                                          )
+                                        }
+                                      }}
+                                    />
+                                    {index !== visibleProjectFlow.length - 1 && <RoadmapLine />}
+                                  </div>
+                                )
+                              })}
                           </div>
                       </div>
                   </div>
@@ -291,13 +270,18 @@ function RoadmapStep({
   label,
   status,
   icon: Icon,
+  onClick,
 }: {
   label: string
   status?: "completed" | "active"
   icon: React.ElementType
+  onClick?: () => void
 }) {
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div
+      onClick={onClick}
+      className={`flex flex-col items-center gap-2 min-w-[110px] ${onClick ? "cursor-pointer" : ""}`}
+    >
       <div
         className={`w-10 h-10 rounded-full flex items-center justify-center duration-300
         ${
@@ -327,5 +311,5 @@ function RoadmapStep({
 }
 
 function RoadmapLine() {
-  return <div className="flex-1 h-[2px] bg-slate-200 mx-2" />
+  return <div className="h-[2px] bg-slate-200 w-8 lg:flex-1 lg:w-auto" />
 }

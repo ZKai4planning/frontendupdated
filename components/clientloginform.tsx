@@ -108,8 +108,8 @@ export function ClientLogin() {
       toast.error("Full name can only contain letters and spaces")
       return
     }
-    if (fullName.trim().length < 2 || fullName.trim().length > 50) {
-      toast.error("Full name must be between 2 and 50 characters")
+    if (fullName.trim().length < 3 || fullName.trim().length > 50) {
+      toast.error("Full name must be between 3 and 50 characters")
       return
     }
 

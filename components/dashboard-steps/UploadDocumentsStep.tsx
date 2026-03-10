@@ -1,19 +1,17 @@
 "use client"
 
 import React, { useState } from "react"
-import Table from "@/components/upload-table"
-import {
-  FileSearch,
-  Landmark,
-  CheckCircle,
-  Headset,
-  Package,
-  User,
-  FileText,
-  Camera,
-} from "lucide-react"
-import { useRouter } from "next/navigation"
+import { CheckCircle, FileText} from "lucide-react"
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useUserIdentity } from "@/lib/use-user-identity"
+import {
+  PROJECT_FLOW,
+  getRoadmapProjectFlow,
+  getProjectStepIndexById,
+  getJourneyProgressPercent,
+  normalizeProjectStepIndex,
+  resolveProjectProgressIndex,
+} from "@/lib/project-flow"
 
 /* ================= DOCUMENT TYPES ================= */
 
@@ -63,22 +61,46 @@ export default function UploadDocumentsDashboard() {
   const [documents, setDocuments] =
     useState<DocumentItem[]>(REQUIRED_DOCUMENTS)
 
-  const projectFlow = [
-      { label: "Profile", icon: User },
-      { label: "Service & Initial Payment", icon: Package },
-      { label: "Eligibility Check", icon: FileSearch },
-      { label: "Consultant Schedule", icon: Headset },
-      { label: "Upload Documents", icon: FileText },
-      { label: "Review", icon: CheckCircle },
-      { label: "Submit to Council", icon: Landmark },
-    ]
-  
-    // 🔁 Later replace from backend
-    const currentProjectStep = 5
-  
-    const progress = Math.round(
-      ((currentProjectStep - 1) / (projectFlow.length - 1)) * 100
-    )
+  const pathname = usePathname()
+  const params = useParams()
+  const searchParams = useSearchParams()
+
+  const stageParam =
+    typeof params?.stage === "string"
+      ? params.stage
+      : Array.isArray(params?.stage)
+      ? params.stage[0]
+      : undefined
+
+  const stageFromQuery = searchParams.get("stage")
+  const progressParam = searchParams.get("progress")
+  const isReadOnly = searchParams.get("readonly") === "1"
+  const pathnameStage = pathname.split("/").filter(Boolean).pop()
+  const currentRoute = stageFromQuery ?? stageParam ?? pathnameStage ?? ""
+
+  const stepIndex = PROJECT_FLOW.findIndex(step =>
+    step.route === currentRoute || step.legacyRoutes?.includes(currentRoute)
+  )
+  const currentStageIndex = stepIndex >= 0 ? normalizeProjectStepIndex(stepIndex) : 0
+  const currentProjectStep = resolveProjectProgressIndex(currentStageIndex, progressParam)
+  const visibleProjectFlow = getRoadmapProjectFlow(currentProjectStep)
+  const roadmapSteps = [
+    ...visibleProjectFlow.map((stepItem) => {
+      const stepItemIndex = getProjectStepIndexById(stepItem.id)
+      return ({
+      id: stepItem.id,
+      label: stepItem.label,
+      icon: stepItem.icon,
+      stage: stepItem.route,
+      status:
+        stepItemIndex < currentProjectStep
+          ? ("completed" as const)
+          : stepItemIndex === currentProjectStep
+          ? ("active" as const)
+          : undefined,
+    })}),
+  ]
+  const progress = getJourneyProgressPercent(currentProjectStep)
 
   const uploadedCount = documents.filter(
     doc => doc.status === "uploaded"
@@ -111,7 +133,7 @@ export default function UploadDocumentsDashboard() {
           <p className="text-sm text-slate-500 mt-1">
             Current Stage:{" "}
             <span className="font-medium text-slate-700">
-              {projectFlow[currentProjectStep - 1].label}
+              {PROJECT_FLOW[currentStageIndex]?.label}
             </span>
           </p>
         </div>
@@ -165,55 +187,35 @@ export default function UploadDocumentsDashboard() {
           Project Stages
         </h2>
         <span className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-          STEP 6 OF 8
+          STEP {currentProjectStep + 1} OF {roadmapSteps.length}
         </span>
       </div>
 
       {/* Roadmap Container */}
       <div className="overflow-x-auto">
         <div className="flex items-center justify-between overflow-x-auto pb-2 min-h-[100px]">
-                
-                              <RoadmapStep label="Profile" status="completed" icon={User} />
-                              <RoadmapLine />
-                
-                              <RoadmapStep
-                                label="Service & Initial Payment"
-                                status="completed"
-                                icon={Package}
-                              />
-                              <RoadmapLine />
-                
-                              <RoadmapStep label="Eligibility Check" status="completed" icon={FileSearch} />
-                              <RoadmapLine />
-                
-                              <RoadmapStep label="Consultant Schedule" status="completed" icon={Headset} />
-                              <RoadmapLine />
-                
-                              <RoadmapStep
-                                label="Initial Quotation"
-                                status="completed"
-                                icon={FileText}
-                              />
-                              <RoadmapLine />
-                
-                              <RoadmapStep
-                                label="Upload Documents"
-                                status="active"
-                                icon={FileText}
-                              /><RoadmapLine />
-        
-                              <RoadmapStep
-                                label="Final Quotation"
-                                icon={FileText}
-                              />
-                              <RoadmapLine />
-                
-                              <RoadmapStep
-                                label="Review"
-                                icon={FileText}
-                              />
-                              
-                            </div>
+          {roadmapSteps.map((stepItem, index) => {
+            return (
+              <React.Fragment key={stepItem.id}>
+                <RoadmapStep
+                  label={stepItem.label}
+                  status={stepItem.status}
+                  icon={stepItem.icon}
+                  onClick={() => {
+                    const stepItemIndex = getProjectStepIndexById(stepItem.id)
+                    if (stepItemIndex <= currentProjectStep && stepItem.stage !== "#") {
+                      const readonlyParam = stepItemIndex < currentProjectStep ? "&readonly=1" : ""
+                      router.push(
+                        `/dashboard?stage=${stepItem.stage}&progress=${currentProjectStep}${readonlyParam}`
+                      )
+                    }
+                  }}
+                />
+                {index !== roadmapSteps.length - 1 && <RoadmapLine />}
+              </React.Fragment>
+            )
+          })}
+        </div>
       </div>
 
     </div>
@@ -252,6 +254,7 @@ export default function UploadDocumentsDashboard() {
                 key={doc.id}
                 doc={doc}
                 onUpload={() => handleUpload(doc.id)}
+                disabled={isReadOnly}
               />
             ))}
           </div>
@@ -292,17 +295,15 @@ export default function UploadDocumentsDashboard() {
             </div>
 
             <button
+              disabled={isReadOnly}
               onClick={() => router.push("/dashboard?stage=final-quotation")}
               className="w-full rounded-xl bg-green-600 text-white py-3 font-semibold
-              disabled:opacity-40 cursor-pointer"
+              disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
             >
               Continue 
             </button>
-
           </div>
         </div>
-
-
     </main>
   )
 }
@@ -312,9 +313,11 @@ export default function UploadDocumentsDashboard() {
 function DocumentCard({
   doc,
   onUpload,
+  disabled = false,
 }: {
   doc: DocumentItem
   onUpload: () => void
+  disabled?: boolean
 }) {
   return (
     <div className="rounded-2xl border bg-white p-6 shadow-sm flex items-center justify-between">
@@ -352,10 +355,11 @@ function DocumentCard({
           Uploaded
         </span>
       ) : (
-        <label className="cursor-pointer">
+        <label className={disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer"}>
           <input
             type="file"
             className="hidden"
+            disabled={disabled}
             accept=".pdf,.jpg,.jpeg,.png"
             onChange={onUpload}
           />
@@ -385,7 +389,7 @@ function RoadmapStep({
   return (
     <div
           onClick={onClick}
-          className="flex flex-col items-center gap-2 cursor-pointer group"
+          className={`flex flex-col items-center gap-2 min-w-[110px] ${onClick ? "cursor-pointer" : ""}`}
         >
           <div
             className={`

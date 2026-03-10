@@ -2,24 +2,26 @@
 
 import React, { useState, useEffect } from "react"
 import Table from "@/components/consultant-table"
-import { useRouter } from "next/navigation"
+import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
 import {
-  FileSearch,
-  Landmark,
   CheckCircle,
-  Headset,
-  Package,
-  User,
-  FileText,
-  Camera,
-  Info,
-  UploadCloud,
 } from "lucide-react"
 import { motion } from "framer-motion"
 import { useUserIdentity } from "@/lib/use-user-identity"
+import {
+  PROJECT_FLOW,
+  getRoadmapProjectFlow,
+  getProjectStepIndexById,
+  getJourneyProgressPercent,
+  normalizeProjectStepIndex,
+  resolveProjectProgressIndex,
+} from "@/lib/project-flow"
 
 export default function EligibilityCheckPage() {
   const router = useRouter()
+  const pathname = usePathname()
+  const params = useParams()
+  const searchParams = useSearchParams()
   const { fullName } = useUserIdentity()
   const displayName = fullName || "User"
 
@@ -39,25 +41,29 @@ export default function EligibilityCheckPage() {
     return () => clearTimeout(timer)
   }, [])
 
-  /* ================= PROJECT FLOW ================= */
+  const stageParam =
+    typeof params?.stage === "string"
+      ? params.stage
+      : Array.isArray(params?.stage)
+      ? params.stage[0]
+      : undefined
 
-  const projectFlow = [
-    { label: "Profile", icon: User },
-    { label: "Service & Initial Payment", icon: Package },
-    { label: "Eligibility Check", icon: FileSearch },
-    { label: "Consultant Schedule", icon: Headset },
-    { label: "Initial Quotation", icon: CheckCircle },
-    { label: "Upload Documents", icon: FileText },
-    { label: "Final Quotation", icon: CheckCircle },
-    { label: "Review", icon: CheckCircle },
-    { label: "Submit to Council", icon: Landmark },
-  ]
+  const stageFromQuery = searchParams.get("stage")
+  const progressParam = searchParams.get("progress")
+  const isReadOnly = searchParams.get("readonly") === "1"
+  const pathnameStage = pathname.split("/").filter(Boolean).pop()
+  const currentRoute = stageFromQuery ?? stageParam ?? pathnameStage ?? ""
 
-  const currentProjectStep = 7
-
-  const progress = Math.round(
-    ((currentProjectStep - 1) / (projectFlow.length - 1)) * 100
+  const stepIndex = PROJECT_FLOW.findIndex(step =>
+    step.route === currentRoute || step.legacyRoutes?.includes(currentRoute)
   )
+  const fallbackIndex = PROJECT_FLOW.findIndex(step => step.route === "final-quotation")
+  const resolvedStepIndex = stepIndex >= 0 ? stepIndex : fallbackIndex
+  const currentStageIndex = normalizeProjectStepIndex(resolvedStepIndex)
+  const currentProjectStep = resolveProjectProgressIndex(currentStageIndex, progressParam)
+  const visibleProjectFlow = getRoadmapProjectFlow(currentProjectStep)
+
+  const progress = getJourneyProgressPercent(currentProjectStep)
 
   return (
     <main className="min-h-screen bg-slate-50 px-5 py-8">
@@ -76,7 +82,7 @@ export default function EligibilityCheckPage() {
           <p className="text-sm text-slate-500 mt-1">
             Current Stage:{" "}
             <span className="font-medium text-slate-700">
-              {projectFlow[currentProjectStep - 1].label}
+              {PROJECT_FLOW[currentStageIndex]?.label}
             </span>
           </p>
         </div>
@@ -122,64 +128,41 @@ export default function EligibilityCheckPage() {
           Project Stages
         </h2>
         <span className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-          STEP 7 OF 8
+          STEP {currentProjectStep + 1} OF {visibleProjectFlow.length}
         </span>
       </div>
 
       {/* Horizontal scroll container */}
       <div className="overflow-x-auto">
         <div className="flex items-center min-w-max gap-2">
+          {visibleProjectFlow.map((stepItem, index) => {
+            const stepItemIndex = getProjectStepIndexById(stepItem.id)
+            const status =
+              stepItemIndex < currentProjectStep
+                ? "completed"
+                : stepItemIndex === currentProjectStep
+                ? "active"
+                : undefined
 
-          <RoadmapStep label="Profile" status="completed" icon={User} />
-          <RoadmapLine />
-
-          <RoadmapStep
-            label="Service & Initial Payment"
-            status="completed"
-            icon={Package}
-          />
-          <RoadmapLine />
-
-          <RoadmapStep
-            label="Eligibility Check"
-            status="completed"
-            icon={FileSearch}
-          />
-          <RoadmapLine />
-
-          <RoadmapStep
-            label="Consultant Schedule"
-            status="completed"
-            icon={Headset}
-          />
-          <RoadmapLine />
-
-          <RoadmapStep
-            label="Quotation Received"
-            status="completed"
-            icon={FileText}
-          />
-          <RoadmapLine />
-
-          <RoadmapStep
-            label="Upload Documents"
-            status="completed"
-            icon={FileText}
-          />
-          <RoadmapLine />
-
-          <RoadmapStep
-            label="Final Quotation"
-            status="active"
-            icon={FileText}
-          />
-          <RoadmapLine />
-
-          <RoadmapStep
-            label="Review"
-            icon={FileText}
-          />
-
+            return (
+              <React.Fragment key={stepItem.id}>
+                <RoadmapStep
+                  label={stepItem.label}
+                  status={status}
+                  icon={stepItem.icon}
+                  onClick={() => {
+                    if (stepItemIndex <= currentProjectStep) {
+                      const readonlyParam = stepItemIndex < currentProjectStep ? "&readonly=1" : ""
+                      router.push(
+                        `/dashboard?stage=${stepItem.route}&progress=${currentProjectStep}${readonlyParam}`
+                      )
+                    }
+                  }}
+                />
+                {index !== visibleProjectFlow.length - 1 && <RoadmapLine />}
+              </React.Fragment>
+            )
+          })}
         </div>
       </div>
 
@@ -349,6 +332,7 @@ export default function EligibilityCheckPage() {
     {/* Transaction Reference */}
     <input
       placeholder="Transaction reference"
+      disabled={isReadOnly}
       className="w-full border rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
     />
 
@@ -363,6 +347,7 @@ export default function EligibilityCheckPage() {
       <input
         type="file"
         className="hidden"
+        disabled={isReadOnly}
         onChange={(e) => setFile(e.target.files?.[0] || null)}
       />
     </label>
@@ -375,8 +360,9 @@ export default function EligibilityCheckPage() {
 
     {/* Submit Button */}
     <button
+      disabled={isReadOnly}
       onClick={() => router.push("/dashboard?stage=review")}
-      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold transition cursor-pointer"
+      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
     >
       Submit
     </button>
@@ -400,13 +386,18 @@ function RoadmapStep({
   label,
   status,
   icon: Icon,
+  onClick,
 }: {
   label: string
   status?: "completed" | "active"
   icon: React.ElementType
+  onClick?: () => void
 }) {
   return (
-    <div className="flex flex-col items-center gap-2">
+    <div
+      onClick={onClick}
+      className={`flex flex-col items-center gap-2 min-w-[110px] ${onClick ? "cursor-pointer" : ""}`}
+    >
       <div
         className={`w-10 h-10 rounded-full flex items-center justify-center duration-300
         ${
@@ -436,5 +427,5 @@ function RoadmapStep({
 }
 
 function RoadmapLine() {
-  return <div className="flex-1 h-[2px] bg-slate-200 mx-2" />
+  return <div className="h-[2px] bg-slate-200 w-8 lg:flex-1 lg:w-auto" />
 }

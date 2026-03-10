@@ -2,11 +2,13 @@
 
 import { useState } from "react"
 import { Info, ShieldCheck, UploadCloud } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 
 
 export default function PaymentUI() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const isReadOnly = searchParams.get("readonly") === "1"
 
   const [file, setFile] = useState<File | null>(null)
 
@@ -101,6 +103,7 @@ export default function PaymentUI() {
           {/* Transaction Ref */}
           <input
             placeholder="Transaction reference"
+            disabled={isReadOnly}
             className="w-full border rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
           />
 
@@ -116,6 +119,7 @@ export default function PaymentUI() {
             <input
               type="file"
               className="hidden"
+              disabled={isReadOnly}
               onChange={(e) => setFile(e.target.files?.[0] || null)}
             />
           </label>
@@ -128,8 +132,9 @@ export default function PaymentUI() {
 
           {/* Submit */}
           <button
+            disabled={isReadOnly}
             onClick={() => router.push("/dashboard?stage=eligibility")}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold transition cursor-pointer"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-semibold transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Submit
           </button>

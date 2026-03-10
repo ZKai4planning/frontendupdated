@@ -56,7 +56,7 @@ export default function RootLayout({
     right: 170,
   }}
   toastOptions={{
-    duration: 5000,
+    duration: 1000,
     style: {
       animation: "slideUpRight 0.4s ease-out",
     },

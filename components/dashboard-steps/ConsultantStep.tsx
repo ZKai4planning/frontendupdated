@@ -5,7 +5,14 @@ import { useRouter, usePathname, useParams, useSearchParams } from "next/navigat
 import {
   CheckCircle,
 } from "lucide-react"
-import { PROJECT_FLOW } from "@/lib/project-flow"
+import {
+  PROJECT_FLOW,
+  getRoadmapProjectFlow,
+  getProjectStepIndexById,
+  getJourneyProgressPercent,
+  normalizeProjectStepIndex,
+  resolveProjectProgressIndex,
+} from "@/lib/project-flow"
 import { useUserIdentity } from "@/lib/use-user-identity"
 
 export default function ConsultantSchedulePage() {
@@ -27,6 +34,8 @@ export default function ConsultantSchedulePage() {
         : undefined
 
   const stageFromQuery = searchParams.get("stage")
+  const progressParam = searchParams.get("progress")
+  const isReadOnly = searchParams.get("readonly") === "1"
   const pathnameStage = pathname.split("/").filter(Boolean).pop()
   const currentRoute = stageFromQuery ?? stageParam ?? pathnameStage ?? ""
 
@@ -35,12 +44,12 @@ export default function ConsultantSchedulePage() {
     step.legacyRoutes?.includes(currentRoute)
   )
 
-  const currentProjectStep = stepIndex >= 0 ? stepIndex : 0
+  const currentStageIndex = stepIndex >= 0 ? normalizeProjectStepIndex(stepIndex) : 0
+  const currentProjectStep = resolveProjectProgressIndex(currentStageIndex, progressParam)
+  const visibleProjectFlow = getRoadmapProjectFlow(currentProjectStep)
 
-  const progress = Math.round(
-    ((currentProjectStep + 1) / PROJECT_FLOW.length) * 100
-  )
-  const currentStepCard = PROJECT_FLOW[currentProjectStep]?.nextCard
+  const progress = getJourneyProgressPercent(currentProjectStep)
+  const currentStepCard = PROJECT_FLOW[currentStageIndex]?.nextCard
   const currentStepCta =
     currentStepCard?.ctaStage
       ? `/dashboard?stage=${currentStepCard.ctaStage}`
@@ -64,7 +73,7 @@ export default function ConsultantSchedulePage() {
           <p className="text-sm text-slate-500 mt-1">
             Current Stage:{" "}
             <span className="font-medium text-slate-700">
-              {PROJECT_FLOW[currentProjectStep]?.label}
+              {PROJECT_FLOW[currentStageIndex]?.label}
             </span>
           </p>
         </div>
@@ -104,58 +113,48 @@ export default function ConsultantSchedulePage() {
 
         {/* LEFT ROADMAP */}
 
-        <div className="lg:col-span-8">
-          <div className="rounded-2xl border bg-white p-6 shadow-sm">
+        <div className="lg:col-span-8 space-y-6">
 
+          <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-semibold text-slate-800">
                 Project Stages
               </h2>
-
               <span className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                STEP {currentProjectStep + 1} OF {PROJECT_FLOW.length}
+                STEP {currentProjectStep + 1} OF {visibleProjectFlow.length}
               </span>
             </div>
 
-            <div className="flex items-center overflow-x-auto pb-2 min-h-[120px]">
+            {/* Scrollable on mobile */}
+            <div className="flex items-center justify-between overflow-x-auto pb-2 min-h-[100px]">
+              {visibleProjectFlow.map((stepItem, index) => {
+                const stepItemIndex = getProjectStepIndexById(stepItem.id)
+                const status =
+                  stepItemIndex < currentProjectStep
+                    ? "completed"
+                    : stepItemIndex === currentProjectStep
+                      ? "active"
+                      : undefined
 
-              {PROJECT_FLOW.map((stepItem, index) => {
-  let status: "completed" | "active" | "upcoming" | undefined
-
-  if (index < currentProjectStep) {
-    status = "completed"
-  } else if (index === currentProjectStep) {
-    status = "active"
-  } else if (index === currentProjectStep + 1) {
-    status = "upcoming"
-  } else {
-    status = undefined
-  }
-
-  return (
-    <div key={stepItem.route} className="flex items-center">
-      <RoadmapStep
-        label={stepItem.label}
-        icon={stepItem.icon}
-        status={status}
-        onClick={() => {
-          if (
-            index <= currentProjectStep &&
-            stepItem.route !== "#"
-          ) {
-            router.push(`/dashboard?stage=${stepItem.route}`)
-          }
-        }}
-      />
-
-      {index !== PROJECT_FLOW.length - 1 && (
-        <RoadmapLine />
-      )}
-    </div>
-  )
-})}
-
-
+                return (
+                  <React.Fragment key={stepItem.id}>
+                    <RoadmapStep
+                      label={stepItem.label}
+                      status={status}
+                      icon={stepItem.icon}
+                      onClick={() => {
+                        if (stepItemIndex <= currentProjectStep) {
+                          const readonlyParam = stepItemIndex < currentProjectStep ? "&readonly=1" : ""
+                          router.push(
+                            `/dashboard?stage=${stepItem.route}&progress=${currentProjectStep}${readonlyParam}`
+                          )
+                        }
+                      }}
+                    />
+                    {index !== visibleProjectFlow.length - 1 && <RoadmapLine />}
+                  </React.Fragment>
+                )
+              })}
             </div>
           </div>
         </div>
@@ -178,21 +177,20 @@ export default function ConsultantSchedulePage() {
             <div className="mt-auto">
               {currentStepCard?.ctaLabel && currentStepCta && (
                 <button
+                  disabled={isReadOnly}
                   onClick={() => router.push(currentStepCta)}
                   className="w-full rounded-xl bg-white text-blue-600 font-semibold py-3
-                   hover:bg-blue-50 active:scale-[0.98] transition cursor-pointer"
+                   hover:bg-blue-50 active:scale-[0.98] transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {currentStepCard.ctaLabel}
                 </button>
               )}
             </div>
-
           </div>
         </div>
-
       </div>
-
-<div className="w-full lg:max-w-md rounded-2xl bg-blue-500 p-6 text-white shadow-lg">
+      
+      <div className="w-full lg:max-w-md rounded-2xl bg-blue-500 p-6 text-white shadow-lg">
 
         <p className="text-sm opacity-90 mb-4 leading-relaxed">
           Hi {displayFirstName}, Thank you for choosing <span className="font-semibold">AI4Planning</span>.
@@ -233,17 +231,19 @@ function RoadmapStep({
   return (
     <div
       onClick={onClick}
-      className="flex flex-col items-center gap-2 min-w-[110px] cursor-pointer"
+      className={`flex flex-col items-center gap-2 min-w-[110px] ${
+        onClick ? "cursor-pointer" : ""
+      }`}
     >
       <div
-        className={`w-10 h-10 rounded-full flex items-center justify-center duration-300
+        className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200
         ${
           status === "completed"
             ? "bg-blue-600 text-white"
             : status === "active"
             ? "border-2 border-blue-600 text-blue-600 bg-white animate-pulse"
             : status === "upcoming"
-            ? "bg-white-100 text-blue-600 border border-blue-600 animate-bounce"
+            ? "border border-blue-300 text-blue-500 bg-blue-50"
             : "bg-slate-200 text-slate-400"
         }`}
       >
@@ -255,15 +255,7 @@ function RoadmapStep({
       </div>
 
       <span
-        className={`text-xs text-center ${
-          status === "completed"
-            ? "text-blue-600 font-medium"
-            : status === "active"
-            ? "text-blue-600 font-semibold"
-            : status === "upcoming"
-            ? "text-blue-600 font-medium"
-            : "text-slate-400"
-        }`}
+        className={`text-xs text-center ${status ? "text-blue-600 font-medium" : "text-slate-400"}`}
       >
         {label}
       </span>
@@ -273,5 +265,5 @@ function RoadmapStep({
 
 
 function RoadmapLine() {
-  return <div className="h-[2px] bg-slate-200 mx-6 min-w-[45px] flex-1" />
+  return <div className="h-[2px] bg-slate-200 w-8 lg:flex-1 lg:w-auto" />
 }
