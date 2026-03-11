@@ -29,6 +29,7 @@ export interface ApiSubService {
 }
 
 export interface ApiServiceData {
+  image: string;
   serviceId: string;
   title: string;
   description: string;

@@ -25,7 +25,7 @@ const mapApiServiceToService = (apiService: ApiServiceData): Service => {
     title: apiService.title,
     shortTitle: apiService.title, // Using title as shortTitle fallback
     subtitle: apiService.title,
-    image: apiService.images?.[0] || "/Service-01.png", // Fallback image
+    image: apiService.image , // Fallback image
     description: apiService.description,
     features: apiService.subServices.map((sub) => ({
       title: sub.title,
@@ -264,6 +264,11 @@ export default function Home() {
                       &quot;{service.description.substring(0, 80)}...&quot;
                     </p>
                   </div>
+                  <span className="mt-auto pt-6 text-sm text-blue-400 font-semibold inline-flex items-center gap-1 relative self-start">
+                    Get Started
+                    <span className="transition-transform duration-300 group-hover:translate-x-2">-&gt;</span>
+                    <span className="absolute left-0 -bottom-1 h-0.5 w-0 bg-blue-400 transition-all duration-300 group-hover:w-full" />
+                  </span>
                 </div>
               ))}
             </div>
@@ -299,6 +304,11 @@ export default function Home() {
                       &quot;{service.description.substring(0, 80)}...&quot;
                     </p>
                   </div>
+                  <span className="mt-auto pt-6 text-sm text-blue-400 font-semibold inline-flex items-center gap-1 relative self-start">
+                    Get Started
+                    <span className="transition-transform duration-300 group-hover:translate-x-2">-&gt;</span>
+                    <span className="absolute left-0 -bottom-1 h-0.5 w-0 bg-blue-400 transition-all duration-300 group-hover:w-full" />
+                  </span>
                 </div>
               ))}
             </div>
