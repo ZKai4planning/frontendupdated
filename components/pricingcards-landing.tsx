@@ -1,9 +1,8 @@
 "use client"
 
-import { Check, MessageCircle } from "lucide-react"
+import { Check } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import Link from "next/link"
 
 const plans = [
   {
@@ -142,16 +141,6 @@ export default function PricingCardsLanding() {
                 ))}
               </ul>
 
-              <div className="mt-auto pt-6 text-xs opacity-80 flex items-center gap-2">
-                <MessageCircle className="w-4 h-4 text-green-400" />
-                
-                <span>Have a Question?    
-                  <Link href="https://api.whatsapp.com/send/?phone=+447777788885
- &text=Hello%21+I+have+a+query.&type=phone_number&app_absent=0" className="text-green-400 hover:underline ml-2">
-                    Connect with us
-                  </Link>
-                </span>
-              </div>
             </CardContent>
           </Card>
           )

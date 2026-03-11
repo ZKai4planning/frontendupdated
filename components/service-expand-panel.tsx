@@ -14,6 +14,7 @@ interface ServiceExpandPanelProps {
   onClose: () => void;
   index: number;
   mobile?: boolean;
+  isLaptop?: boolean;
 }
 
 /* ================= ICON MAPPING ================= */
@@ -86,6 +87,7 @@ export default function ServiceExpandPanel({
   onClose,
   index,
   mobile = false,
+  isLaptop = false,
 }: ServiceExpandPanelProps) {
   const [showLogin, setShowLogin] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -190,7 +192,8 @@ export default function ServiceExpandPanel({
         transition={{ layout: { duration: 0.5, ease: [0.4, 0, 0.2, 1] } }}
         className={`relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden 
           ${isExpanded ? "md:order-first lg:order-0 md:scroll-mt-24" : ""}
-          ${isExpanded ? "h-162.5 md:h-162.5 lg:h-full w-full lg:w-auto" : "h-16 md:h-20 lg:h-full w-full lg:w-16"}`}
+          ${isExpanded ? "h-162.5 md:h-162.5 lg:h-full w-full lg:w-auto" : "h-16 md:h-20 lg:h-full w-full lg:w-16"}
+          ${isLaptop ? "lg:max-h-140" : ""}`}
       >
         {/* Mobile Header */}
         {mobile && isExpanded && (
@@ -230,14 +233,14 @@ export default function ServiceExpandPanel({
                 <div className="absolute inset-0 bg-blue-900/30" />
                 <div className="absolute inset-x-0 bottom-0 h-44 bg-linear-to-t from-[#050b18]/95 via-[#050b18]/65 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 p-4 lg:p-6">
-                  <h3 className="mt-2 text-lg lg:text-2xl font-bold text-white">{service.title}</h3>
-                  <p className="mt-1 text-xs lg:text-sm text-white/70">{service.description}</p>
+                  <h3 className={`mt-2 font-bold text-white ${isLaptop ? "text-base lg:text-xl" : "text-lg lg:text-2xl"}`}>{service.title}</h3>
+                  <p className={`mt-1 text-white/70 ${isLaptop ? "text-[11px] lg:text-xs" : "text-xs lg:text-sm"}`}>{service.description}</p>
                 </div>
               </div>
             </div>
 
             {/* Right Content */}
-            <div className="relative flex-1 w-full md:w-[60%] lg:w-[70%] p-6 md:p-8 lg:p-10 flex flex-col bg-white/5 overflow-y-auto">
+            <div className={`relative flex-1 w-full md:w-[60%] lg:w-[70%] flex flex-col bg-white/5 overflow-y-auto ${isLaptop ? "p-5 md:p-6 lg:p-7" : "p-6 md:p-8 lg:p-10"}`}>
               <button onClick={handleClose} className={`absolute top-6 right-6 z-20 h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/70 hover:bg-white/20 hover:text-white ${mobile ? "hidden md:inline-flex" : "inline-flex"}`}>
                 <span className="material-symbols-outlined text-xl leading-none">close</span>
               </button>
@@ -248,7 +251,7 @@ export default function ServiceExpandPanel({
                     <div className="mb-4 w-fit inline-flex items-center rounded-full bg-blue-500/15 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-blue-300">
                       Service Selection
                     </div>
-                    <h2 className="text-3xl font-bold mb-2">Detailed Service View</h2>
+                    <h2 className={`font-bold mb-2 ${isLaptop ? "text-2xl" : "text-3xl"}`}>Detailed Service View</h2>
 
                     <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_1.4fr] gap-6 mb-8">
                       {/* Feature List */}
@@ -261,14 +264,14 @@ export default function ServiceExpandPanel({
                               type="button"
                               onClick={() => setSelectedFeatureIndex(i)}
                               className={`group relative flex items-center gap-3 rounded-2xl border overflow-hidden text-left transition-all duration-200 
-                                ${isActive ? "px-4 py-2 border-blue-400/50 bg-blue-500/10" : "px-4 py-1.5 border-white/10 bg-white/5 hover:border-blue-400/50 hover:bg-white/10"}`}
+                                ${isActive ? (isLaptop ? "px-3 py-1.5 border-blue-400/50 bg-blue-500/10" : "px-4 py-2 border-blue-400/50 bg-blue-500/10") : (isLaptop ? "px-3 py-1 border-white/10 bg-white/5 hover:border-blue-400/50 hover:bg-white/10" : "px-4 py-1.5 border-white/10 bg-white/5 hover:border-blue-400/50 hover:bg-white/10")}`}
                             >
-                              <span className={`material-symbols-outlined text-xl relative z-10 ${isActive ? "text-blue-300" : "text-white/60"}`}>
+                              <span className={`material-symbols-outlined relative z-10 ${isLaptop ? "text-lg" : "text-xl"} ${isActive ? "text-blue-300" : "text-white/60"}`}>
                                 {getFeatureIcon(feature.title)}
                               </span>
                               <div className="flex flex-col relative z-10">
                                 {isActive && <span className="text-[10px] uppercase tracking-[0.18em] text-blue-300">Active Selection</span>}
-                                <span className="text-sm text-white/90 font-semibold">{feature.title}</span>
+                                <span className={`${isLaptop ? "text-xs" : "text-sm"} text-white/90 font-semibold`}>{feature.title}</span>
                               </div>
                               {isActive && beamVisible && (
                                 <BorderBeam size={40} initialOffset={20} className="from-transparent via-yellow-500 to-transparent" transition={{ duration: beamDurationSeconds, ease: "linear", repeat: 0 }} />
@@ -285,16 +288,16 @@ export default function ServiceExpandPanel({
                             <span className="material-symbols-outlined text-2xl">{getFeatureIcon(selectedFeature?.title ?? "")}</span>
                           </div>
                           <div>
-                            <h3 className="text-xl font-bold text-white">{selectedFeature?.title}</h3>
-                            <p className="text-sm text-blue-300/90">{service.label}</p>
+                            <h3 className={`${isLaptop ? "text-lg" : "text-xl"} font-bold text-white`}>{selectedFeature?.title}</h3>
+                            <p className={`${isLaptop ? "text-xs" : "text-sm"} text-blue-300/90`}>{service.label}</p>
                           </div>
                         </div>
                         <div className="mt-6">
                           <p className="text-[11px] uppercase tracking-[0.2em] text-white/40">Service Overview</p>
-                          <p className="mt-3 text-sm leading-relaxed text-white/70">{selectedFeature?.description ?? service.description}</p>
+                          <p className={`mt-3 leading-relaxed text-white/70 ${isLaptop ? "text-xs" : "text-sm"}`}>{selectedFeature?.description ?? service.description}</p>
                         </div>
                         <div className="mt-6 flex items-center justify-center gap-4 rounded-2xl px-4 py-3 mb-8">
-                          <button type="button" onClick={() => setShowLogin(true)} className="rounded-full bg-blue-500 px-5 py-2 text-sm font-semibold text-white transition hover:bg-blue-400">
+                          <button type="button" onClick={() => setShowLogin(true)} className={`rounded-full bg-blue-500 px-5 py-2 font-semibold text-white transition hover:bg-blue-400 ${isLaptop ? "text-xs" : "text-sm"}`}>
                             Apply for this Service
                           </button>
                         </div>
@@ -306,7 +309,7 @@ export default function ServiceExpandPanel({
                               <span className="material-symbols-outlined text-xl">help_outline</span>
                             </span>
                             <div>
-                              <p className="text-sm font-semibold text-white">Talk to an expert?</p>
+                              <p className={`${isLaptop ? "text-xs" : "text-sm"} font-semibold text-white`}>Talk to an expert?</p>
                             </div>
                           </div>
                           <button type="button" onClick={() => setShowChat1(true)} className="rounded-full border border-blue-400/40 bg-blue-500/10 px-4 py-2 text-xs font-semibold text-blue-200 transition hover:border-blue-300/60 hover:bg-blue-500/20">
@@ -320,8 +323,8 @@ export default function ServiceExpandPanel({
               ) : (
                 <>
                   <div className="flex-1">
-                    <h2 className="text-3xl font-bold mb-4">{service.title}</h2>
-                    <p className="text-white/70 mb-6 leading-relaxed italic">“{service.description}”</p>
+                    <h2 className={`${isLaptop ? "text-2xl" : "text-3xl"} font-bold mb-4`}>{service.title}</h2>
+                    <p className={`text-white/70 mb-6 leading-relaxed italic ${isLaptop ? "text-sm" : "text-base"}`}>&quot;{service.description}&quot;</p>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                       {service.features.map((feature, i) => (
@@ -331,8 +334,8 @@ export default function ServiceExpandPanel({
                           onClick={() => { setSelectedFeatureIndex(i); setShowDetail(true); }}
                           className="group relative flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-left transition-all duration-200 hover:border-blue-400/60 hover:bg-white/10"
                         >
-                          <span className="material-symbols-outlined text-blue-300 text-xl">{getFeatureIcon(feature.title)}</span>
-                          <span className="text-sm text-white/90 font-semibold">{feature.title}</span>
+                          <span className={`material-symbols-outlined text-blue-300 ${isLaptop ? "text-lg" : "text-xl"}`}>{getFeatureIcon(feature.title)}</span>
+                          <span className={`${isLaptop ? "text-xs" : "text-sm"} text-white/90 font-semibold`}>{feature.title}</span>
                         </button>
                       ))}
                     </div>
@@ -344,7 +347,7 @@ export default function ServiceExpandPanel({
                         <span className="material-symbols-outlined text-xl">help_outline</span>
                       </span>
                       <div>
-                        <p className="text-sm font-semibold text-white">Not sure where to start?</p>
+                        <p className={`${isLaptop ? "text-xs" : "text-sm"} font-semibold text-white`}>Not sure where to start?</p>
                         <p className="text-xs text-white/60">Get personalised guidance for your unique project.</p>
                       </div>
                     </div>
@@ -433,3 +436,4 @@ export default function ServiceExpandPanel({
     </>
   );
 }
+

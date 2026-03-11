@@ -73,10 +73,10 @@ export default function TermsPage() {
             Questions about these terms can be sent to
             {" "}
             <a
-              href="mailto:zafer.khan@ai4planning.com"
+              href="mailto:info@ai4planning.com"
               className="text-[#78A7FF] hover:text-white"
             >
-              zafer.khan@ai4planning.com
+              info@ai4planning.com
             </a>
             .
           </p>

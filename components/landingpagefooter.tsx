@@ -101,6 +101,7 @@ export default function Footer() {
               <li className="flex items-center gap-3">
                 <Mail className="h-4 w-4 text-indigo-400" />
                 <span>info@ai4planning.com</span>
+                <span>info@ai4planning.com</span>
               </li>
               <li className="flex items-center gap-3">
                 <Phone className="h-4 w-4 text-indigo-400" />

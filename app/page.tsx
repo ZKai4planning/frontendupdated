@@ -48,6 +48,7 @@ export default function Home() {
   const expandedContainerRef = useRef<HTMLDivElement>(null);
   const servicesSectionRef = useRef<HTMLElement>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [isLaptop, setIsLaptop] = useState(false);
 
   // Fetch Services
   useEffect(() => {
@@ -97,17 +98,33 @@ export default function Home() {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const mediaQuery = window.matchMedia("(max-width: 767px)");
-    const handleChange = () => setIsMobile(mediaQuery.matches);
+    const mobileQuery = window.matchMedia("(max-width: 767px)");
+    const laptopQuery = window.matchMedia("(min-width: 1024px) and (max-width: 1600px)");
+    const handleChange = () => {
+      setIsMobile(mobileQuery.matches);
+      setIsLaptop(laptopQuery.matches);
+    };
 
     handleChange();
-    if (mediaQuery.addEventListener) {
-      mediaQuery.addEventListener("change", handleChange);
-      return () => mediaQuery.removeEventListener("change", handleChange);
+    window.addEventListener("resize", handleChange);
+
+    if (mobileQuery.addEventListener && laptopQuery.addEventListener) {
+      mobileQuery.addEventListener("change", handleChange);
+      laptopQuery.addEventListener("change", handleChange);
+      return () => {
+        window.removeEventListener("resize", handleChange);
+        mobileQuery.removeEventListener("change", handleChange);
+        laptopQuery.removeEventListener("change", handleChange);
+      };
     }
 
-    mediaQuery.addListener(handleChange);
-    return () => mediaQuery.removeListener(handleChange);
+    mobileQuery.addListener(handleChange);
+    laptopQuery.addListener(handleChange);
+    return () => {
+      window.removeEventListener("resize", handleChange);
+      mobileQuery.removeListener(handleChange);
+      laptopQuery.removeListener(handleChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -222,7 +239,7 @@ export default function Home() {
       >
         {!expandedServiceId && (
           <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-5xl lg:text-9xl font-bold mb-4">
+            <h2 className="text-3xl sm:text-5xl lg:text-8xl font-bold mb-4">
               Our Services
             </h2>
           </div>
@@ -241,27 +258,26 @@ export default function Home() {
                   className="group bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-2xl transition-all flex flex-col"
                 >
                   <div>
-                    <p className="text-xs font-bold text-blue-400 mb-2">{service.label}</p>
-                    <h3 className="text-lg font-bold mb-3 leading-snug">{service.subtitle}</h3>
-                    <p className="text-sm text-white/60 leading-relaxed italic">
+                    <p className={`${isLaptop ? "text-[11px]" : "text-xs"} font-bold text-blue-400 mb-2`}>{service.label}</p>
+                    <h3 className={`${isLaptop ? "text-base" : "text-lg"} font-bold mb-3 leading-snug`}>{service.subtitle}</h3>
+                    <p className={`${isLaptop ? "text-xs" : "text-sm"} text-white/60 leading-relaxed italic`}>
                       &quot;{service.description.substring(0, 80)}...&quot;
                     </p>
                   </div>
-                  <span className="mt-auto pt-6 text-blue-400 font-semibold inline-flex items-center gap-1 relative self-start">
-                    Get Started
-                    <span className="transition-transform duration-300 group-hover:translate-x-2">-&gt;</span>
-                    <span className="absolute left-0 -bottom-1 h-0.5 w-0 bg-blue-400 transition-all duration-300 group-hover:w-full" />
-                  </span>
                 </div>
               ))}
             </div>
           ) : expandedServiceId ? (
-            <div ref={expandedContainerRef} className="flex gap-2 h-162.5 flex-col lg:flex-row">
+            <div
+              ref={expandedContainerRef}
+              className={`flex gap-2 flex-col lg:flex-row ${isLaptop ? "h-140" : "h-162.5"}`}
+            >
               {services.map((service, index) => (
                 <ServiceExpandPanel
                   key={service.id}
                   index={index}
                   service={service}
+                  isLaptop={isLaptop}
                   isExpanded={expandedServiceId === service.id}
                   onExpand={() => setExpandedServiceId(service.id)}
                   onClose={() => setExpandedServiceId(null)}
@@ -277,21 +293,17 @@ export default function Home() {
                   className="group bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-2xl cursor-pointer transition-all hover:border-blue-400/60 hover:shadow-xl hover:shadow-blue-500/20 flex flex-col"
                 >
                   <div>
-                    <p className="text-xs font-bold text-blue-400 mb-2">{service.label}</p>
-                    <h3 className="text-lg font-bold mb-3 leading-snug">{service.subtitle}</h3>
-                    <p className="text-sm text-white/60 leading-relaxed italic">
+                    <p className={`${isLaptop ? "text-[11px]" : "text-xs"} font-bold text-blue-400 mb-2`}>{service.label}</p>
+                    <h3 className={`${isLaptop ? "text-[13px]" : "text-lg"} font-bold mb-3 leading-snug`}>{service.subtitle}</h3>
+                    <p className={`${isLaptop ? "text-xs" : "text-sm"} text-white/60 leading-relaxed italic`}>
                       &quot;{service.description.substring(0, 80)}...&quot;
                     </p>
                   </div>
-                  <span className="mt-auto pt-6 text-blue-400 font-semibold inline-flex items-center gap-1 relative self-start">
-                    Get Started
-                    <span className="transition-transform duration-300 group-hover:translate-x-2">-&gt;</span>
-                    <span className="absolute left-0 -bottom-1 h-0.5 w-0 bg-blue-400 transition-all duration-300 group-hover:w-full" />
-                  </span>
                 </div>
               ))}
             </div>
           )}
+
         </div>
       </section>
 
@@ -305,6 +317,22 @@ export default function Home() {
         <Suspense fallback={<div className="p-10 text-center">Loading...</div>}>
           <PricingCardsLanding />
         </Suspense>
+        <div className="mt-8 flex items-center justify-center gap-3 text-center">
+          <p className="text-sm text-white/70">Have a Question?</p>
+          <button
+            type="button"
+            onClick={() =>
+              window.open(
+                "https://wa.me/447777788885?text=Hello%21%20I%20have%20a%20query.",
+                "_blank",
+                "noopener,noreferrer"
+              )
+            }
+            className="text-sm font-semibold text-blue-300 underline underline-offset-4 hover:text-blue-200"
+          >
+            Connect with us
+          </button>
+        </div>
       </section>
 
       <OurTeams />
