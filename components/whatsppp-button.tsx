@@ -2,7 +2,7 @@ import { FaWhatsapp } from "react-icons/fa";
 
 const WhatsAppButton = () => {
   // IMPORTANT: wa.me numbers must NOT include "+"
-  const phoneNumber = "447768262279";
+  const phoneNumber = "447777788885";
   const message = "Hello! I have a query.";
 
   const handleClick = () => {

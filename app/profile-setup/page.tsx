@@ -1,543 +1,606 @@
 "use client";
 
 import axios from "axios";
-import type { FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import type { FormEvent, ChangeEvent } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import axiosInstance from "@/lib/axiosinstance";
+import Image from "next/image";
 import {
-  EMPTY_PROFILE,
-  type AddressModel,
-  type PhoneModel,
-  type ProfileFieldErrors,
-  type ProfileFieldPath,
+  mergeProfileData,
   type ProfileModel,
+  type ProfileFieldPath,
+  type ProfileFieldErrors,
   validateProfileInput,
+  COUNTRY_CODES,
 } from "@/lib/profile-validation";
 import { useAuthStore } from "@/lib/zustand";
+import {
+  Camera, MapPin, Phone, User, ChevronDown, Search, Check,
+  Loader2, Landmark, Navigation
+} from "lucide-react";
 
-const inputClassName =
-  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
-
-const asRecord = (value: unknown): Record<string, unknown> => {
-  if (typeof value === "object" && value !== null) {
-    return value as Record<string, unknown>;
-  }
-
-  return {};
+// --- Utility: Get Initials ---
+const getInitials = (name: string) => {
+  if (!name) return "U";
+  const parts = name.trim().split(" ");
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 };
 
-const toSafeString = (value: unknown): string => {
-  if (typeof value === "string") return value;
-  if (typeof value === "number") return String(value);
-  return "";
+// --- Component: Country Dropdown ---
+const CountryCodeDropdown = ({
+  value,
+  onChange,
+  error,
+  placeholder = "Code",
+  allowClear = true,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  error?: string;
+  placeholder?: string;
+  allowClear?: boolean;
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const filteredCountries = COUNTRY_CODES.filter(
+    (c) =>
+      c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.code.includes(search)
+  );
+
+  const selectedCountry = COUNTRY_CODES.find((c) => c.code === value);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center justify-between w-full md:w-28 px-3 py-2 text-sm bg-white border rounded-lg focus:outline-none focus:ring-2 transition ${
+          error ? "border-red-400 ring-red-100" : "border-gray-200 ring-blue-100"
+        }`}
+      >
+        <span className="flex items-center gap-2 truncate">
+          {selectedCountry ? (
+            <>
+              <span>{selectedCountry.flag}</span>
+              <span className="font-medium">{selectedCountry.code}</span>
+            </>
+          ) : (
+            <span className="text-gray-400">{placeholder}</span>
+          )}
+        </span>
+        <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute z-20 mt-1 w-72 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-hidden flex flex-col">
+          <div className="p-2 border-b sticky top-0 bg-white z-10">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search country..."
+                className="w-full pl-8 pr-3 py-2 text-sm border rounded-md focus:outline-none focus:ring-1 focus:ring-blue-200"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                autoFocus
+              />
+            </div>
+          </div>
+          
+          <div className="overflow-y-auto flex-1">
+            {allowClear && (
+              <button
+                type="button"
+                className={`flex items-center w-full px-3 py-2 text-left text-sm hover:bg-gray-100 transition text-gray-500 italic ${
+                  !value ? "bg-gray-50 font-semibold" : ""
+                }`}
+                onClick={() => {
+                  onChange("");
+                  setIsOpen(false);
+                  setSearch("");
+                }}
+              >
+                <span className="mr-2 w-6 text-center">❌</span>
+                <span className="flex-1">None / Clear</span>
+                {!value && <Check className="h-4 w-4 ml-2 text-gray-600" />}
+              </button>
+            )}
+
+            {filteredCountries.length === 0 ? (
+              <p className="p-3 text-sm text-gray-500 text-center">No country found.</p>
+            ) : (
+              filteredCountries.map((country) => (
+                <button
+                  type="button"
+                  key={country.name + country.code}
+                  className={`flex items-center w-full px-3 py-2 text-left text-sm hover:bg-blue-50 transition ${
+                    value === country.code ? "bg-blue-50 text-blue-700" : "text-gray-700"
+                  }`}
+                  onClick={() => {
+                    onChange(country.code);
+                    setIsOpen(false);
+                    setSearch("");
+                  }}
+                >
+                  <span className="mr-2 text-base">{country.flag}</span>
+                  <span className="flex-1">{country.name}</span>
+                  <span className="ml-2 text-gray-500 font-mono text-xs">{country.code}</span>
+                  {value === country.code && <Check className="h-4 w-4 ml-2 text-blue-600" />}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
-const getErrorMessage = (error: unknown, fallback: string): string => {
-  if (!axios.isAxiosError(error)) return fallback;
+// --- Component: Reusable Input ---
+const InputField = ({
+  label,
+  mandatory,
+  value,
+  onChange,
+  error,
+  placeholder,
+  className,
+  type = "text",
+  autoComplete,
+}: {
+  label: string;
+  mandatory?: boolean;
+  value: string; // Expecting string always
+  onChange: (e: ChangeEvent<HTMLInputElement>) => void;
+  error?: string;
+  placeholder?: string;
+  className?: string;
+  type?: string;
+  autoComplete?: string;
+}) => (
+  <div className={`space-y-1 ${className || ""}`}>
+    <label className="text-sm font-medium text-gray-700">
+      {label} {mandatory && <span className="text-red-500">*</span>}
+    </label>
+    <input
+      type={type}
+      // CRITICAL FIX: Ensure value is never undefined by providing a fallback
+      value={value || ""}
+      onChange={onChange}
+      placeholder={placeholder}
+      autoComplete={autoComplete}
+      className={`w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:ring-2 ${
+        error ? "border-red-400 focus:border-red-500 ring-red-50" : "border-gray-200 focus:border-blue-500 ring-blue-50"
+      }`}
+    />
+    {error && <p className="text-xs text-red-500 mt-0.5">{error}</p>}
+  </div>
+);
 
-  const data = error.response?.data;
-  if (typeof data === "string" && data.trim()) return data;
-
-  const objectData = asRecord(data);
-  const message = objectData.message;
-  if (typeof message === "string" && message.trim()) return message;
-
-  return fallback;
-};
-
-const shouldTryNextMethod = (error: unknown): boolean => {
-  if (!axios.isAxiosError(error)) return false;
-
-  const status = error.response?.status;
-  return status === 404 || status === 405 || status === 415;
-};
-
-const normalizeProfileResponse = (responseData: unknown): ProfileModel => {
-  const responseObject = asRecord(responseData);
-  const payload = Object.keys(asRecord(responseObject.data)).length
-    ? asRecord(responseObject.data)
-    : responseObject;
-
-  const profileCandidate = asRecord(payload.profile);
-  const source = Object.keys(profileCandidate).length ? profileCandidate : payload;
-  const phone = asRecord(source.phone);
-  const landline = asRecord(source.landline);
-  const address = asRecord(source.address);
-
-  return {
-    fullName: toSafeString(source.fullName),
-    bio: toSafeString(source.bio),
-    council: toSafeString(source.council),
-    phone: {
-      countryCode: toSafeString(phone.countryCode) || "+44",
-      number: toSafeString(phone.number),
-    },
-    landline: {
-      countryCode: toSafeString(landline.countryCode) || "+44",
-      number: toSafeString(landline.number),
-    },
-    address: {
-      doorNo: toSafeString(address.doorNo),
-      street: toSafeString(address.street),
-      locality: toSafeString(address.locality),
-      city: toSafeString(address.city),
-      state: toSafeString(address.state),
-      country: toSafeString(address.country),
-      postalCode: toSafeString(address.postalCode),
-    },
-  };
-};
-
+// --- Main Page ---
 export default function ProfileSetupPage() {
   const router = useRouter();
   const storeUserId = useAuthStore((state) => state.userId);
 
-  const [formProfile, setFormProfile] = useState<ProfileModel>(EMPTY_PROFILE);
+  const [formProfile, setFormProfile] = useState<ProfileModel>(mergeProfileData(null)); // Initialize safe empty
   const [fieldErrors, setFieldErrors] = useState<ProfileFieldErrors>({});
-  const [isFetching, setIsFetching] = useState(false);
+  const [profilePictureUrl, setProfilePictureUrl] = useState<string>("");
+  
+  const [isFetching, setIsFetching] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [isSkipping, setIsSkipping] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [locating, setLocating] = useState(false);
 
+  // Resolve User ID
   const resolvedUserId = useMemo(() => {
     if (storeUserId) return storeUserId;
     if (typeof window === "undefined") return null;
-
-    const raw =
-      window.sessionStorage.getItem("currentAuth") ||
-      window.localStorage.getItem("currentAuth");
-
-    if (!raw) return null;
-
     try {
-      const parsed = JSON.parse(raw) as { userId?: string | null };
-      return parsed.userId ?? null;
-    } catch {
-      return null;
-    }
+      const raw = window.sessionStorage.getItem("currentAuth") || window.localStorage.getItem("currentAuth");
+      if (!raw) return null;
+      return JSON.parse(raw)?.userId ?? null;
+    } catch { return null; }
   }, [storeUserId]);
 
   useEffect(() => {
-    if (!resolvedUserId) return;
-
-    let isCancelled = false;
-
-    const loadProfile = async () => {
-      setIsFetching(true);
-
-      try {
-        const response = await axiosInstance.get(
-          `/profile/${encodeURIComponent(resolvedUserId)}`
-        );
-
-        if (isCancelled) return;
-
-        const normalized = normalizeProfileResponse(response.data);
-        setFormProfile(normalized);
-        setFieldErrors({});
-      } catch (error) {
-        if (isCancelled) return;
-
-        const status = axios.isAxiosError(error) ? error.response?.status : null;
-        if (status !== 404) {
-          toast.error(getErrorMessage(error, "Failed to load profile details."));
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsFetching(false);
-        }
-      }
-    };
-
-    void loadProfile();
-
-    return () => {
-      isCancelled = true;
-    };
+    if (!resolvedUserId) {
+        setIsFetching(false); // Stop loading if no user
+        return;
+    }
+    loadData();
   }, [resolvedUserId]);
 
-  const getInputClassName = (field: ProfileFieldPath) =>
-    `${inputClassName} ${
-      fieldErrors[field] ? "border-red-500 focus:border-red-500 focus:ring-red-100" : ""
-    }`;
-
-  const clearFieldError = (field: ProfileFieldPath) => {
-    setFieldErrors((prev) => {
-      if (!prev[field]) return prev;
-      const next = { ...prev };
-      delete next[field];
-      return next;
-    });
-  };
-
-  const renderFieldError = (field: ProfileFieldPath) => {
-    const message = fieldErrors[field];
-    if (!message) return null;
-    return <p className="mt-1 text-xs text-red-600">{message}</p>;
-  };
-
-  const handleRootChange = (field: "fullName" | "bio" | "council", value: string) => {
-    setFormProfile((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-    clearFieldError(field);
-  };
-
-  const handlePhoneChange = (
-    field: "phone" | "landline",
-    key: keyof PhoneModel,
-    value: string
-  ) => {
-    setFormProfile((prev) => ({
-      ...prev,
-      [field]: {
-        ...prev[field],
-        [key]: value,
-      },
-    }));
-    const path =
-      field === "phone"
-        ? (`phone.${key}` as ProfileFieldPath)
-        : (`landline.${key}` as ProfileFieldPath);
-    clearFieldError(path);
-  };
-
-  const handleAddressChange = (key: keyof AddressModel, value: string) => {
-    setFormProfile((prev) => ({
-      ...prev,
-      address: {
-        ...prev.address,
-        [key]: value,
-      },
-    }));
-    clearFieldError(`address.${key}` as ProfileFieldPath);
-  };
-
-  const goToDashboard = () => {
-    router.push("/profile");
-  };
-
-  const handleSkip = () => {
-    setIsSkipping(true);
-    toast.success("Skipped profile setup. You can update it later.");
-    goToDashboard();
-  };
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!resolvedUserId) {
-      toast.error("Missing userId. Please login again and retry.");
-      return;
-    }
-
-    const validation = validateProfileInput(formProfile);
-    setFormProfile(validation.sanitizedProfile);
-
-    if (!validation.isValid) {
-      setFieldErrors(validation.fieldErrors);
-      toast.error(validation.firstError ?? "Please fix the highlighted profile fields.");
-      return;
-    }
-
-    setFieldErrors({});
-    setIsSaving(true);
-
-    const endpoint = `/profile/${encodeURIComponent(resolvedUserId)}`;
-
+  const loadData = async () => {
+    setIsFetching(true);
     try {
-      try {
-        await axiosInstance.put(endpoint, validation.sanitizedProfile);
-      } catch (error) {
-        if (!shouldTryNextMethod(error)) throw error;
+      const response = await axiosInstance.get(`/profile/${encodeURIComponent(resolvedUserId!)}`);
+      const data = response.data?.data || response.data;
 
-        try {
-          await axiosInstance.patch(endpoint, validation.sanitizedProfile);
-        } catch (patchError) {
-          if (!shouldTryNextMethod(patchError)) throw patchError;
-          await axiosInstance.post(endpoint, validation.sanitizedProfile);
-        }
-      }
+      // USE MERGE HELPER: Ensures no undefined fields, fixes controlled input error
+      const loadedProfile = mergeProfileData(data);
+      
+      if (data.profilePicture) setProfilePictureUrl(data.profilePicture);
+      setFormProfile(loadedProfile);
 
-      toast.success("Profile saved successfully.");
-      goToDashboard();
     } catch (error) {
-      toast.error(getErrorMessage(error, "Failed to save profile details."));
+      if (axios.isAxiosError(error) && error.response?.status !== 404) {
+        toast.error("Failed to load profile");
+      }
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
+  // --- GPS Location Logic ---
+  const fetchAccurateLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation not supported.");
+      return;
+    }
+
+    setLocating(true);
+    // Clear previous address errors
+    setFieldErrors(prev => {
+      const n = { ...prev };
+      delete n["address.city"];
+      delete n["address.country"];
+      return n;
+    });
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        
+        try {
+          // OpenStreetMap Nominatim
+          const reverseGeoUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`;
+          
+          // FIX: Removed 'User-Agent' header which is forbidden by browsers
+          const geoRes = await axios.get(reverseGeoUrl);
+
+          const addr = geoRes.data.address;
+          
+          // Mapping OSM address fields to our Model based on your JSON example
+          setFormProfile(prev => ({
+            ...prev,
+            address: {
+              ...prev.address,
+              // OSM 'house_number' -> doorNo
+              doorNo: addr.house_number || prev.address.doorNo,
+              // OSM 'road' -> street
+              street: addr.road || prev.address.street,
+              // OSM 'suburb' or 'neighbourhood' -> locality
+              locality: addr.suburb || addr.neighbourhood || prev.address.locality,
+              // OSM 'city' or 'town' or 'village' -> city
+              city: addr.city || addr.town || addr.village || prev.address.city,
+              state: addr.state || prev.address.state,
+              country: addr.country || prev.address.country,
+              postalCode: addr.postcode || prev.address.postalCode,
+            }
+          }));
+
+          toast.success("Location detected!");
+        } catch (err) {
+          console.error("Reverse geocoding failed", err);
+          toast.error("Could not decode address from location.");
+        } finally {
+          setLocating(false);
+        }
+      },
+      (error) => {
+        setLocating(false);
+        if (error.code === 1) {
+          toast.error("Permission denied. Please allow location access.");
+        } else {
+          toast.error("Unable to retrieve location.");
+        }
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  // --- Handlers ---
+  const handleImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !resolvedUserId) return;
+
+    const formData = new FormData();
+    formData.append("profilePicture", file);
+
+    setUploading(true);
+    try {
+      const res = await axiosInstance.put(`/profile/${resolvedUserId}/picture`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      const newUrl = res.data?.data?.profilePicture || res.data?.profilePicture;
+      if (newUrl) {
+        setProfilePictureUrl(newUrl);
+        toast.success("Picture updated!");
+      }
+    } catch (err) {
+      toast.error("Upload failed.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleChange = (field: keyof ProfileModel, value: string) => {
+    setFormProfile(prev => ({ ...prev, [field]: value }));
+    if (fieldErrors[field as ProfileFieldPath]) {
+      setFieldErrors(prev => { const n = { ...prev }; delete n[field as ProfileFieldPath]; return n; });
+    }
+  };
+
+  const handlePhoneChange = (type: "phone" | "landline", key: "countryCode" | "number", value: string) => {
+    setFormProfile(prev => ({
+      ...prev,
+      [type]: { ...prev[type], [key]: value },
+    }));
+    const path = `${type}.${key}` as ProfileFieldPath;
+    if (fieldErrors[path]) {
+      setFieldErrors(prev => { const n = { ...prev }; delete n[path]; return n; });
+    }
+  };
+
+  const handleAddressChange = (key: keyof ProfileModel["address"], value: string) => {
+    setFormProfile(prev => ({
+      ...prev,
+      address: { ...prev.address, [key]: value },
+    }));
+    const path = `address.${key}` as ProfileFieldPath;
+    if (fieldErrors[path]) {
+      setFieldErrors(prev => { const n = { ...prev }; delete n[path]; return n; });
+    }
+  };
+
+  // --- Validation & Submit ---
+  
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!resolvedUserId) return;
+
+    const result = validateProfileInput(formProfile);
+    
+    setFieldErrors(result.fieldErrors);
+
+    if (!result.isValid) {
+      toast.error(result.firstError || "Please fill all mandatory fields.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await axiosInstance.put(`/profile/${resolvedUserId}`, result.sanitizedProfile);
+      toast.success("Profile saved!");
+      router.push("/profile");
+    } catch (err) {
+      toast.error("Failed to save profile");
     } finally {
       setIsSaving(false);
     }
   };
 
-  return (
-    <main className="min-h-screen bg-gray-50 px-4 py-10 sm:px-6">
-      <Card className="mx-auto w-full max-w-4xl rounded-2xl shadow-sm">
-        <CardContent className="p-6 sm:p-8">
-          <div className="mb-6 flex flex-col gap-4 border-b border-slate-200 pb-6 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold text-slate-900">Complete Your Profile</h1>
-              <p className="mt-1 text-sm text-slate-600">
-                Add your details now, or skip and update later from Profile.
-              </p>
-            </div>
+  const handleSkip = () => {
+    const result = validateProfileInput(formProfile);
+    setFieldErrors(result.fieldErrors);
 
-            <button
-              type="button"
-              onClick={handleSkip}
-              disabled={isSaving || isSkipping}
-              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {isSkipping ? "Skipping..." : "Skip for now"}
-            </button>
+    if (!result.isValid) {
+      toast.error("Please fill mandatory fields (Name, Mobile) before skipping.");
+      return;
+    }
+
+    router.push("/profile");
+  };
+
+  if (isFetching) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 py-10 px-4">
+      <Card className="mx-auto w-full max-w-4xl rounded-2xl shadow-xl border-none overflow-hidden">
+        <div className="bg-blue-600 h-32 relative" />
+
+        <CardContent className="pt-0 pb-10 px-6 sm:px-10 relative">
+          {/* Profile Picture */}
+          <div className="flex flex-col items-center -mt-16 mb-8">
+            <div className="relative">
+              <div className="h-28 w-28 rounded-full border-4 border-white shadow-lg bg-blue-100 flex items-center justify-center text-blue-600 text-3xl font-bold overflow-hidden">
+                {profilePictureUrl ? (
+                  <Image src={profilePictureUrl} alt="Profile" width={112} height={112} className="h-full w-full object-cover" />
+                ) : (
+                  formProfile.fullName ? getInitials(formProfile.fullName) : "U"
+                )}
+              </div>
+              <label className="absolute bottom-1 right-1 bg-white p-1.5 rounded-full shadow-md border cursor-pointer hover:bg-gray-50 transition">
+                {uploading ? (
+                   <Loader2 className="h-4 w-4 text-gray-600 animate-spin" />
+                ) : (
+                  <Camera className="h-4 w-4 text-gray-600" />
+                )}
+                <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={uploading} />
+              </label>
+            </div>
+            <h2 className="mt-3 text-lg font-semibold text-gray-800">{formProfile.fullName || "New User"}</h2>
+            <p className="text-sm text-gray-500">Setup your profile</p>
           </div>
 
-          {!resolvedUserId && (
-            <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-              userId not found in auth storage. Please login again.
-            </p>
-          )}
-
-          {isFetching ? (
-            <p className="py-8 text-center text-sm text-slate-500">Loading profile details...</p>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-8">
-              <section className="space-y-4">
-                <h2 className="text-base font-semibold text-slate-800">Basic Details</h2>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label htmlFor="fullName" className="mb-1 block text-sm text-slate-600">
-                      Full Name
-                    </label>
-                    <input
-                      id="fullName"
-                      value={formProfile.fullName}
-                      onChange={(event) => handleRootChange("fullName", event.target.value)}
-                      className={getInputClassName("fullName")}
-                      placeholder="Full name"
-                      maxLength={80}
-                      aria-invalid={Boolean(fieldErrors.fullName)}
-                    />
-                    {renderFieldError("fullName")}
-                  </div>
-
-                  <div>
-                    <label htmlFor="council" className="mb-1 block text-sm text-slate-600">
-                      Council
-                    </label>
-                    <input
-                      id="council"
-                      value={formProfile.council}
-                      onChange={(event) => handleRootChange("council", event.target.value)}
-                      className={getInputClassName("council")}
-                      placeholder="Council"
-                      maxLength={120}
-                      aria-invalid={Boolean(fieldErrors.council)}
-                    />
-                    {renderFieldError("council")}
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label htmlFor="bio" className="mb-1 block text-sm text-slate-600">
-                      Bio
-                    </label>
-                    <textarea
-                      id="bio"
-                      value={formProfile.bio}
-                      onChange={(event) => handleRootChange("bio", event.target.value)}
-                      className={`${getInputClassName("bio")} min-h-24`}
-                      placeholder="Short bio"
-                      maxLength={600}
-                      aria-invalid={Boolean(fieldErrors.bio)}
-                    />
-                    {renderFieldError("bio")}
-                  </div>
-                </div>
-              </section>
-
-              <section className="space-y-4">
-                <h2 className="text-base font-semibold text-slate-800">Contact Numbers</h2>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-600">Phone Country Code</label>
-                    <input
-                      value={formProfile.phone.countryCode}
-                      onChange={(event) =>
-                        handlePhoneChange("phone", "countryCode", event.target.value)
-                      }
-                      className={getInputClassName("phone.countryCode")}
-                      placeholder="+44"
-                      maxLength={5}
-                      aria-invalid={Boolean(fieldErrors["phone.countryCode"])}
-                    />
-                    {renderFieldError("phone.countryCode")}
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-600">Phone Number</label>
-                    <input
-                      value={formProfile.phone.number}
-                      onChange={(event) => handlePhoneChange("phone", "number", event.target.value)}
-                      className={getInputClassName("phone.number")}
-                      placeholder="9100012345"
-                      maxLength={15}
-                      inputMode="numeric"
-                      aria-invalid={Boolean(fieldErrors["phone.number"])}
-                    />
-                    {renderFieldError("phone.number")}
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-600">
-                      Landline Country Code
-                    </label>
-                    <input
-                      value={formProfile.landline.countryCode}
-                      onChange={(event) =>
-                        handlePhoneChange("landline", "countryCode", event.target.value)
-                      }
-                      className={getInputClassName("landline.countryCode")}
-                      placeholder="+44"
-                      maxLength={5}
-                      aria-invalid={Boolean(fieldErrors["landline.countryCode"])}
-                    />
-                    {renderFieldError("landline.countryCode")}
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-600">Landline Number</label>
-                    <input
-                      value={formProfile.landline.number}
-                      onChange={(event) =>
-                        handlePhoneChange("landline", "number", event.target.value)
-                      }
-                      className={getInputClassName("landline.number")}
-                      placeholder="4023456789"
-                      maxLength={15}
-                      inputMode="numeric"
-                      aria-invalid={Boolean(fieldErrors["landline.number"])}
-                    />
-                    {renderFieldError("landline.number")}
-                  </div>
-                </div>
-              </section>
-
-              <section className="space-y-4">
-                <h2 className="text-base font-semibold text-slate-800">Address</h2>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-600">Door No</label>
-                    <input
-                      value={formProfile.address.doorNo}
-                      onChange={(event) => handleAddressChange("doorNo", event.target.value)}
-                      className={getInputClassName("address.doorNo")}
-                      placeholder="12-3-45"
-                      maxLength={30}
-                      aria-invalid={Boolean(fieldErrors["address.doorNo"])}
-                    />
-                    {renderFieldError("address.doorNo")}
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-600">Street</label>
-                    <input
-                      value={formProfile.address.street}
-                      onChange={(event) => handleAddressChange("street", event.target.value)}
-                      className={getInputClassName("address.street")}
-                      placeholder="Street Road"
-                      maxLength={120}
-                      aria-invalid={Boolean(fieldErrors["address.street"])}
-                    />
-                    {renderFieldError("address.street")}
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-600">Locality</label>
-                    <input
-                      value={formProfile.address.locality}
-                      onChange={(event) => handleAddressChange("locality", event.target.value)}
-                      className={getInputClassName("address.locality")}
-                      placeholder="Locality"
-                      maxLength={120}
-                      aria-invalid={Boolean(fieldErrors["address.locality"])}
-                    />
-                    {renderFieldError("address.locality")}
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-600">City</label>
-                    <input
-                      value={formProfile.address.city}
-                      onChange={(event) => handleAddressChange("city", event.target.value)}
-                      className={getInputClassName("address.city")}
-                      placeholder="City"
-                      maxLength={80}
-                      aria-invalid={Boolean(fieldErrors["address.city"])}
-                    />
-                    {renderFieldError("address.city")}
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-600">State</label>
-                    <input
-                      value={formProfile.address.state}
-                      onChange={(event) => handleAddressChange("state", event.target.value)}
-                      className={getInputClassName("address.state")}
-                      placeholder="State"
-                      maxLength={80}
-                      aria-invalid={Boolean(fieldErrors["address.state"])}
-                    />
-                    {renderFieldError("address.state")}
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-600">Country</label>
-                    <input
-                      value={formProfile.address.country}
-                      onChange={(event) => handleAddressChange("country", event.target.value)}
-                      className={getInputClassName("address.country")}
-                      placeholder="Country"
-                      maxLength={80}
-                      aria-invalid={Boolean(fieldErrors["address.country"])}
-                    />
-                    {renderFieldError("address.country")}
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="mb-1 block text-sm text-slate-600">Postal Code</label>
-                    <input
-                      value={formProfile.address.postalCode}
-                      onChange={(event) => handleAddressChange("postalCode", event.target.value)}
-                      className={getInputClassName("address.postalCode")}
-                      placeholder="500016"
-                      maxLength={12}
-                      aria-invalid={Boolean(fieldErrors["address.postalCode"])}
-                    />
-                    {renderFieldError("address.postalCode")}
-                  </div>
-                </div>
-              </section>
-
-              <div className="flex flex-col gap-3 border-t border-slate-200 pt-6 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={handleSkip}
-                  disabled={isSaving || isSkipping}
-                  className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
-                >
-                  {isSkipping ? "Skipping..." : "Skip for now"}
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSaving || isSkipping || !resolvedUserId}
-                  className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
-                >
-                  {isSaving ? "Saving..." : "Save & Continue"}
-                </button>
+          <form onSubmit={handleSubmit} className="space-y-8">
+            
+            {/* Personal Info */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 border-b pb-2">
+                <User className="h-5 w-5 text-blue-600" />
+                <h3 className="text-base font-semibold text-gray-800">Personal Information</h3>
               </div>
-            </form>
-          )}
+
+              <InputField 
+                label="Full Name" 
+                mandatory 
+                value={formProfile.fullName} 
+                onChange={(e) => handleChange("fullName", e.target.value)} 
+                error={fieldErrors["fullName"]} 
+                placeholder="John Doe"
+                autoComplete="name"
+              />
+
+              <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-xl p-4 shadow-sm relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-indigo-400"></div>
+                <div className="flex items-start gap-3">
+                  <div className="bg-white p-2 rounded-lg border border-indigo-100 shadow-sm mt-0.5">
+                     <Landmark className="h-5 w-5 text-indigo-500" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-sm font-semibold text-indigo-800 flex items-center gap-2 mb-1">
+                      Council Affiliation
+                      <span className="text-xs font-normal bg-indigo-100 text-indigo-600 px-2 py-0.5 rounded-full">
+                        Optional
+                      </span>
+                    </label>
+                    <input
+                      value={formProfile.council}
+                      onChange={(e) => handleChange("council", e.target.value)}
+                      placeholder="e.g., City of London Council"
+                      className={`w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none transition focus:ring-2 ${
+                        fieldErrors["council"] ? "border-red-400" : "border-gray-200 focus:border-indigo-400 ring-indigo-100"
+                      }`}
+                    />
+                    {fieldErrors["council"] && <p className="text-xs text-red-500 mt-1">{fieldErrors["council"]}</p>}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Contact Details */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 border-b pb-2">
+                <Phone className="h-5 w-5 text-blue-600" />
+                <h3 className="text-base font-semibold text-gray-800">Contact Details</h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Mobile */}
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">
+                    Mobile Number <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <CountryCodeDropdown 
+                      value={formProfile.phone.countryCode} 
+                      onChange={(val) => handlePhoneChange("phone", "countryCode", val)} 
+                      error={fieldErrors["phone.countryCode"]}
+                      allowClear={false}
+                    />
+                    <input
+                      className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:ring-2 ring-blue-50 focus:border-blue-500"
+                      value={formProfile.phone.number}
+                      onChange={(e) => handlePhoneChange("phone", "number", e.target.value)}
+                      placeholder="7123456789"
+                      type="tel"
+                      autoComplete="tel"
+                    />
+                  </div>
+                  {fieldErrors["phone.number"] && <p className="text-xs text-red-500">{fieldErrors["phone.number"]}</p>}
+                </div>
+
+                {/* Landline */}
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Landline</label>
+                  <div className="flex gap-2">
+                    <CountryCodeDropdown 
+                      value={formProfile.landline.countryCode} 
+                      onChange={(val) => handlePhoneChange("landline", "countryCode", val)} 
+                      error={fieldErrors["landline.countryCode"]}
+                      placeholder="Code"
+                      allowClear={true}
+                    />
+                    <input
+                      className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition focus:ring-2 ring-blue-50 focus:border-blue-500"
+                      value={formProfile.landline.number}
+                      onChange={(e) => handlePhoneChange("landline", "number", e.target.value)}
+                      placeholder="2012345678"
+                      type="tel"
+                    />
+                  </div>
+                  {fieldErrors["landline.number"] && <p className="text-xs text-red-500">{fieldErrors["landline.number"]}</p>}
+                </div>
+              </div>
+            </div>
+
+            {/* Address */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b pb-2">
+                 <div className="flex items-center gap-2">
+                   <MapPin className="h-5 w-5 text-blue-600" />
+                   <h3 className="text-base font-semibold text-gray-800">Location & Address</h3>
+                 </div>
+                 
+                 <button 
+                   type="button" 
+                   onClick={fetchAccurateLocation} 
+                   disabled={locating}
+                   className="flex items-center gap-1.5 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 transition px-3 py-1.5 rounded-md shadow-sm"
+                 >
+                   {locating ? (
+                     <><Loader2 className="h-3 w-3 animate-spin" /> Locating...</>
+                   ) : (
+                     <><Navigation className="h-3 w-3" /> Fetch My Location</>
+                   )}
+                 </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <InputField label="Door / House No." value={formProfile.address.doorNo} onChange={(e) => handleAddressChange("doorNo", e.target.value)} placeholder="12-B" className="md:col-span-1" />
+                <InputField label="Street" value={formProfile.address.street} onChange={(e) => handleAddressChange("street", e.target.value)} placeholder="Baker Street" className="md:col-span-2" autoComplete="address-line1" />
+                <InputField label="Locality" value={formProfile.address.locality} onChange={(e) => handleAddressChange("locality", e.target.value)} placeholder="Central" />
+                <InputField label="City" value={formProfile.address.city} onChange={(e) => handleAddressChange("city", e.target.value)} error={fieldErrors["address.city"]} autoComplete="address-level2" />
+                <InputField label="State" value={formProfile.address.state} onChange={(e) => handleAddressChange("state", e.target.value)} autoComplete="address-level1" />
+                <InputField label="Country" value={formProfile.address.country} onChange={(e) => handleAddressChange("country", e.target.value)} placeholder="UK" autoComplete="country-name" />
+                <InputField label="Postal Code" value={formProfile.address.postalCode} onChange={(e) => handleAddressChange("postalCode", e.target.value)} placeholder="NW1 6XE" autoComplete="postal-code" />
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="pt-4 flex flex-col sm:flex-row gap-3 justify-end">
+              <button 
+                type="button" 
+                onClick={handleSkip} 
+                className="px-6 py-2.5 text-sm font-medium text-gray-700 bg-white border rounded-lg hover:bg-gray-50"
+              >
+                Skip for now
+              </button>
+              <button 
+                type="submit" 
+                disabled={isSaving} 
+                className="px-8 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 shadow-md flex items-center gap-2 justify-center"
+              >
+                 {isSaving ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : "Save Profile"}
+              </button>
+            </div>
+
+          </form>
         </CardContent>
       </Card>
     </main>

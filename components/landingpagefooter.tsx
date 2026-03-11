@@ -100,11 +100,11 @@ export default function Footer() {
             <ul className="space-y-4 text-sm text-white/70">
               <li className="flex items-center gap-3">
                 <Mail className="h-4 w-4 text-indigo-400" />
-                <span>zafer.khan@ai4planning.com</span>
+                <span>info@ai4planning.com</span>
               </li>
               <li className="flex items-center gap-3">
                 <Phone className="h-4 w-4 text-indigo-400" />
-                <span>+44 7768262279</span>
+                <span>+44 7777788885</span>
               </li>
               <li className="flex items-start gap-3">
                 <MapPin className="h-4 w-4 text-indigo-400 mt-0.5" />
