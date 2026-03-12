@@ -137,7 +137,6 @@ const normalizeProfileResponse = (
 
   const normalizedProfile: ProfileModel = {
     fullName: toSafeString(source.fullName),
-    bio: toSafeString(source.bio),
     council: toSafeString(source.council),
     phone: {
       countryCode: toSafeString(phone.countryCode) || "+44",
@@ -275,7 +274,7 @@ export default function ProfileSectionPage() {
     return <p className="mt-1 text-xs text-red-600">{message}</p>;
   };
 
-  const handleRootChange = (field: "fullName" | "bio" | "council", value: string) => {
+  const handleRootChange = (field: "fullName" | "council", value: string) => {
     setFormProfile((prev) => ({
       ...prev,
       [field]: value,
@@ -584,10 +583,6 @@ export default function ProfileSectionPage() {
                     <p className="text-xs text-slate-500">Council</p>
                     <p className="text-sm font-medium text-slate-900">{toDisplay(profile.council)}</p>
                   </div>
-                  <div className="rounded-lg border border-slate-200 px-4 py-3 md:col-span-2">
-                    <p className="text-xs text-slate-500">Bio</p>
-                    <p className="text-sm font-medium text-slate-900">{toDisplay(profile.bio)}</p>
-                  </div>
                 </div>
               </section>
 
@@ -678,22 +673,6 @@ export default function ProfileSectionPage() {
                       aria-invalid={Boolean(fieldErrors.council)}
                     />
                     {renderFieldError("council")}
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label htmlFor="bio" className="mb-1 block text-sm text-slate-600">
-                      Bio
-                    </label>
-                    <textarea
-                      id="bio"
-                      value={formProfile.bio}
-                      onChange={(event) => handleRootChange("bio", event.target.value)}
-                      className={`${getInputClassName("bio")} min-h-24`}
-                      placeholder="Short bio"
-                      maxLength={600}
-                      aria-invalid={Boolean(fieldErrors.bio)}
-                    />
-                    {renderFieldError("bio")}
                   </div>
                 </div>
               </section>
