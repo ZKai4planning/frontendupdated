@@ -81,6 +81,20 @@ export function ClientLogin() {
       : fallbackMessage
   }
 
+  const applyOtpValue = (value: string, startIndex = 0) => {
+    const digits = value.replace(/\D/g, "").slice(0, otp.length - startIndex)
+    if (!digits) return
+
+    const newOtp = [...otp]
+    for (let i = 0; i < digits.length; i += 1) {
+      newOtp[startIndex + i] = digits[i] ?? ""
+    }
+    setOtp(newOtp)
+
+    const nextIndex = Math.min(startIndex + digits.length, otp.length - 1)
+    document.getElementById(`otp-${nextIndex}`)?.focus()
+  }
+
   /* ================= SUBMIT HANDLER ================= */
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -315,16 +329,34 @@ export function ClientLogin() {
                     value={digit}
                     disabled={isMobile}
                     onChange={(e) => {
-                      const value = e.target.value.replace(/\D/, "")
-                      if (!value) return
+                      const raw = e.target.value
+                      if (!raw) {
+                        const newOtp = [...otp]
+                        newOtp[index] = ""
+                        setOtp(newOtp)
+                        return
+                      }
+
+                      const digitsOnly = raw.replace(/\D/g, "")
+                      if (!digitsOnly) return
+
+                      if (digitsOnly.length > 1) {
+                        applyOtpValue(digitsOnly, index)
+                        return
+                      }
 
                       const newOtp = [...otp]
-                      newOtp[index] = value
+                      newOtp[index] = digitsOnly
                       setOtp(newOtp)
 
                       if (index < otp.length - 1) {
                         document.getElementById(`otp-${index + 1}`)?.focus()
                       }
+                    }}
+                    onPaste={(e) => {
+                      e.preventDefault()
+                      const pasted = e.clipboardData.getData("text")
+                      applyOtpValue(pasted, index)
                     }}
                     onKeyDown={(e) => {
                       if (e.key === "Backspace") {
