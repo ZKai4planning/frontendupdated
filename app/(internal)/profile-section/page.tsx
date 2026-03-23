@@ -1,62 +1,74 @@
 "use client";
 
 import axios from "axios";
+import Image from "next/image";
 import type { ChangeEvent, FormEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import toast from "react-hot-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import axiosInstance from "@/lib/axiosinstance";
 import {
-  EMPTY_PROFILE,
-  type AddressModel,
-  type PhoneModel,
+  COUNTRY_CODES,
+  mergeProfileData,
   type ProfileFieldErrors,
   type ProfileFieldPath,
   type ProfileModel,
   validateProfileInput,
 } from "@/lib/profile-validation";
-import { USER_IDENTITY_UPDATED_EVENT } from "@/lib/use-user-identity";
 import { useAuthStore } from "@/lib/zustand";
+import {
+  Camera,
+  Check,
+  ChevronDown,
+  Landmark,
+  Loader2,
+  MapPin,
+  Navigation,
+  Phone,
+  Search,
+  User,
+} from "lucide-react";
 
-const DEFAULT_AVATAR = "/profile.jpg";
-const MAX_PROFILE_PICTURE_SIZE_BYTES = 5 * 1024 * 1024;
-const inputClassName =
-  "w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100";
-
-const asRecord = (value: unknown): Record<string, unknown> => {
-  if (typeof value === "object" && value !== null) {
-    return value as Record<string, unknown>;
-  }
-
-  return {};
+const getInitials = (name: string) => {
+  if (!name) return "U";
+  const parts = name.trim().split(" ").filter(Boolean);
+  if (parts.length === 0) return "U";
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 };
 
-const toSafeString = (value: unknown): string => {
-  if (typeof value === "string") return value;
-  if (typeof value === "number") return String(value);
-  return "";
-};
-
-const getErrorMessage = (error: unknown, fallback: string): string => {
+const getErrorMessage = (error: unknown, fallback: string) => {
   if (!axios.isAxiosError(error)) return fallback;
 
   const data = error.response?.data;
   if (typeof data === "string" && data.trim()) return data;
 
-  const objectData = asRecord(data);
-  const message = objectData.message;
-  if (typeof message === "string" && message.trim()) return message;
+  if (typeof data === "object" && data !== null) {
+    const message = (data as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+  }
 
   return fallback;
 };
 
-const shouldTryNextMethod = (error: unknown): boolean => {
+const shouldTryNextMethod = (error: unknown) => {
   if (!axios.isAxiosError(error)) return false;
-
   const status = error.response?.status;
   return status === 404 || status === 405 || status === 415;
 };
 
-const pickPictureUrl = (...records: Record<string, unknown>[]): string => {
+const pickPictureUrl = (data: unknown) => {
+  if (!data || typeof data !== "object") return "";
+
+  const record = data as Record<string, unknown>;
+  const payload =
+    record.data && typeof record.data === "object"
+      ? (record.data as Record<string, unknown>)
+      : record;
+
+  const candidates = [record, payload];
   const keys = [
     "profilePictureUrl",
     "profilePicture",
@@ -69,25 +81,9 @@ const pickPictureUrl = (...records: Record<string, unknown>[]): string => {
     "image",
   ];
 
-  for (const record of records) {
+  for (const candidate of candidates) {
     for (const key of keys) {
-      const value = record[key];
-      if (typeof value === "string" && value.trim()) {
-        return value;
-      }
-    }
-
-    const user = asRecord(record.user);
-    for (const key of keys) {
-      const value = user[key];
-      if (typeof value === "string" && value.trim()) {
-        return value;
-      }
-    }
-
-    const profile = asRecord(record.profile);
-    for (const key of keys) {
-      const value = profile[key];
+      const value = candidate[key];
       if (typeof value === "string" && value.trim()) {
         return value;
       }
@@ -97,20 +93,21 @@ const pickPictureUrl = (...records: Record<string, unknown>[]): string => {
   return "";
 };
 
-const pickEmail = (...records: Record<string, unknown>[]): string => {
+const pickEmail = (data: unknown) => {
+  if (!data || typeof data !== "object") return "";
+
+  const record = data as Record<string, unknown>;
+  const payload =
+    record.data && typeof record.data === "object"
+      ? (record.data as Record<string, unknown>)
+      : record;
+
+  const candidates = [record, payload];
   const keys = ["email", "mail", "userEmail"];
 
-  for (const record of records) {
+  for (const candidate of candidates) {
     for (const key of keys) {
-      const value = record[key];
-      if (typeof value === "string" && value.trim()) {
-        return value;
-      }
-    }
-
-    const user = asRecord(record.user);
-    for (const key of keys) {
-      const value = user[key];
+      const value = candidate[key];
       if (typeof value === "string" && value.trim()) {
         return value;
       }
@@ -120,744 +117,786 @@ const pickEmail = (...records: Record<string, unknown>[]): string => {
   return "";
 };
 
-const normalizeProfileResponse = (
-  responseData: unknown
-): { profile: ProfileModel; pictureUrl: string; email: string } => {
-  const responseObject = asRecord(responseData);
-  const payload = Object.keys(asRecord(responseObject.data)).length
-    ? asRecord(responseObject.data)
-    : responseObject;
+function CountryCodeDropdown({
+  value,
+  onChange,
+  error,
+  placeholder = "Code",
+  allowClear = true,
+  disabled = false,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+  placeholder?: string;
+  allowClear?: boolean;
+  disabled?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const profileCandidate = asRecord(payload.profile);
-  const source = Object.keys(profileCandidate).length ? profileCandidate : payload;
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
 
-  const phone = asRecord(source.phone);
-  const landline = asRecord(source.landline);
-  const address = asRecord(source.address);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-  const normalizedProfile: ProfileModel = {
-    fullName: toSafeString(source.fullName),
-    council: toSafeString(source.council),
-    phone: {
-      countryCode: toSafeString(phone.countryCode) || "+44",
-      number: toSafeString(phone.number),
-    },
-    landline: {
-      countryCode: toSafeString(landline.countryCode) || "+44",
-      number: toSafeString(landline.number),
-    },
-    address: {
-      doorNo: toSafeString(address.doorNo),
-      street: toSafeString(address.street),
-      locality: toSafeString(address.locality),
-      city: toSafeString(address.city),
-      state: toSafeString(address.state),
-      country: toSafeString(address.country),
-      postalCode: toSafeString(address.postalCode),
-    },
-  };
+  const filteredCountries = COUNTRY_CODES.filter(
+    (country) =>
+      country.name.toLowerCase().includes(search.toLowerCase()) ||
+      country.code.includes(search)
+  );
 
-  return {
-    profile: normalizedProfile,
-    pictureUrl: pickPictureUrl(source, payload, responseObject),
-    email: pickEmail(source, payload, responseObject),
-  };
-};
+  const selectedCountry = COUNTRY_CODES.find((country) => country.code === value);
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => {
+          if (!disabled) {
+            setIsOpen((prev) => !prev);
+          }
+        }}
+        disabled={disabled}
+        className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-sm transition focus:outline-none focus:ring-2 md:w-28 ${
+          disabled
+            ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500"
+            : error
+              ? "border-red-400 bg-white ring-red-100"
+              : "border-gray-200 bg-white ring-blue-100"
+        }`}
+      >
+        <span className="flex items-center gap-2 truncate">
+          {selectedCountry ? (
+            <>
+              <span>{selectedCountry.flag}</span>
+              <span className="font-medium">{selectedCountry.code}</span>
+            </>
+          ) : (
+            <span className="text-gray-400">{placeholder}</span>
+          )}
+        </span>
+        <ChevronDown
+          className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {isOpen && !disabled ? (
+        <div className="absolute z-20 mt-1 flex max-h-60 w-72 flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+          <div className="sticky top-0 z-10 border-b bg-white p-2">
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search country..."
+                autoFocus
+                className="w-full rounded-md border py-2 pl-8 pr-3 text-sm focus:outline-none focus:ring-1 focus:ring-blue-200"
+              />
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {allowClear ? (
+              <button
+                type="button"
+                className={`flex w-full items-center px-3 py-2 text-left text-sm italic text-gray-500 transition hover:bg-gray-100 ${
+                  !value ? "bg-gray-50 font-semibold" : ""
+                }`}
+                onClick={() => {
+                  onChange("");
+                  setIsOpen(false);
+                  setSearch("");
+                }}
+              >
+                <span className="mr-2 w-6 text-center">x</span>
+                <span className="flex-1">None / Clear</span>
+                {!value ? <Check className="ml-2 h-4 w-4 text-gray-600" /> : null}
+              </button>
+            ) : null}
+
+            {filteredCountries.length === 0 ? (
+              <p className="p-3 text-center text-sm text-gray-500">No country found.</p>
+            ) : (
+              filteredCountries.map((country) => (
+                <button
+                  type="button"
+                  key={`${country.name}-${country.code}`}
+                  className={`flex w-full items-center px-3 py-2 text-left text-sm transition hover:bg-blue-50 ${
+                    value === country.code ? "bg-blue-50 text-blue-700" : "text-gray-700"
+                  }`}
+                  onClick={() => {
+                    onChange(country.code);
+                    setIsOpen(false);
+                    setSearch("");
+                  }}
+                >
+                  <span className="mr-2 text-base">{country.flag}</span>
+                  <span className="flex-1">{country.name}</span>
+                  <span className="ml-2 font-mono text-xs text-gray-500">{country.code}</span>
+                  {value === country.code ? (
+                    <Check className="ml-2 h-4 w-4 text-blue-600" />
+                  ) : null}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function InputField({
+  label,
+  mandatory,
+  value,
+  onChange,
+  error,
+  placeholder,
+  className,
+  type = "text",
+  autoComplete,
+  disabled = false,
+}: {
+  label: string;
+  mandatory?: boolean;
+  value: string;
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  error?: string;
+  placeholder?: string;
+  className?: string;
+  type?: string;
+  autoComplete?: string;
+  disabled?: boolean;
+}) {
+  return (
+    <div className={`space-y-1 ${className ?? ""}`}>
+      <label className="text-sm font-medium text-gray-700">
+        {label} {mandatory ? <span className="text-red-500">*</span> : null}
+      </label>
+      <input
+        type={type}
+        value={value || ""}
+        onChange={onChange}
+        placeholder={placeholder}
+        autoComplete={autoComplete}
+        disabled={disabled}
+        className={`w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:ring-2 ${
+          disabled
+            ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500"
+            : error
+              ? "border-red-400 ring-red-50 focus:border-red-500"
+              : "border-gray-200 ring-blue-50 focus:border-blue-500"
+        }`}
+      />
+      {error ? <p className="mt-0.5 text-xs text-red-500">{error}</p> : null}
+    </div>
+  );
+}
 
 export default function ProfileSectionPage() {
   const storeUserId = useAuthStore((state) => state.userId);
 
-  const [profile, setProfile] = useState<ProfileModel>(EMPTY_PROFILE);
-  const [formProfile, setFormProfile] = useState<ProfileModel>(EMPTY_PROFILE);
+  const [savedProfile, setSavedProfile] = useState<ProfileModel>(mergeProfileData(null));
+  const [formProfile, setFormProfile] = useState<ProfileModel>(mergeProfileData(null));
   const [fieldErrors, setFieldErrors] = useState<ProfileFieldErrors>({});
-  const [serverPictureUrl, setServerPictureUrl] = useState(DEFAULT_AVATAR);
-  const [profilePictureUrl, setProfilePictureUrl] = useState(DEFAULT_AVATAR);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [isEditMode, setIsEditMode] = useState(false);
-
-  const [isFetching, setIsFetching] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [savedProfilePictureUrl, setSavedProfilePictureUrl] = useState("");
+  const [profilePictureUrl, setProfilePictureUrl] = useState("");
   const [profileEmail, setProfileEmail] = useState("");
+  const [isFetching, setIsFetching] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   const resolvedUserId = useMemo(() => {
     if (storeUserId) return storeUserId;
     if (typeof window === "undefined") return null;
 
-    const raw =
-      window.sessionStorage.getItem("currentAuth") ||
-      window.localStorage.getItem("currentAuth");
-
-    if (!raw) return null;
-
     try {
-      const parsed = JSON.parse(raw) as { userId?: string | null };
-      return parsed.userId ?? null;
+      const raw =
+        window.sessionStorage.getItem("currentAuth") ||
+        window.localStorage.getItem("currentAuth");
+
+      if (!raw) return null;
+
+      return JSON.parse(raw)?.userId ?? null;
     } catch {
       return null;
     }
   }, [storeUserId]);
 
   useEffect(() => {
-    return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-      }
-    };
-  }, [previewUrl]);
+    if (!resolvedUserId) {
+      setIsFetching(false);
+      return;
+    }
 
-  useEffect(() => {
-    if (!resolvedUserId) return;
-
-    let isCancelled = false;
-
-    const loadProfile = async () => {
+    const loadData = async () => {
       setIsFetching(true);
-      setErrorMessage(null);
-      setSuccessMessage(null);
 
       try {
         const response = await axiosInstance.get(
           `/profile/${encodeURIComponent(resolvedUserId)}`
         );
+        const data = response.data?.data || response.data;
+        const mergedProfile = mergeProfileData(data);
+        setSavedProfile(mergedProfile);
+        setFormProfile(mergedProfile);
 
-        if (isCancelled) return;
+        const pictureUrl = pickPictureUrl(response.data);
+        if (pictureUrl) {
+          setSavedProfilePictureUrl(pictureUrl);
+          setProfilePictureUrl(pictureUrl);
+        }
 
-        const normalized = normalizeProfileResponse(response.data);
-        setProfile(normalized.profile);
-        setFormProfile(normalized.profile);
-        setFieldErrors({});
-        if (normalized.email) setProfileEmail(normalized.email);
-
-        if (normalized.pictureUrl) {
-          setServerPictureUrl(normalized.pictureUrl);
-          setProfilePictureUrl(normalized.pictureUrl);
+        const email = pickEmail(response.data);
+        if (email) {
+          setProfileEmail(email);
         }
       } catch (error) {
-        if (isCancelled) return;
-
-        setErrorMessage(getErrorMessage(error, "Failed to load profile details."));
-      } finally {
-        if (!isCancelled) {
-          setIsFetching(false);
+        if (!axios.isAxiosError(error) || error.response?.status !== 404) {
+          toast.error(getErrorMessage(error, "Failed to load profile"));
         }
+      } finally {
+        setIsFetching(false);
       }
     };
 
-    void loadProfile();
-
-    return () => {
-      isCancelled = true;
-    };
+    void loadData();
   }, [resolvedUserId]);
 
-  const getInputClassName = (field: ProfileFieldPath) =>
-    `${inputClassName} ${
-      fieldErrors[field] ? "border-red-500 focus:border-red-500 focus:ring-red-100" : ""
-    }`;
-
-  const clearFieldError = (field: ProfileFieldPath) => {
+  const clearFieldError = (path: ProfileFieldPath) => {
     setFieldErrors((prev) => {
-      if (!prev[field]) return prev;
+      if (!prev[path]) return prev;
       const next = { ...prev };
-      delete next[field];
+      delete next[path];
       return next;
     });
   };
 
-  const renderFieldError = (field: ProfileFieldPath) => {
-    const message = fieldErrors[field];
-    if (!message) return null;
-    return <p className="mt-1 text-xs text-red-600">{message}</p>;
-  };
-
-  const handleRootChange = (field: "fullName" | "council", value: string) => {
-    setFormProfile((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-    clearFieldError(field);
-  };
-
-  const handlePhoneChange = (
-    field: "phone" | "landline",
-    key: keyof PhoneModel,
-    value: string
-  ) => {
-    setFormProfile((prev) => ({
-      ...prev,
-      [field]: {
-        ...prev[field],
-        [key]: value,
-      },
-    }));
-    const path =
-      field === "phone"
-        ? (`phone.${key}` as ProfileFieldPath)
-        : (`landline.${key}` as ProfileFieldPath);
-    clearFieldError(path);
-  };
-
-  const handleAddressChange = (key: keyof AddressModel, value: string) => {
-    setFormProfile((prev) => ({
-      ...prev,
-      address: {
-        ...prev.address,
-        [key]: value,
-      },
-    }));
-    clearFieldError(`address.${key}` as ProfileFieldPath);
-  };
-
-  const submitProfile = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!resolvedUserId) {
-      setErrorMessage("Missing userId. Please login again and retry.");
+  const fetchAccurateLocation = () => {
+    if (!navigator.geolocation) {
+      toast.error("Geolocation not supported.");
       return;
     }
 
-    const validation = validateProfileInput(formProfile);
-    setFormProfile(validation.sanitizedProfile);
+    setLocating(true);
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next["address.city"];
+      delete next["address.country"];
+      return next;
+    });
 
-    if (!validation.isValid) {
-      setFieldErrors(validation.fieldErrors);
-      setErrorMessage(validation.firstError ?? "Please fix the highlighted profile fields.");
-      setSuccessMessage(null);
-      return;
-    }
-
-    setFieldErrors({});
-    setIsSaving(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
-    const endpoint = `/profile/${encodeURIComponent(resolvedUserId)}`;
-
-    try {
-      try {
-        await axiosInstance.put(endpoint, validation.sanitizedProfile);
-      } catch (error) {
-        if (!shouldTryNextMethod(error)) throw error;
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
 
         try {
-          await axiosInstance.patch(endpoint, validation.sanitizedProfile);
-        } catch (patchError) {
-          if (!shouldTryNextMethod(patchError)) throw patchError;
-          await axiosInstance.post(endpoint, validation.sanitizedProfile);
+          const reverseGeoUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`;
+          const geoRes = await axios.get(reverseGeoUrl);
+          const addr = geoRes.data?.address ?? {};
+
+          setFormProfile((prev) => ({
+            ...prev,
+            address: {
+              ...prev.address,
+              doorNo:
+                typeof addr.house_number === "string" ? addr.house_number : prev.address.doorNo,
+              street: typeof addr.road === "string" ? addr.road : prev.address.street,
+              locality:
+                typeof (addr.suburb || addr.neighbourhood) === "string"
+                  ? (addr.suburb || addr.neighbourhood)
+                  : prev.address.locality,
+              city:
+                typeof (addr.city || addr.town || addr.village) === "string"
+                  ? (addr.city || addr.town || addr.village)
+                  : prev.address.city,
+              state: typeof addr.state === "string" ? addr.state : prev.address.state,
+              country: typeof addr.country === "string" ? addr.country : prev.address.country,
+              postalCode:
+                typeof addr.postcode === "string" ? addr.postcode : prev.address.postalCode,
+            },
+          }));
+
+          toast.success("Location detected!");
+        } catch (error) {
+          console.error("Reverse geocoding failed", error);
+          toast.error("Could not decode address from location.");
+        } finally {
+          setLocating(false);
         }
-      }
-
-      setProfile(validation.sanitizedProfile);
-      setFormProfile(validation.sanitizedProfile);
-      setIsEditMode(false);
-      setSuccessMessage("Profile details updated successfully.");
-      window.dispatchEvent(new Event(USER_IDENTITY_UPDATED_EVENT));
-    } catch (error) {
-      setErrorMessage(getErrorMessage(error, "Failed to update profile details."));
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const onProfileFileSelect = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null;
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-      setPreviewUrl(null);
-    }
-
-    if (file && !file.type.startsWith("image/")) {
-      event.target.value = "";
-      setSelectedFile(null);
-      setErrorMessage("Please choose a valid image file.");
-      setProfilePictureUrl(serverPictureUrl || DEFAULT_AVATAR);
-      return;
-    }
-
-    if (file && file.size > MAX_PROFILE_PICTURE_SIZE_BYTES) {
-      event.target.value = "";
-      setSelectedFile(null);
-      setErrorMessage("Profile picture must be 5 MB or smaller.");
-      setProfilePictureUrl(serverPictureUrl || DEFAULT_AVATAR);
-      return;
-    }
-
-    setSelectedFile(file);
-
-    if (file) {
-      const nextPreview = URL.createObjectURL(file);
-      setPreviewUrl(nextPreview);
-      setProfilePictureUrl(nextPreview);
-      return;
-    }
-
-    setProfilePictureUrl(serverPictureUrl || DEFAULT_AVATAR);
-  };
-
-  const uploadProfilePicture = async () => {
-    if (!selectedFile) {
-      setErrorMessage("Choose a profile picture before uploading.");
-      return;
-    }
-
-    if (!resolvedUserId) {
-      setErrorMessage("Missing userId. Please login again and retry.");
-      return;
-    }
-
-    setIsUploading(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
-    const endpoint = `/profile/${encodeURIComponent(resolvedUserId)}/picture`;
-    const payload = new FormData();
-    payload.append("profilePicture", selectedFile);
-
-    const config = {
-      headers: {
-        "Content-Type": "multipart/form-data",
       },
-    };
+      (error) => {
+        setLocating(false);
+        if (error.code === 1) {
+          toast.error("Permission denied. Please allow location access.");
+          return;
+        }
+        toast.error("Unable to retrieve location.");
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !resolvedUserId || !isEditMode) return;
+
+    const formData = new FormData();
+    formData.append("profilePicture", file);
+
+    setUploading(true);
 
     try {
       let response;
 
       try {
-        response = await axiosInstance.put(endpoint, payload, config);
+        response = await axiosInstance.put(
+          `/profile/${encodeURIComponent(resolvedUserId)}/picture`,
+          formData,
+          {
+            headers: { "Content-Type": "multipart/form-data" },
+          }
+        );
       } catch (error) {
         if (!shouldTryNextMethod(error)) throw error;
 
         try {
-          response = await axiosInstance.patch(endpoint, payload, config);
+          response = await axiosInstance.patch(
+            `/profile/${encodeURIComponent(resolvedUserId)}/picture`,
+            formData,
+            {
+              headers: { "Content-Type": "multipart/form-data" },
+            }
+          );
         } catch (patchError) {
           if (!shouldTryNextMethod(patchError)) throw patchError;
-          response = await axiosInstance.post(endpoint, payload, config);
+          response = await axiosInstance.post(
+            `/profile/${encodeURIComponent(resolvedUserId)}/picture`,
+            formData,
+            {
+              headers: { "Content-Type": "multipart/form-data" },
+            }
+          );
         }
       }
 
-      const normalized = normalizeProfileResponse(response?.data);
-      if (normalized.pictureUrl) {
-        setServerPictureUrl(normalized.pictureUrl);
-        setProfilePictureUrl(normalized.pictureUrl);
-      }
-      if (normalized.email) setProfileEmail(normalized.email);
-
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
-        setPreviewUrl(null);
+      const newUrl = pickPictureUrl(response?.data);
+      if (newUrl) {
+        setSavedProfilePictureUrl(newUrl);
+        setProfilePictureUrl(newUrl);
       }
 
-      setSelectedFile(null);
-      setSuccessMessage("Profile picture uploaded successfully.");
-      window.dispatchEvent(new Event(USER_IDENTITY_UPDATED_EVENT));
+      toast.success("Picture updated!");
     } catch (error) {
-      setErrorMessage(getErrorMessage(error, "Failed to upload profile picture."));
+      toast.error(getErrorMessage(error, "Upload failed."));
     } finally {
-      setIsUploading(false);
+      setUploading(false);
+      event.target.value = "";
     }
   };
 
-  const toDisplay = (value?: string) => {
-  if (value && value.trim()) return value;
-  return "--";
-};
-
-  const startEdit = () => {
-    setFormProfile(profile);
-    setFieldErrors({});
-    setSelectedFile(null);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-    setIsEditMode(true);
+  const handleChange = (field: "fullName" | "council", value: string) => {
+    setFormProfile((prev) => ({ ...prev, [field]: value }));
+    clearFieldError(field);
   };
 
-  const cancelEdit = () => {
-    setFormProfile(profile);
-    setFieldErrors({});
-    setSelectedFile(null);
-    setErrorMessage(null);
-    setSuccessMessage(null);
+  const handlePhoneChange = (
+    type: "phone" | "landline",
+    key: "countryCode" | "number",
+    value: string
+  ) => {
+    setFormProfile((prev) => ({
+      ...prev,
+      [type]: { ...prev[type], [key]: value },
+    }));
 
-    if (previewUrl) {
-      URL.revokeObjectURL(previewUrl);
-      setPreviewUrl(null);
+    clearFieldError(`${type}.${key}` as ProfileFieldPath);
+  };
+
+  const handleAddressChange = (
+    key: keyof ProfileModel["address"],
+    value: string
+  ) => {
+    setFormProfile((prev) => ({
+      ...prev,
+      address: { ...prev.address, [key]: value },
+    }));
+
+    clearFieldError(`address.${key}` as ProfileFieldPath);
+  };
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!resolvedUserId) return;
+
+    const result = validateProfileInput(formProfile);
+    setFieldErrors(result.fieldErrors);
+
+    if (!result.isValid) {
+      toast.error(result.firstError || "Please fill all mandatory fields.");
+      return;
     }
 
-    setProfilePictureUrl(serverPictureUrl || DEFAULT_AVATAR);
+    setIsSaving(true);
+
+    try {
+      const endpoint = `/profile/${encodeURIComponent(resolvedUserId)}`;
+
+      try {
+        await axiosInstance.put(endpoint, result.sanitizedProfile);
+      } catch (error) {
+        if (!shouldTryNextMethod(error)) throw error;
+
+        try {
+          await axiosInstance.patch(endpoint, result.sanitizedProfile);
+        } catch (patchError) {
+          if (!shouldTryNextMethod(patchError)) throw patchError;
+          await axiosInstance.post(endpoint, result.sanitizedProfile);
+        }
+      }
+
+      toast.success("Profile updated!");
+      setSavedProfile(result.sanitizedProfile);
+      setIsEditMode(false);
+    } catch (error) {
+      toast.error(getErrorMessage(error, "Failed to save profile"));
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setFormProfile(savedProfile);
+    setProfilePictureUrl(savedProfilePictureUrl);
+    setFieldErrors({});
     setIsEditMode(false);
   };
 
-  return (
-    <main className="min-h-screen bg-gray-50 p-4 sm:p-6">
-      <Card className="mx-auto w-full max-w-5xl rounded-2xl shadow-sm">
-        <CardContent className="p-6 sm:p-8">
-          <div className="mb-8 flex flex-col gap-6 border-b border-slate-200 pb-6 md:flex-row md:items-center md:justify-between">
-            <div className="flex items-center gap-4">
-              <img
-                src={profilePictureUrl || DEFAULT_AVATAR}
-                alt="Profile"
-                className="h-24 w-24 rounded-full border border-slate-200 object-cover"
-              />
+  if (isFetching) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50">
+        <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-blue-600" />
+      </div>
+    );
+  }
 
-              <div>
-                <h1 className="text-xl font-semibold text-slate-900">
-                  {profile.fullName || "Your Profile"}
-                </h1>
-                <p className="text-sm text-slate-500">
-                  {profileEmail || "No email available"}
-                </p>
-                <p className="text-xs text-slate-400">
-                  View your profile and edit when needed.
-                </p>
+  return (
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 px-4 py-10">
+      <Card className="mx-auto w-full max-w-4xl overflow-hidden rounded-2xl border-none shadow-xl">
+        <div className="relative h-32 bg-blue-500" />
+
+        <CardContent className="relative px-6 pb-10 pt-0 sm:px-10">
+          <div className="-mt-16 mb-8 flex flex-col items-center">
+            <div className="relative">
+              <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full border-4 border-white bg-blue-100 text-3xl font-bold text-blue-600 shadow-lg">
+                {profilePictureUrl ? (
+                  <Image
+                    src={profilePictureUrl}
+                    alt="Profile"
+                    width={112}
+                    height={112}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  formProfile.fullName ? getInitials(formProfile.fullName) : "U"
+                )}
               </div>
+
+              {isEditMode ? (
+                <label className="absolute bottom-1 right-1 cursor-pointer rounded-full border bg-white p-1.5 shadow-md transition hover:bg-gray-50">
+                  {uploading ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-gray-600" />
+                  ) : (
+                    <Camera className="h-4 w-4 text-gray-600" />
+                  )}
+                  <input
+                    type="file"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={uploading}
+                  />
+                </label>
+              ) : null}
             </div>
 
+            <h2 className="mt-3 text-lg font-semibold text-gray-800">
+              {formProfile.fullName || "New User"}
+            </h2>
+            <p className="text-sm text-gray-500">Setup your profile</p>
             {!isEditMode ? (
               <button
                 type="button"
-                onClick={startEdit}
-                disabled={!resolvedUserId}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                onClick={() => setIsEditMode(true)}
+                className="mt-4 rounded-lg bg-blue-600 px-5 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700"
               >
                 Edit Profile
               </button>
             ) : (
-              <div className="flex w-full flex-col gap-2 md:w-auto">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={onProfileFileSelect}
-                  className="w-full text-sm md:w-64"
-                />
-                <button
-                  type="button"
-                  onClick={uploadProfilePicture}
-                  disabled={isUploading || !selectedFile || !resolvedUserId}
-                  className="rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-                >
-                  {isUploading ? "Uploading..." : "Upload Picture"}
-                </button>
-              </div>
+              <p className="mt-4 text-xs font-medium uppercase tracking-[0.2em] text-blue-600">
+                Editing Enabled
+              </p>
             )}
           </div>
 
-          {errorMessage && (
-            <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-              {errorMessage}
-            </p>
-          )}
+          <form onSubmit={handleSubmit} className="space-y-8">
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 border-b pb-2">
+                <User className="h-5 w-5 text-blue-600" />
+                <h3 className="text-base font-semibold text-gray-800">Personal Information</h3>
+              </div>
 
-          {successMessage && (
-            <p className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-              {successMessage}
-            </p>
-          )}
+              <InputField
+                label="Full Name"
+                mandatory
+                value={formProfile.fullName}
+                onChange={(event) => handleChange("fullName", event.target.value)}
+                error={fieldErrors.fullName}
+                placeholder="John Doe"
+                autoComplete="name"
+                disabled={!isEditMode}
+              />
 
-          {!resolvedUserId && (
-            <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-              userId not found in auth storage. Please login again.
-            </p>
-          )}
+              <InputField
+                label="Email"
+                value={profileEmail}
+                onChange={() => {}}
+                placeholder="Email"
+                autoComplete="email"
+                disabled
+              />
 
-          {isFetching ? (
-            <p className="py-12 text-center text-sm text-slate-500">
-              Loading profile details...
-            </p>
-          ) : !isEditMode ? (
-            <div className="space-y-8">
-              <section className="space-y-4">
-                <h2 className="text-base font-semibold text-slate-800">Basic Details</h2>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="rounded-lg border border-slate-200 px-4 py-3">
-                    <p className="text-xs text-slate-500">Full Name</p>
-                    <p className="text-sm font-medium text-slate-900">{toDisplay(profile.fullName)}</p>
+              <div className="relative overflow-hidden rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-blue-50 p-4 shadow-sm">
+                <div className="absolute left-0 top-0 h-full w-1 bg-indigo-400" />
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 rounded-lg border border-indigo-100 bg-white p-2 shadow-sm">
+                    <Landmark className="h-5 w-5 text-indigo-500" />
                   </div>
-                  <div className="rounded-lg border border-slate-200 px-4 py-3">
-                    <p className="text-xs text-slate-500">Council</p>
-                    <p className="text-sm font-medium text-slate-900">{toDisplay(profile.council)}</p>
-                  </div>
-                </div>
-              </section>
 
-              <section className="space-y-4">
-                <h2 className="text-base font-semibold text-slate-800">Contact Numbers</h2>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="rounded-lg border border-slate-200 px-4 py-3">
-                    <p className="text-xs text-slate-500">Phone</p>
-                    <p className="text-sm font-medium text-slate-900">
-                      {toDisplay(profile.phone.countryCode)} {toDisplay(profile.phone.number)}
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 px-4 py-3">
-                    <p className="text-xs text-slate-500">Landline</p>
-                    <p className="text-sm font-medium text-slate-900">
-                      {toDisplay(profile.landline.countryCode)} {toDisplay(profile.landline.number)}
-                    </p>
-                  </div>
-                </div>
-              </section>
-
-              <section className="space-y-4">
-                <h2 className="text-base font-semibold text-slate-800">Address</h2>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div className="rounded-lg border border-slate-200 px-4 py-3">
-                    <p className="text-xs text-slate-500">Door No</p>
-                    <p className="text-sm font-medium text-slate-900">{toDisplay(profile.address.doorNo)}</p>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 px-4 py-3">
-                    <p className="text-xs text-slate-500">Street</p>
-                    <p className="text-sm font-medium text-slate-900">{toDisplay(profile.address.street)}</p>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 px-4 py-3">
-                    <p className="text-xs text-slate-500">Locality</p>
-                    <p className="text-sm font-medium text-slate-900">{toDisplay(profile.address.locality)}</p>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 px-4 py-3">
-                    <p className="text-xs text-slate-500">City</p>
-                    <p className="text-sm font-medium text-slate-900">{toDisplay(profile.address.city)}</p>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 px-4 py-3">
-                    <p className="text-xs text-slate-500">State</p>
-                    <p className="text-sm font-medium text-slate-900">{toDisplay(profile.address.state)}</p>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 px-4 py-3">
-                    <p className="text-xs text-slate-500">Country</p>
-                    <p className="text-sm font-medium text-slate-900">{toDisplay(profile.address.country)}</p>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 px-4 py-3 md:col-span-2">
-                    <p className="text-xs text-slate-500">Postal Code</p>
-                    <p className="text-sm font-medium text-slate-900">{toDisplay(profile.address.postalCode)}</p>
-                  </div>
-                </div>
-              </section>
-            </div>
-          ) : (
-            <form onSubmit={submitProfile} className="space-y-8">
-              <section className="space-y-4">
-                <h2 className="text-base font-semibold text-slate-800">Basic Details</h2>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label htmlFor="fullName" className="mb-1 block text-sm text-slate-600">
-                      Full Name
+                  <div className="flex-1">
+                    <label className="mb-1 flex items-center gap-2 text-sm font-semibold text-indigo-800">
+                      Council Affiliation
+                      <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-normal text-indigo-600">
+                        Optional
+                      </span>
                     </label>
                     <input
-                      id="fullName"
-                      value={formProfile.fullName}
-                      onChange={(event) => handleRootChange("fullName", event.target.value)}
-                      className={getInputClassName("fullName")}
-                      placeholder="Full name"
-                      maxLength={80}
-                      aria-invalid={Boolean(fieldErrors.fullName)}
-                    />
-                    {renderFieldError("fullName")}
-                  </div>
-
-                  <div>
-                    <label htmlFor="council" className="mb-1 block text-sm text-slate-600">
-                      Council
-                    </label>
-                    <input
-                      id="council"
                       value={formProfile.council}
-                      onChange={(event) => handleRootChange("council", event.target.value)}
-                      className={getInputClassName("council")}
-                      placeholder="Council"
-                      maxLength={120}
-                      aria-invalid={Boolean(fieldErrors.council)}
+                      onChange={(event) => handleChange("council", event.target.value)}
+                      placeholder="e.g., City of London Council"
+                      disabled={!isEditMode}
+                      className={`w-full rounded-lg border px-3 py-2 text-sm outline-none transition focus:ring-2 ${
+                        !isEditMode
+                          ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500"
+                          : fieldErrors.council
+                            ? "border-red-400 bg-white"
+                            : "border-gray-200 bg-white ring-indigo-100 focus:border-indigo-400"
+                      }`}
                     />
-                    {renderFieldError("council")}
+                    {fieldErrors.council ? (
+                      <p className="mt-1 text-xs text-red-500">{fieldErrors.council}</p>
+                    ) : null}
                   </div>
                 </div>
-              </section>
+              </div>
+            </div>
 
-              <section className="space-y-4">
-                <h2 className="text-base font-semibold text-slate-800">Contact Numbers</h2>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-600">Phone Country Code</label>
-                    <input
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 border-b pb-2">
+                <Phone className="h-5 w-5 text-blue-600" />
+                <h3 className="text-base font-semibold text-gray-800">Contact Details</h3>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">
+                    Mobile Number <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    <CountryCodeDropdown
                       value={formProfile.phone.countryCode}
-                      onChange={(event) =>
-                        handlePhoneChange("phone", "countryCode", event.target.value)
-                      }
-                      className={getInputClassName("phone.countryCode")}
-                      placeholder="+44"
-                      maxLength={5}
-                      aria-invalid={Boolean(fieldErrors["phone.countryCode"])}
+                      onChange={(value) => handlePhoneChange("phone", "countryCode", value)}
+                      error={fieldErrors["phone.countryCode"]}
+                      allowClear={false}
+                      disabled={!isEditMode}
                     />
-                    {renderFieldError("phone.countryCode")}
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-600">Phone Number</label>
                     <input
+                      className={`flex-1 rounded-lg border px-3 py-2 text-sm outline-none transition ${
+                        !isEditMode
+                          ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500"
+                          : "border-gray-200 bg-white ring-blue-50 focus:border-blue-500 focus:ring-2"
+                      }`}
                       value={formProfile.phone.number}
                       onChange={(event) => handlePhoneChange("phone", "number", event.target.value)}
-                      className={getInputClassName("phone.number")}
-                      placeholder="9100012345"
-                      maxLength={15}
-                      inputMode="numeric"
-                      aria-invalid={Boolean(fieldErrors["phone.number"])}
+                      placeholder="7123456789"
+                      type="tel"
+                      autoComplete="tel"
+                      disabled={!isEditMode}
                     />
-                    {renderFieldError("phone.number")}
                   </div>
+                  {fieldErrors["phone.number"] ? (
+                    <p className="text-xs text-red-500">{fieldErrors["phone.number"]}</p>
+                  ) : null}
+                </div>
 
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-600">
-                      Landline Country Code
-                    </label>
-                    <input
+                <div className="space-y-1">
+                  <label className="text-sm font-medium text-gray-700">Landline</label>
+                  <div className="flex gap-2">
+                    <CountryCodeDropdown
                       value={formProfile.landline.countryCode}
-                      onChange={(event) =>
-                        handlePhoneChange("landline", "countryCode", event.target.value)
-                      }
-                      className={getInputClassName("landline.countryCode")}
-                      placeholder="+44"
-                      maxLength={5}
-                      aria-invalid={Boolean(fieldErrors["landline.countryCode"])}
+                      onChange={(value) => handlePhoneChange("landline", "countryCode", value)}
+                      error={fieldErrors["landline.countryCode"]}
+                      placeholder="Code"
+                      allowClear
+                      disabled={!isEditMode}
                     />
-                    {renderFieldError("landline.countryCode")}
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-600">Landline Number</label>
                     <input
+                      className={`flex-1 rounded-lg border px-3 py-2 text-sm outline-none transition ${
+                        !isEditMode
+                          ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500"
+                          : "border-gray-200 bg-white ring-blue-50 focus:border-blue-500 focus:ring-2"
+                      }`}
                       value={formProfile.landline.number}
                       onChange={(event) =>
                         handlePhoneChange("landline", "number", event.target.value)
                       }
-                      className={getInputClassName("landline.number")}
-                      placeholder="4023456789"
-                      maxLength={15}
-                      inputMode="numeric"
-                      aria-invalid={Boolean(fieldErrors["landline.number"])}
+                      placeholder="2012345678"
+                      type="tel"
+                      disabled={!isEditMode}
                     />
-                    {renderFieldError("landline.number")}
                   </div>
+                  {fieldErrors["landline.number"] ? (
+                    <p className="text-xs text-red-500">{fieldErrors["landline.number"]}</p>
+                  ) : null}
                 </div>
-              </section>
+              </div>
+            </div>
 
-              <section className="space-y-4">
-                <h2 className="text-base font-semibold text-slate-800">Address</h2>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-600">Door No</label>
-                    <input
-                      value={formProfile.address.doorNo}
-                      onChange={(event) => handleAddressChange("doorNo", event.target.value)}
-                      className={getInputClassName("address.doorNo")}
-                      placeholder="12-3-45"
-                      maxLength={30}
-                      aria-invalid={Boolean(fieldErrors["address.doorNo"])}
-                    />
-                    {renderFieldError("address.doorNo")}
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-600">Street</label>
-                    <input
-                      value={formProfile.address.street}
-                      onChange={(event) => handleAddressChange("street", event.target.value)}
-                      className={getInputClassName("address.street")}
-                      placeholder="Street Road"
-                      maxLength={120}
-                      aria-invalid={Boolean(fieldErrors["address.street"])}
-                    />
-                    {renderFieldError("address.street")}
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-600">Locality</label>
-                    <input
-                      value={formProfile.address.locality}
-                      onChange={(event) => handleAddressChange("locality", event.target.value)}
-                      className={getInputClassName("address.locality")}
-                      placeholder="Locality"
-                      maxLength={120}
-                      aria-invalid={Boolean(fieldErrors["address.locality"])}
-                    />
-                    {renderFieldError("address.locality")}
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-600">City</label>
-                    <input
-                      value={formProfile.address.city}
-                      onChange={(event) => handleAddressChange("city", event.target.value)}
-                      className={getInputClassName("address.city")}
-                      placeholder="City"
-                      maxLength={80}
-                      aria-invalid={Boolean(fieldErrors["address.city"])}
-                    />
-                    {renderFieldError("address.city")}
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-600">State</label>
-                    <input
-                      value={formProfile.address.state}
-                      onChange={(event) => handleAddressChange("state", event.target.value)}
-                      className={getInputClassName("address.state")}
-                      placeholder="State"
-                      maxLength={80}
-                      aria-invalid={Boolean(fieldErrors["address.state"])}
-                    />
-                    {renderFieldError("address.state")}
-                  </div>
-
-                  <div>
-                    <label className="mb-1 block text-sm text-slate-600">Country</label>
-                    <input
-                      value={formProfile.address.country}
-                      onChange={(event) => handleAddressChange("country", event.target.value)}
-                      className={getInputClassName("address.country")}
-                      placeholder="Country"
-                      maxLength={80}
-                      aria-invalid={Boolean(fieldErrors["address.country"])}
-                    />
-                    {renderFieldError("address.country")}
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="mb-1 block text-sm text-slate-600">Postal Code</label>
-                    <input
-                      value={formProfile.address.postalCode}
-                      onChange={(event) => handleAddressChange("postalCode", event.target.value)}
-                      className={getInputClassName("address.postalCode")}
-                      placeholder="500016"
-                      maxLength={12}
-                      aria-invalid={Boolean(fieldErrors["address.postalCode"])}
-                    />
-                    {renderFieldError("address.postalCode")}
-                  </div>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b pb-2">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5 text-blue-600" />
+                  <h3 className="text-base font-semibold text-gray-800">Location & Address</h3>
                 </div>
-              </section>
 
-              <div className="flex justify-end gap-3 border-t border-slate-200 pt-6">
+                {isEditMode ? (
+                  <button
+                    type="button"
+                    onClick={fetchAccurateLocation}
+                    disabled={locating}
+                    className="flex items-center gap-1.5 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {locating ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin" /> Locating...
+                      </>
+                    ) : (
+                      <>
+                        <Navigation className="h-3 w-3" /> Fetch My Location
+                      </>
+                    )}
+                  </button>
+                ) : null}
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <InputField
+                  label="Door / House No."
+                  value={formProfile.address.doorNo}
+                  onChange={(event) => handleAddressChange("doorNo", event.target.value)}
+                  placeholder="12-B"
+                  className="md:col-span-1"
+                  disabled={!isEditMode}
+                />
+                <InputField
+                  label="Street"
+                  value={formProfile.address.street}
+                  onChange={(event) => handleAddressChange("street", event.target.value)}
+                  placeholder="Baker Street"
+                  className="md:col-span-2"
+                  autoComplete="address-line1"
+                  disabled={!isEditMode}
+                />
+                <InputField
+                  label="Locality"
+                  value={formProfile.address.locality}
+                  onChange={(event) => handleAddressChange("locality", event.target.value)}
+                  placeholder="Central"
+                  disabled={!isEditMode}
+                />
+                <InputField
+                  label="City"
+                  value={formProfile.address.city}
+                  onChange={(event) => handleAddressChange("city", event.target.value)}
+                  error={fieldErrors["address.city"]}
+                  autoComplete="address-level2"
+                  disabled={!isEditMode}
+                />
+                <InputField
+                  label="State"
+                  value={formProfile.address.state}
+                  onChange={(event) => handleAddressChange("state", event.target.value)}
+                  autoComplete="address-level1"
+                  disabled={!isEditMode}
+                />
+                <InputField
+                  label="Country"
+                  value={formProfile.address.country}
+                  onChange={(event) => handleAddressChange("country", event.target.value)}
+                  placeholder="Country"
+                  error={fieldErrors["address.country"]}
+                  autoComplete="off"
+                  disabled={!isEditMode}
+                />
+                <InputField
+                  label="Postal Code"
+                  value={formProfile.address.postalCode}
+                  onChange={(event) => handleAddressChange("postalCode", event.target.value)}
+                  placeholder="NW1 6XE"
+                  error={fieldErrors["address.postalCode"]}
+                  autoComplete="postal-code"
+                  disabled={!isEditMode}
+                />
+              </div>
+            </div>
+
+            {isEditMode ? (
+              <div className="flex justify-end gap-3 pt-4">
                 <button
                   type="button"
-                  onClick={cancelEdit}
-                  className="rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  onClick={handleCancelEdit}
+                  className="rounded-lg border border-slate-300 bg-white px-6 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={isSaving || !resolvedUserId}
-                  className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+                  disabled={isSaving}
+                  className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-8 py-2.5 text-sm font-medium text-white shadow-md hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {isSaving ? "Saving..." : "Save Profile"}
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" /> Saving...
+                    </>
+                  ) : (
+                    "Update Profile"
+                  )}
                 </button>
               </div>
-            </form>
-          )}
+            ) : null}
+          </form>
         </CardContent>
       </Card>
     </main>

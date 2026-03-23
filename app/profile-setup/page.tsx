@@ -613,6 +613,7 @@ import { FormEvent, ChangeEvent, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import axiosInstance from "@/lib/axiosinstance";
+import { COUNTRY_CODES } from "@/lib/profile-validation";
 import { useAuthStore } from "@/lib/zustand";
 import { Card, CardContent } from "@/components/ui/card";
 import { User, Phone, Loader2 } from "lucide-react";
@@ -622,6 +623,7 @@ export default function ProfileSetupPage() {
   const storeUserId = useAuthStore((state) => state.userId);
 
   const [fullName, setFullName] = useState("");
+  const [phoneCountryCode, setPhoneCountryCode] = useState("+44");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -655,6 +657,11 @@ export default function ProfileSetupPage() {
       return;
     }
 
+    if (!phoneCountryCode.trim()) {
+      toast.error("Country code is required");
+      return;
+    }
+
     if (!resolvedUserId) {
       toast.error("User not found");
       return;
@@ -666,6 +673,7 @@ export default function ProfileSetupPage() {
       await axiosInstance.put(`/profile/${resolvedUserId}`, {
         fullName,
         phone: {
+          countryCode: phoneCountryCode,
           number: phoneNumber,
         },
       });
@@ -728,17 +736,36 @@ export default function ProfileSetupPage() {
                 Phone Number
               </label>
 
-              <div className="relative">
-                <Phone className="absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
-
-                <input
-                  value={phoneNumber}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                    setPhoneNumber(e.target.value)
+              <div className="flex gap-2">
+                <select
+                  value={phoneCountryCode}
+                  onChange={(e: ChangeEvent<HTMLSelectElement>) =>
+                    setPhoneCountryCode(e.target.value)
                   }
-                  placeholder="7123456789"
-                  className="w-full pl-10 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ring-blue-100 focus:border-blue-500 transition"
-                />
+                  className="w-28 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ring-blue-100 focus:border-blue-500 transition bg-white"
+                >
+                  {COUNTRY_CODES.map((country) => (
+                    <option
+                      key={`${country.name}-${country.code}`}
+                      value={country.code}
+                    >
+                      {country.code}
+                    </option>
+                  ))}
+                </select>
+
+                <div className="relative flex-1">
+                  <Phone className="absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
+
+                  <input
+                    value={phoneNumber}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                      setPhoneNumber(e.target.value)
+                    }
+                    placeholder="7123456789"
+                    className="w-full pl-10 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ring-blue-100 focus:border-blue-500 transition"
+                  />
+                </div>
               </div>
             </div>
 
