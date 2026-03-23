@@ -464,10 +464,10 @@ export default function ProfileSectionPage() {
     }
   };
 
-  const toDisplay = (value: string) => {
-    if (value.trim()) return value;
-    return "--";
-  };
+  const toDisplay = (value?: string) => {
+  if (value && value.trim()) return value;
+  return "--";
+};
 
   const startEdit = () => {
     setFormProfile(profile);
