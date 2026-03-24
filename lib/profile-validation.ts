@@ -69,6 +69,8 @@ export type ProfileValidationResult = {
   firstError: string | null;
 };
 
+export const MOBILE_NUMBER_LENGTH = 10;
+
 /**
  * Helper to create a guaranteed safe default state.
  * This prevents "undefined" from ever entering the form inputs.
@@ -105,7 +107,7 @@ const NAME_PATTERN = /^[\p{L}\p{M}' .-]+$/u;
 // Text (Address/Council): Allows Letters, Numbers, Spaces, and safe punctuation (# , . - /). Blocks @ $ % & * etc.
 const TEXT_PATTERN = /^[\p{L}\p{M}\p{N}#.,'/\- ]+$/u;
 const COUNTRY_CODE_PATTERN = /^\+\d{1,4}$/;
-const PHONE_PATTERN = /^\d{7,15}$/;
+const PHONE_PATTERN = new RegExp(`^\\d{${MOBILE_NUMBER_LENGTH}}$`);
 const LANDLINE_PATTERN = /^\d{6,15}$/;
 const POSTAL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 -]{2,11}$/;
 
@@ -214,7 +216,7 @@ export const validateProfileInput = (profile: ProfileModel): ProfileValidationRe
   if (!hasValue(sanitized.phone.number)) {
     errors["phone.number"] = "Mobile number is required.";
   } else if (!PHONE_PATTERN.test(sanitized.phone.number)) {
-    errors["phone.number"] = "Mobile number must contain 7 to 15 digits.";
+    errors["phone.number"] = `Mobile number must contain exactly ${MOBILE_NUMBER_LENGTH} digits.`;
   }
 
   if (!hasValue(sanitized.phone.countryCode)) {

@@ -9,12 +9,15 @@ import { Card, CardContent } from "@/components/ui/card";
 import axiosInstance from "@/lib/axiosinstance";
 import {
   COUNTRY_CODES,
+  MOBILE_NUMBER_LENGTH,
   mergeProfileData,
   type ProfileFieldErrors,
   type ProfileFieldPath,
   type ProfileModel,
   validateProfileInput,
 } from "@/lib/profile-validation";
+import { PROFILE_COMPLETION_UPDATED_EVENT } from "@/lib/use-profile-completion-status";
+import { USER_IDENTITY_UPDATED_EVENT } from "@/lib/use-user-identity";
 import { useAuthStore } from "@/lib/zustand";
 import {
   Camera,
@@ -498,6 +501,11 @@ export default function ProfileSectionPage() {
         setProfilePictureUrl(newUrl);
       }
 
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event(USER_IDENTITY_UPDATED_EVENT));
+        window.dispatchEvent(new Event(PROFILE_COMPLETION_UPDATED_EVENT));
+      }
+
       toast.success("Picture updated!");
     } catch (error) {
       toast.error(getErrorMessage(error, "Upload failed."));
@@ -517,9 +525,14 @@ export default function ProfileSectionPage() {
     key: "countryCode" | "number",
     value: string
   ) => {
+    const nextValue =
+      type === "phone" && key === "number"
+        ? value.replace(/\D/g, "").slice(0, MOBILE_NUMBER_LENGTH)
+        : value;
+
     setFormProfile((prev) => ({
       ...prev,
-      [type]: { ...prev[type], [key]: value },
+      [type]: { ...prev[type], [key]: nextValue },
     }));
 
     clearFieldError(`${type}.${key}` as ProfileFieldPath);
@@ -570,6 +583,11 @@ export default function ProfileSectionPage() {
       toast.success("Profile updated!");
       setSavedProfile(result.sanitizedProfile);
       setIsEditMode(false);
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event(USER_IDENTITY_UPDATED_EVENT));
+        window.dispatchEvent(new Event(PROFILE_COMPLETION_UPDATED_EVENT));
+      }
     } catch (error) {
       toast.error(getErrorMessage(error, "Failed to save profile"));
     } finally {
@@ -743,6 +761,8 @@ export default function ProfileSectionPage() {
                       placeholder="7123456789"
                       type="tel"
                       autoComplete="tel"
+                      inputMode="numeric"
+                      maxLength={MOBILE_NUMBER_LENGTH}
                       disabled={!isEditMode}
                     />
                   </div>

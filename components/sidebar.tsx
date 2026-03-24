@@ -1,12 +1,13 @@
 "use client"
  
-import { FiChevronLeft, FiChevronRight } from "react-icons/fi"
 import { SIDEBAR_ITEMS } from "@/lib/sidebar"
 import { cn } from "@/lib/utils"
 import Logo from "@/components/logo"
 import Link from "next/link"
 import { useState } from "react"
 import { usePathname } from "next/navigation"
+import { Loader2 } from "lucide-react"
+import { useProfileCompletionStatus } from "@/lib/use-profile-completion-status"
 import { useUserIdentity } from "@/lib/use-user-identity"
  
 /* ---------------- Divider ---------------- */
@@ -35,6 +36,10 @@ export default function Sidebar({
   const [openGroup, setOpenGroup] = useState<string | null>(null)
   const pathname = usePathname()
   const { fullName, email, initials } = useUserIdentity()
+  const {
+    completionPercentage,
+    isLoading: isProfileStatusLoading,
+  } = useProfileCompletionStatus()
   const userName = fullName || "User"
   const userEmail = email || "No email available"
  
@@ -194,6 +199,53 @@ export default function Sidebar({
  
       {/* -------- Bottom Section -------- */}
       <div className="mt-auto border-t border-slate-200">
+        <div className="p-3">
+          <Link
+            href="/profile-section"
+            className={cn(
+              "block rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50 transition hover:border-blue-200 hover:shadow-sm",
+              collapsed ? "p-3" : "p-4"
+            )}
+          >
+            {collapsed ? (
+              <div className="flex flex-col items-center gap-2">
+                <div className="relative flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-sm">
+                  {isProfileStatusLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                  ) : (
+                    <span className="text-xs font-semibold text-blue-700">
+                      {completionPercentage}%
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-700">
+                  Profile
+                </span>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-700">
+                      Profile Completion
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-slate-900">
+                      {completionPercentage}% complete
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/90">
+                  <div
+                    className="h-full rounded-full bg-blue-600 transition-all duration-300"
+                    style={{ width: `${completionPercentage}%` }}
+                  />
+                </div>
+              </>
+            )}
+          </Link>
+        </div>
+
         <div className="p-3">
           <button
             onClick={onGetStarted}

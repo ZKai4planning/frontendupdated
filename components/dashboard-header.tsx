@@ -90,10 +90,9 @@
 // }
 "use client"
 
-import { Bell, ChevronDown, Folder, ChevronLeft, ChevronRight, FileText, LogOut, User } from "lucide-react"
-import Image from "next/image"
+import { Bell, ChevronDown, ChevronLeft, ChevronRight, FileText, Folder, LogOut, User } from "lucide-react"
 import Link from "next/link"
-import { useRouter, usePathname } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 import { useUserIdentity } from "@/lib/use-user-identity"
 
@@ -115,7 +114,6 @@ export default function DashboardHeader({
   collapsed,
   onToggle,
 }: DashboardHeaderProps) {
-  const router = useRouter()
   const pathname = usePathname()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const profileRef = useRef<HTMLDivElement | null>(null)
@@ -123,6 +121,7 @@ export default function DashboardHeader({
   const displayName = fullName || userName || "User"
   const displayEmail = email || "No email available"
   const avatarSrc = profilePictureUrl || "/profile.jpg"
+  const breadcrumbTrail = breadcrumbs.filter((crumb) => Boolean(crumb.label))
 
   useEffect(() => {
     setIsProfileOpen(false)
@@ -141,23 +140,6 @@ export default function DashboardHeader({
       document.removeEventListener("mousedown", handleClickOutside)
     }
   }, [])
-
-  const handleLogoClick = () => {
-    if (pathname === "/services") {
-      router.push("/dashboard")
-      return
-    }
-
-    if (pathname === "/eligibility-check") {
-      router.push("/dashboard?stage=eligibility")
-      return
-    }
-
-    if (pathname === "/upload-documents") {
-      router.push("/dashboard?stage=upload")
-      return
-    }
-  }
 
   return (
     <header className="w-full border-b bg-white h-18 sticky top-0 z-50">
@@ -180,28 +162,22 @@ export default function DashboardHeader({
               )}
             </button>
 
-            {/* Logo */}
-            {/* <div
-              onClick={handleLogoClick}
-              className="flex items-center gap-2 cursor-pointer select-none"
-            >
-              <div className="h-10 w-10 rounded-md flex items-center justify-center overflow-hidden">
-                <Image
-                  src="/logo.png"
-                  alt="PlanningAI Logo"
-                  width={40}
-                  height={40}
-                  className="object-contain"
-                  priority
-                />
-              </div>
-
-              <span className="text-lg font-semibold text-slate-900">
-                Ai4Planning
-              </span>
-            </div> */}
-
-           
+            {breadcrumbTrail.length > 0 ? (
+              <nav className="hidden items-center gap-2 text-sm text-slate-500 md:flex">
+                {breadcrumbTrail.map((crumb, index) => (
+                  <div key={`${crumb.label}-${index}`} className="flex items-center gap-2">
+                    {index > 0 ? <span>/</span> : null}
+                    {crumb.href ? (
+                      <Link href={crumb.href} className="transition hover:text-blue-600">
+                        {crumb.label}
+                      </Link>
+                    ) : (
+                      <span className="font-medium text-slate-900">{crumb.label}</span>
+                    )}
+                  </div>
+                ))}
+              </nav>
+            ) : null}
           </div>
 
           {/* ================= RIGHT ================= */}

@@ -613,7 +613,9 @@ import { FormEvent, ChangeEvent, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import axiosInstance from "@/lib/axiosinstance";
-import { COUNTRY_CODES } from "@/lib/profile-validation";
+import { COUNTRY_CODES, MOBILE_NUMBER_LENGTH } from "@/lib/profile-validation";
+import { PROFILE_COMPLETION_UPDATED_EVENT } from "@/lib/use-profile-completion-status";
+import { USER_IDENTITY_UPDATED_EVENT } from "@/lib/use-user-identity";
 import { useAuthStore } from "@/lib/zustand";
 import { Card, CardContent } from "@/components/ui/card";
 import { User, Phone, Loader2 } from "lucide-react";
@@ -644,6 +646,11 @@ export default function ProfileSetupPage() {
     }
   }, [storeUserId]);
 
+  const handlePhoneNumberChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const digitsOnly = event.target.value.replace(/\D/g, "").slice(0, MOBILE_NUMBER_LENGTH);
+    setPhoneNumber(digitsOnly);
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -654,6 +661,11 @@ export default function ProfileSetupPage() {
 
     if (!phoneNumber.trim()) {
       toast.error("Phone number is required");
+      return;
+    }
+
+    if (phoneNumber.length !== MOBILE_NUMBER_LENGTH) {
+      toast.error(`Phone number must be exactly ${MOBILE_NUMBER_LENGTH} digits`);
       return;
     }
 
@@ -677,6 +689,11 @@ export default function ProfileSetupPage() {
           number: phoneNumber,
         },
       });
+
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event(USER_IDENTITY_UPDATED_EVENT));
+        window.dispatchEvent(new Event(PROFILE_COMPLETION_UPDATED_EVENT));
+      }
 
       toast.success("Profile saved!");
       router.push("/profile");
@@ -759,14 +776,19 @@ export default function ProfileSetupPage() {
 
                   <input
                     value={phoneNumber}
-                    onChange={(e: ChangeEvent<HTMLInputElement>) =>
-                      setPhoneNumber(e.target.value)
-                    }
+                    onChange={handlePhoneNumberChange}
                     placeholder="7123456789"
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={MOBILE_NUMBER_LENGTH}
+                    pattern={`\\d{${MOBILE_NUMBER_LENGTH}}`}
                     className="w-full pl-10 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ring-blue-100 focus:border-blue-500 transition"
                   />
                 </div>
               </div>
+              <p className="text-xs text-gray-500">
+                Enter exactly {MOBILE_NUMBER_LENGTH} digits.
+              </p>
             </div>
 
             {/* Save Button */}
