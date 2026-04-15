@@ -20,6 +20,7 @@ export type ProjectData = {
   }
 
   service?: {
+    serviceId?: string
     plan?: string
     price?: number
   }
@@ -30,6 +31,9 @@ export type ProjectData = {
     formData?: Record<string, string | string[]>
     aiFilled?: Record<string, boolean>
     aiDismissed?: Record<string, boolean>
+    projectId?: string
+    isDraft?: boolean
+    draftSavedAt?: string
 
     /* 🔹 Structured fields (future use / admin / backend) */
     propertyDetails?: {

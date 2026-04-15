@@ -10,6 +10,7 @@ import axiosInstance from "@/lib/axiosinstance";
 import {
   COUNTRY_CODES,
   MOBILE_NUMBER_LENGTH,
+  UK_LANDLINE_MAX_LENGTH,
   mergeProfileData,
   type ProfileFieldErrors,
   type ProfileFieldPath,
@@ -61,6 +62,11 @@ const shouldTryNextMethod = (error: unknown) => {
   const status = error.response?.status;
   return status === 404 || status === 405 || status === 415;
 };
+
+const GENERIC_LANDLINE_MAX_LENGTH = 15;
+
+const getLandlineMaxLength = (countryCode: string) =>
+  !countryCode || countryCode === "+44" ? UK_LANDLINE_MAX_LENGTH : GENERIC_LANDLINE_MAX_LENGTH;
 
 const pickPictureUrl = (data: unknown) => {
   if (!data || typeof data !== "object") return "";
@@ -525,17 +531,35 @@ export default function ProfileSectionPage() {
     key: "countryCode" | "number",
     value: string
   ) => {
-    const nextValue =
-      type === "phone" && key === "number"
-        ? value.replace(/\D/g, "").slice(0, MOBILE_NUMBER_LENGTH)
-        : value;
-
     setFormProfile((prev) => ({
       ...prev,
-      [type]: { ...prev[type], [key]: nextValue },
+      [type]:
+        key === "number"
+          ? {
+              ...prev[type],
+              number: value
+                .replace(/\D/g, "")
+                .slice(
+                  0,
+                  type === "phone"
+                    ? MOBILE_NUMBER_LENGTH
+                    : getLandlineMaxLength(prev.landline.countryCode)
+                ),
+            }
+          : {
+              ...prev[type],
+              countryCode: value,
+              number:
+                type === "landline"
+                  ? prev.landline.number.slice(0, getLandlineMaxLength(value))
+                  : prev.phone.number,
+            },
     }));
 
     clearFieldError(`${type}.${key}` as ProfileFieldPath);
+    if (type === "landline" && key === "countryCode") {
+      clearFieldError("landline.number");
+    }
   };
 
   const handleAddressChange = (
@@ -792,8 +816,15 @@ export default function ProfileSectionPage() {
                       onChange={(event) =>
                         handlePhoneChange("landline", "number", event.target.value)
                       }
-                      placeholder="2012345678"
+                      placeholder={
+                        !formProfile.landline.countryCode ||
+                        formProfile.landline.countryCode === "+44"
+                          ? "02079460000"
+                          : "2012345678"
+                      }
                       type="tel"
+                      inputMode="numeric"
+                      maxLength={getLandlineMaxLength(formProfile.landline.countryCode)}
                       disabled={!isEditMode}
                     />
                   </div>

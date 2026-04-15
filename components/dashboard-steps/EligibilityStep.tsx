@@ -28,12 +28,27 @@ import {
   resolveProjectProgressIndex,
 } from "@/lib/project-flow"
 import { useUserIdentity } from "@/lib/use-user-identity"
+import axiosInstance from "@/lib/axiosinstance"
 
 type Step = 1 | 2 | 3 | 4 | 5
 type PlanType = "bronze" | "silver" | "gold" | "platinum"
 type ActivePlanType = PlanType | null
+type EligibilitySaveStatus = "in_progress" | "draft" | "submitted"
+type EligibilityFormValue = string | string[] | undefined
+type EligibilityFormValues = Record<string, EligibilityFormValue>
+type EligibilityFileMap = Record<string, File[]>
+
+type EligibilityAssetsContextValue = {
+  uploadedFiles: EligibilityFileMap
+  setUploadedFiles: React.Dispatch<React.SetStateAction<EligibilityFileMap>>
+  signatureFile: File | null
+  setSignatureFile: React.Dispatch<React.SetStateAction<File | null>>
+}
 
 const DEFAULT_ELIGIBILITY_TOOLTIP = ""
+const ELIGIBILITY_SERVICE_ID = "grexnb"
+const ELIGIBILITY_CREATE_ENDPOINT =
+  process.env.NEXT_PUBLIC_ELIGIBILITY_CREATE_ENDPOINT ?? "/eligibility"
 
 const EligibilityStepContext = React.createContext<Step>(1)
 const EligibilityAIContext = React.createContext({
@@ -42,9 +57,17 @@ const EligibilityAIContext = React.createContext({
   totalChecks: 0,
   consumeCheck: () => {},
 })
+const EligibilityAssetsContext = React.createContext<EligibilityAssetsContextValue | null>(null)
 
 const useEligibilityStep = () => React.useContext(EligibilityStepContext)
 const useEligibilityAI = () => React.useContext(EligibilityAIContext)
+const useEligibilityAssets = () => {
+  const context = React.useContext(EligibilityAssetsContext)
+  if (!context) {
+    throw new Error("useEligibilityAssets must be used within EligibilityAssetsContext")
+  }
+  return context
+}
 
 const getFieldId = (label: string) =>
   `eligibility-field-${label
@@ -60,6 +83,861 @@ const isDontKnowValue = (value?: string) => {
 
 const asStringValue = (value: string | string[] | undefined) =>
   typeof value === "string" ? value : ""
+
+const asArrayValue = (value: EligibilityFormValue): string[] =>
+  Array.isArray(value) ? value : []
+
+const yesNoToBooleanString = (value: string) => (value.trim().toLowerCase().startsWith("y") ? "true" : "false")
+
+const appendMultipartValue = (formData: FormData, key: string, value: string) => {
+  formData.append(key, value)
+}
+
+const appendSingleFile = (formData: FormData, key: string, files: File[] | undefined) => {
+  if (!files || files.length === 0) return
+  formData.append(key, files[0])
+}
+
+const appendRepeatedFiles = (formData: FormData, key: string, files: File[] | undefined) => {
+  if (!files || files.length === 0) return
+  files.forEach((file) => formData.append(key, file))
+}
+
+const extractProjectId = (payload: unknown): string | null => {
+  if (!payload || typeof payload !== "object") return null
+
+  const record = payload as Record<string, unknown>
+  const directValues = [record.projectId, record.id, record._id]
+
+  for (const value of directValues) {
+    if (typeof value === "string" && value.trim()) {
+      return value
+    }
+    if (typeof value === "number") {
+      return String(value)
+    }
+  }
+
+  for (const key of ["data", "eligibility", "project", "result", "payload"]) {
+    const nested = extractProjectId(record[key])
+    if (nested) return nested
+  }
+
+  return null
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value)
+
+const unwrapEligibilityRecord = (payload: unknown): Record<string, unknown> | null => {
+  if (Array.isArray(payload)) {
+    for (const item of payload) {
+      const record = unwrapEligibilityRecord(item)
+      if (record) return record
+    }
+    return null
+  }
+
+  if (!isRecord(payload)) return null
+
+  if (
+    "formData" in payload ||
+    "applicantAndProperty" in payload ||
+    "worksAndMaterials" in payload ||
+    "siteConstratints" in payload ||
+    "siteConstraints" in payload ||
+    "utilitesAndConsents" in payload ||
+    "utilitiesAndConsents" in payload ||
+    "Declarations" in payload ||
+    "declarations" in payload
+  ) {
+    return payload
+  }
+
+  for (const key of ["data", "eligibility", "project", "result", "payload"]) {
+    const nested = unwrapEligibilityRecord(payload[key])
+    if (nested) return nested
+  }
+
+  return payload
+}
+
+const getPathValue = (record: Record<string, unknown>, path: string[]) => {
+  let current: unknown = record
+
+  for (const key of path) {
+    if (!isRecord(current) || !(key in current)) {
+      return undefined
+    }
+    current = current[key]
+  }
+
+  return current
+}
+
+const getFirstPathValue = (record: Record<string, unknown>, paths: string[][]) => {
+  for (const path of paths) {
+    const value = getPathValue(record, path)
+    if (value !== undefined && value !== null) {
+      return value
+    }
+  }
+  return undefined
+}
+
+const normalizeBooleanLike = (value: unknown): boolean | null => {
+  if (typeof value === "boolean") return value
+  if (typeof value === "number") return value !== 0
+  if (typeof value !== "string") return null
+
+  const normalized = value.trim().toLowerCase()
+  if (["true", "yes", "y", "1"].includes(normalized)) return true
+  if (["false", "no", "n", "0"].includes(normalized)) return false
+  return null
+}
+
+const coerceFlatEligibilityValue = (value: unknown): EligibilityFormValue => {
+  if (value === undefined || value === null) return undefined
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (item === undefined || item === null ? "" : String(item)))
+      .filter(Boolean)
+  }
+  if (typeof value === "boolean") return String(value)
+  if (typeof value === "string") return value
+  if (typeof value === "number") return String(value)
+  return undefined
+}
+
+const coerceDisplayEligibilityValue = (value: unknown): EligibilityFormValue => {
+  if (value === undefined || value === null) return undefined
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (item === undefined || item === null ? "" : String(item)))
+      .filter(Boolean)
+  }
+
+  const booleanValue = normalizeBooleanLike(value)
+  if (booleanValue !== null) return booleanValue ? "Yes" : "No"
+
+  if (typeof value === "string") return value
+  if (typeof value === "number") return String(value)
+  return undefined
+}
+
+const coerceDeclarationEligibilityValue = (value: unknown): EligibilityFormValue => {
+  const booleanValue = normalizeBooleanLike(value)
+  if (booleanValue !== null) return String(booleanValue)
+  return coerceFlatEligibilityValue(value)
+}
+
+const coerceArrayEligibilityValue = (value: unknown): EligibilityFormValue => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (item === undefined || item === null ? "" : String(item).trim()))
+      .filter(Boolean)
+  }
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean)
+  }
+  return undefined
+}
+
+const setEligibilityFormValue = (
+  formData: EligibilityFormValues,
+  label: string,
+  value: unknown,
+  mode: "display" | "declaration" | "array" = "display"
+) => {
+  const normalized =
+    mode === "declaration"
+      ? coerceDeclarationEligibilityValue(value)
+      : mode === "array"
+        ? coerceArrayEligibilityValue(value)
+        : coerceDisplayEligibilityValue(value)
+
+  if (normalized === undefined) return
+  formData[label] = normalized
+}
+
+const mergeFlatEligibilityFormData = (
+  formData: EligibilityFormValues,
+  rawFormData: unknown
+) => {
+  if (!isRecord(rawFormData)) return
+
+  for (const [key, value] of Object.entries(rawFormData)) {
+    const normalized = coerceFlatEligibilityValue(value)
+    if (normalized !== undefined) {
+      formData[key] = normalized
+    }
+  }
+}
+
+const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormValues => {
+  const record = unwrapEligibilityRecord(payload)
+  const formData: EligibilityFormValues = {}
+  if (!record) return formData
+
+  mergeFlatEligibilityFormData(formData, record.formData)
+
+  const fieldMappings: Array<{
+    label: string
+    paths: string[][]
+    mode?: "display" | "declaration" | "array"
+  }> = [
+    {
+      label: "Applicant Full Name",
+      paths: [["applicantAndProperty", "applicantDetails", "fullName"]],
+    },
+    {
+      label: "Contact Email / Phone",
+      paths: [["applicantAndProperty", "applicantDetails", "contactEmailPhone"]],
+    },
+    {
+      label: "Site Address",
+      paths: [["applicantAndProperty", "applicantDetails", "siteAddress"]],
+    },
+    {
+      label: "Postcode",
+      paths: [["applicantAndProperty", "applicantDetails", "postcode"]],
+    },
+    {
+      label: "Are you using a planning agent?",
+      paths: [["applicantAndProperty", "agentDetails", "usesPlanningAgent"]],
+    },
+    {
+      label: "Agent Name",
+      paths: [["applicantAndProperty", "agentDetails", "agentName"]],
+    },
+    {
+      label: "Agent Address",
+      paths: [["applicantAndProperty", "agentDetails", "agentAddress"]],
+    },
+    {
+      label: "Agent Contact",
+      paths: [["applicantAndProperty", "agentDetails", "agentContactEmailPhone"]],
+    },
+    {
+      label: "Property Type",
+      paths: [["applicantAndProperty", "propertyAndOwnership", "propertyType"]],
+    },
+    {
+      label: "Ownership Status",
+      paths: [["applicantAndProperty", "propertyAndOwnership", "ownershipStatus"]],
+    },
+    {
+      label: "Conservation Area or Near Listed Building?",
+      paths: [["applicantAndProperty", "propertyAndOwnership", "nearConservationAreaOrListedBuilding"]],
+    },
+    {
+      label: "Purpose of Development",
+      paths: [["applicantAndProperty", "propertyAndOwnership", "purposeOfDevelopment"]],
+    },
+    {
+      label: "Description of Proposed Works",
+      paths: [
+        ["worksAndMaterials", "descriptionOfWorks", "propsedWorksDescription"],
+        ["worksAndMaterials", "descriptionOfWorks", "proposedWorksDescription"],
+      ],
+    },
+    {
+      label: "Existing Property Width (m)",
+      paths: [["worksAndMaterials", "descriptionOfWorks", "existingPropertyWidthM"]],
+    },
+    {
+      label: "Existing Property Depth (m)",
+      paths: [
+        ["worksAndMaterials", "descriptionOfWorks", "existingPropertyHeightM"],
+        ["worksAndMaterials", "descriptionOfWorks", "existingPropertyDepthM"],
+      ],
+    },
+    {
+      label: "Proposed Extension Depth (m)",
+      paths: [
+        ["worksAndMaterials", "descriptionOfWorks", "proposedExtensionWidthM"],
+        ["worksAndMaterials", "descriptionOfWorks", "proposedExtensionDepthM"],
+      ],
+    },
+    {
+      label: "Proposed Extension Height (m)",
+      paths: [["worksAndMaterials", "descriptionOfWorks", "proposedExtensionHeightM"]],
+    },
+    {
+      label: "Ridge / Eaves Height (m)",
+      paths: [["worksAndMaterials", "descriptionOfWorks", "ridgeOrEavesHeightM"]],
+    },
+    {
+      label: "Distance from Boundary (m)",
+      paths: [["worksAndMaterials", "descriptionOfWorks", "distanceFromBoundaryM"]],
+    },
+    {
+      label: "Wall Materials",
+      paths: [["worksAndMaterials", "materials", "wallMaterials"]],
+    },
+    {
+      label: "Roof Materials",
+      paths: [["worksAndMaterials", "materials", "roofMaterials"]],
+    },
+    {
+      label: "Colour / Finish Notes (optional)",
+      paths: [["worksAndMaterials", "materials", "colourOrFinishNotes"]],
+    },
+    {
+      label: "Materials match existing?",
+      paths: [["worksAndMaterials", "materials", "materialsMatchExisting"]],
+    },
+    {
+      label: "Is the property a Listed Building?",
+      paths: [
+        ["siteConstratints", "heritageAndListing", "isListedBuilding"],
+        ["siteConstraints", "heritageAndListing", "isListedBuilding"],
+      ],
+    },
+    {
+      label: "Conservation Area?",
+      paths: [
+        ["siteConstratints", "heritageAndListing", "isInConservationArea"],
+        ["siteConstraints", "heritageAndListing", "isInConservationArea"],
+      ],
+    },
+    {
+      label: "New or altered vehicle access?",
+      paths: [
+        ["siteConstratints", "accessAndParking", "newOrAlteredAccess"],
+        ["siteConstraints", "accessAndParking", "newOrAlteredAccess"],
+      ],
+    },
+    {
+      label: "Details of Access / Parking Changes",
+      paths: [
+        ["siteConstratints", "accessAndParking", "accessOrParkingChanges"],
+        ["siteConstraints", "accessAndParking", "accessOrParkingChanges"],
+      ],
+    },
+    {
+      label: "Number of Proposed Parking Spaces",
+      paths: [
+        ["siteConstratints", "accessAndParking", "proposedParkingSpaces"],
+        ["siteConstraints", "accessAndParking", "proposedParkingSpaces"],
+      ],
+    },
+    {
+      label: "Cycle storage provided?",
+      paths: [
+        ["siteConstratints", "accessAndParking", "cycleStorageProvisions"],
+        ["siteConstraints", "accessAndParking", "cycleStorageProvisions"],
+      ],
+    },
+    {
+      label: "Trees with TPO on or near site?",
+      paths: [
+        ["siteConstratints", "treesHedgesLandscaping", "treesWithTPO"],
+        ["siteConstraints", "treesHedgesLandscaping", "treesWithTPO"],
+      ],
+    },
+    {
+      label: "Trees within falling distance of works?",
+      paths: [
+        ["siteConstratints", "treesHedgesLandscaping", "treesWithinFallingDistance"],
+        ["siteConstraints", "treesHedgesLandscaping", "treesWithinFallingDistance"],
+      ],
+    },
+    {
+      label: "Tree Species (if known)",
+      paths: [
+        ["siteConstratints", "treesHedgesLandscaping", "treeSpecies"],
+        ["siteConstraints", "treesHedgesLandscaping", "treeSpecies"],
+      ],
+    },
+    {
+      label: "Approximate Tree Height (m)",
+      paths: [
+        ["siteConstratints", "treesHedgesLandscaping", "approximateTreeSizeM"],
+        ["siteConstraints", "treesHedgesLandscaping", "approximateTreeSizeM"],
+      ],
+    },
+    {
+      label: "Is the site in Flood Zone 2 or 3?",
+      paths: [
+        ["siteConstratints", "floodAndEnvironmentalRisk", "isSiteInFloodRiskArea"],
+        ["siteConstraints", "floodAndEnvironmentalRisk", "isSiteInFloodRiskArea"],
+      ],
+    },
+    {
+      label: "Any known contamination on site?",
+      paths: [
+        ["siteConstratints", "floodAndEnvironmentalRisk", "isSiteContaminatedLand"],
+        ["siteConstraints", "floodAndEnvironmentalRisk", "isSiteContaminatedLand"],
+      ],
+    },
+    {
+      label: "Has pre-application advice been sought?",
+      paths: [
+        ["siteConstratints", "preApplicationAdvice", "soughtPreAppAdvice"],
+        ["siteConstraints", "preApplicationAdvice", "soughtPreAppAdvice"],
+      ],
+    },
+    {
+      label: "Pre-Application Reference Number",
+      paths: [
+        ["siteConstratints", "preApplicationAdvice", "preApplicationReferenceNumber"],
+        ["siteConstraints", "preApplicationAdvice", "preApplicationReferenceNumber"],
+      ],
+    },
+    {
+      label: "Date of Pre-App Advice",
+      paths: [
+        ["siteConstratints", "preApplicationAdvice", "dateOfPreAppAdvice"],
+        ["siteConstraints", "preApplicationAdvice", "dateOfPreAppAdvice"],
+      ],
+    },
+    {
+      label: "Officer Name",
+      paths: [
+        ["siteConstratints", "preApplicationAdvice", "officerName"],
+        ["siteConstraints", "preApplicationAdvice", "officerName"],
+      ],
+    },
+    {
+      label: "Summary of Pre-App Advice Received",
+      paths: [
+        ["siteConstratints", "preApplicationAdvice", "preApplicationAdviceSummary"],
+        ["siteConstraints", "preApplicationAdvice", "preApplicationAdviceSummary"],
+      ],
+    },
+    {
+      label: "Water Supply",
+      paths: [
+        ["utilitesAndConsents", "utilitiesAndWaste", "waterSupply"],
+        ["utilitiesAndConsents", "utilitiesAndWaste", "waterSupply"],
+      ],
+    },
+    {
+      label: "Sewage / Drainage",
+      paths: [
+        ["utilitesAndConsents", "utilitiesAndWaste", "sewageOrDrainage"],
+        ["utilitiesAndConsents", "utilitiesAndWaste", "sewageOrDrainage"],
+      ],
+    },
+    {
+      label: "Surface Water Drainage",
+      paths: [
+        ["utilitesAndConsents", "utilitiesAndWaste", "surfaceWaterDrainage"],
+        ["utilitiesAndConsents", "utilitiesAndWaste", "surfaceWaterDrainage"],
+      ],
+    },
+    {
+      label: "Existing Waste Arrangements",
+      paths: [
+        ["utilitesAndConsents", "utilitiesAndWaste", "existingWasteArrangements"],
+        ["utilitiesAndConsents", "utilitiesAndWaste", "existingWasteArrangements"],
+      ],
+    },
+    {
+      label: "Renewable energy installations proposed?",
+      paths: [
+        ["utilitesAndConsents", "utilitiesAndWaste", "renewableEnergyProposals"],
+        ["utilitiesAndConsents", "utilitiesAndWaste", "renewableEnergyProposals"],
+      ],
+    },
+    {
+      label: "Details of Renewable / Energy Measures (if applicable)",
+      paths: [
+        ["utilitesAndConsents", "utilitiesAndWaste", "renewableEnergyDetails"],
+        ["utilitiesAndConsents", "utilitiesAndWaste", "renewableEnergyDetails"],
+      ],
+    },
+    {
+      label: "Which Ownership Certificate applies?",
+      paths: [
+        ["utilitesAndConsents", "ownershipCertificate", "certificateOfOwnership"],
+        ["utilitiesAndConsents", "ownershipCertificate", "certificateOfOwnership"],
+      ],
+    },
+    {
+      label: "Other Owners Details",
+      paths: [
+        ["utilitesAndConsents", "ownershipCertificate", "ownershipDetails"],
+        ["utilitiesAndConsents", "ownershipCertificate", "ownershipDetails"],
+      ],
+    },
+    {
+      label: "Additional Consents",
+      paths: [
+        ["utilitesAndConsents", "additionalConsents"],
+        ["utilitiesAndConsents", "additionalConsents"],
+      ],
+      mode: "array",
+    },
+    {
+      label: "Community consultation undertaken?",
+      paths: [
+        ["utilitesAndConsents", "communityConsultation"],
+        ["utilitiesAndConsents", "communityConsultation"],
+      ],
+    },
+    {
+      label: "declaration_0",
+      paths: [
+        ["Declarations", "reviewDeclarations", "informationAccurate"],
+        ["declarations", "reviewDeclarations", "informationAccurate"],
+      ],
+      mode: "declaration",
+    },
+    {
+      label: "declaration_1",
+      paths: [
+        ["Declarations", "reviewDeclarations", "authorityConfirmed"],
+        ["declarations", "reviewDeclarations", "authorityConfirmed"],
+      ],
+      mode: "declaration",
+    },
+    {
+      label: "declaration_2",
+      paths: [
+        ["Declarations", "reviewDeclarations", "privateRightsAcknowledged"],
+        ["declarations", "reviewDeclarations", "privateRightsAcknowledged"],
+      ],
+      mode: "declaration",
+    },
+    {
+      label: "declaration_3",
+      paths: [
+        ["Declarations", "reviewDeclarations", "publicDataConsent"],
+        ["declarations", "reviewDeclarations", "publicDataConsent"],
+      ],
+      mode: "declaration",
+    },
+    {
+      label: "declaration_4",
+      paths: [
+        ["Declarations", "reviewDeclarations", "feeAgreementAccepted"],
+        ["declarations", "reviewDeclarations", "feeAgreementAccepted"],
+      ],
+      mode: "declaration",
+    },
+    {
+      label: "Full Name of Signatory",
+      paths: [
+        ["Declarations", "DigitalSignature", "signatoryFullName"],
+        ["Declarations", "digitalSignature", "signatoryFullName"],
+        ["declarations", "DigitalSignature", "signatoryFullName"],
+        ["declarations", "digitalSignature", "signatoryFullName"],
+      ],
+    },
+    {
+      label: "Date (dd/mm/yyyy)",
+      paths: [
+        ["Declarations", "DigitalSignature", "signedDate"],
+        ["Declarations", "digitalSignature", "signedDate"],
+        ["declarations", "DigitalSignature", "signedDate"],
+        ["declarations", "digitalSignature", "signedDate"],
+      ],
+    },
+    {
+      label: "Capacity (Owner / Agent / Other)",
+      paths: [
+        ["Declarations", "DigitalSignature", "signatoryCapacity"],
+        ["Declarations", "digitalSignature", "signatoryCapacity"],
+        ["declarations", "DigitalSignature", "signatoryCapacity"],
+        ["declarations", "digitalSignature", "signatoryCapacity"],
+      ],
+    },
+  ]
+
+  fieldMappings.forEach(({ label, paths, mode }) => {
+    setEligibilityFormValue(formData, label, getFirstPathValue(record, paths), mode)
+  })
+
+  return formData
+}
+
+const extractStringFromPaths = (
+  record: Record<string, unknown> | null,
+  paths: string[][]
+) => {
+  if (!record) return undefined
+
+  const value = getFirstPathValue(record, paths)
+  if (typeof value === "string" && value.trim()) return value
+  if (typeof value === "number") return String(value)
+  return undefined
+}
+
+const extractBooleanFromPaths = (
+  record: Record<string, unknown> | null,
+  paths: string[][]
+) => {
+  if (!record) return undefined
+  const value = getFirstPathValue(record, paths)
+  const normalized = normalizeBooleanLike(value)
+  return normalized ?? undefined
+}
+
+const normalizeEligibilityResponseFromApi = (payload: unknown, fallbackProjectId: string) => {
+  const record = unwrapEligibilityRecord(payload)
+  const status = extractStringFromPaths(record, [["status"]])?.toLowerCase()
+  const completionStatus = isRecord(record?.completionStatus) ? record.completionStatus : null
+  const totalStepsValue = getFirstPathValue(completionStatus ?? {}, [["totalSteps"]])
+  const totalSteps =
+    typeof totalStepsValue === "number"
+      ? totalStepsValue
+      : typeof totalStepsValue === "string" && !Number.isNaN(Number(totalStepsValue))
+        ? Number(totalStepsValue)
+        : null
+  const currentStepValue = getFirstPathValue(record ?? {}, [["currentStep"]])
+  const nextStepValue = getFirstPathValue(completionStatus ?? {}, [["nextStep"]])
+  const parsedCurrentStep =
+    typeof currentStepValue === "number"
+      ? currentStepValue
+      : typeof currentStepValue === "string" && !Number.isNaN(Number(currentStepValue))
+        ? Number(currentStepValue)
+        : null
+  const parsedNextStep =
+    typeof nextStepValue === "number"
+      ? nextStepValue
+      : typeof nextStepValue === "string" && !Number.isNaN(Number(nextStepValue))
+        ? Number(nextStepValue)
+        : null
+  const stepFromApi =
+    parsedNextStep && parsedNextStep > 0
+      ? parsedNextStep
+      : parsedCurrentStep && parsedCurrentStep > 0
+        ? parsedCurrentStep
+        : null
+  const normalizedStep =
+    stepFromApi && totalSteps && stepFromApi <= totalSteps
+      ? stepFromApi
+      : stepFromApi && stepFromApi >= 1 && stepFromApi <= 5
+        ? stepFromApi
+        : null
+  const isDraft =
+    extractBooleanFromPaths(record, [["isDraft"], ["draft"]]) ??
+    (status ? status === "draft" : undefined)
+  const completedAt = extractStringFromPaths(record, [["completedAt"], ["submittedAt"]])
+  const isEligible =
+    extractBooleanFromPaths(record, [["isEligible"], ["eligible"]]) ??
+    extractBooleanFromPaths(record, [["completionStatus", "isCompleted"]]) ??
+    (status ? ["submitted", "completed", "approved"].includes(status) : undefined)
+
+  return {
+    projectId: extractProjectId(payload) ?? fallbackProjectId,
+    formData: normalizeEligibilityFormDataFromApi(payload),
+    isDraft,
+    draftSavedAt: extractStringFromPaths(record, [["draftSavedAt"]]),
+    completedAt,
+    isEligible,
+    step: normalizedStep,
+  }
+}
+
+const getBooleanFieldValue = (
+  formValues: EligibilityFormValues,
+  label: string,
+  fallback = false
+) => {
+  const normalized = normalizeBooleanLike(formValues[label])
+  return normalized ?? fallback
+}
+
+const buildEligibilityStepPayload = (
+  step: Step,
+  formValues: EligibilityFormValues
+) => {
+  const getValue = (label: string) => asStringValue(formValues[label])
+
+  switch (step) {
+    case 1:
+      return {
+        applicantAndProperty: {
+          applicantDetails: {
+            fullName: getValue("Applicant Full Name"),
+            contactEmailPhone: getValue("Contact Email / Phone"),
+            siteAddress: getValue("Site Address"),
+            postcode: getValue("Postcode"),
+          },
+          agentDetails: {
+            usesPlanningAgent: getBooleanFieldValue(formValues, "Are you using a planning agent?"),
+            agentName: getValue("Agent Name"),
+            agentAddress: getValue("Agent Address"),
+            agentContactEmailPhone: getValue("Agent Contact"),
+          },
+          propertyAndOwnership: {
+            propertyType: getValue("Property Type"),
+            ownershipStatus: getValue("Ownership Status"),
+            nearConservationAreaOrListedBuilding: getValue("Conservation Area or Near Listed Building?"),
+            purposeOfDevelopment: getValue("Purpose of Development"),
+          },
+        },
+      }
+    case 2:
+      return {
+        worksAndMaterials: {
+          descriptionOfWorks: {
+            propsedWorksDescription: getValue("Description of Proposed Works"),
+            existingPropertyWidthM: getValue("Existing Property Width (m)"),
+            existingPropertyHeightM: getValue("Existing Property Depth (m)"),
+            proposedExtensionWidthM: getValue("Proposed Extension Depth (m)"),
+            proposedExtensionHeightM: getValue("Proposed Extension Height (m)"),
+            ridgeOrEavesHeightM: getValue("Ridge / Eaves Height (m)"),
+            distanceFromBoundaryM: getValue("Distance from Boundary (m)"),
+          },
+          materials: {
+            wallMaterials: getValue("Wall Materials"),
+            roofMaterials: getValue("Roof Materials"),
+            colourOrFinishNotes: getValue("Colour / Finish Notes (optional)"),
+            materialsMatchExisting: getValue("Materials match existing?"),
+          },
+        },
+      }
+    case 3:
+      return {
+        siteConstraints: {
+          heritageAndListing: {
+            isListedBuilding: getValue("Is the property a Listed Building?"),
+            isInConservationArea: getValue("Conservation Area?"),
+          },
+          accessAndParking: {
+            newOrAlteredAccess: getValue("New or altered vehicle access?"),
+            accessOrParkingChanges: getValue("Details of Access / Parking Changes"),
+            proposedParkingSpaces: getValue("Number of Proposed Parking Spaces"),
+            cycleStorageProvisions: getValue("Cycle storage provided?"),
+          },
+          treesHedgesLandscaping: {
+            treesWithTPO: getValue("Trees with TPO on or near site?"),
+            treesWithinFallingDistance: getValue("Trees within falling distance of works?"),
+            treeSpecies: getValue("Tree Species (if known)"),
+            approximateTreeSizeM: getValue("Approximate Tree Height (m)"),
+          },
+          floodAndEnvironmentalRisk: {
+            isSiteInFloodRiskArea: getValue("Is the site in Flood Zone 2 or 3?"),
+            isSiteContaminatedLand: getValue("Any known contamination on site?"),
+          },
+          preApplicationAdvice: {
+            soughtPreAppAdvice: getValue("Has pre-application advice been sought?"),
+            preApplicationReferenceNumber: getValue("Pre-Application Reference Number"),
+            dateOfPreAppAdvice: getValue("Date of Pre-App Advice"),
+            officerName: getValue("Officer Name"),
+            preApplicationAdviceSummary: getValue("Summary of Pre-App Advice Received"),
+          },
+        },
+      }
+    case 4:
+      return {
+        utilitiesAndConsents: {
+          utilitiesAndWaste: {
+            waterSupply: getValue("Water Supply"),
+            sewageOrDrainage: getValue("Sewage / Drainage"),
+            surfaceWaterDrainage: getValue("Surface Water Drainage"),
+            existingWasteArrangements: getValue("Existing Waste Arrangements"),
+            renewableEnergyProposals: getValue("Renewable energy installations proposed?"),
+            renewableEnergyDetails: getValue("Details of Renewable / Energy Measures (if applicable)"),
+          },
+          ownershipCertificate: {
+            certificateOfOwnership: getValue("Which Ownership Certificate applies?"),
+            ownershipDetails: getValue("Other Owners Details"),
+          },
+          additionalConsents: asArrayValue(formValues["Additional Consents"]).join(", "),
+          communityConsultation: getValue("Community consultation undertaken?"),
+        },
+      }
+    case 5:
+    default:
+      return {
+        declarations: {
+          reviewDeclarations: {
+            informationAccurate: getBooleanFieldValue(formValues, "declaration_0"),
+            authorityConfirmed: getBooleanFieldValue(formValues, "declaration_1"),
+            privateRightsAcknowledged: getBooleanFieldValue(formValues, "declaration_2"),
+            publicDataConsent: getBooleanFieldValue(formValues, "declaration_3"),
+            feeAgreementAccepted: getBooleanFieldValue(formValues, "declaration_4"),
+          },
+          digitalSignature: {
+            signatoryFullName: getValue("Full Name of Signatory"),
+            signedDate: getValue("Date (dd/mm/yyyy)"),
+            signatoryCapacity: getValue("Capacity (Owner / Agent / Other)"),
+          },
+        },
+      }
+  }
+}
+
+const buildEligibilityMultipartFormData = ({
+  step,
+  status,
+  formValues,
+  uploadedFiles,
+  signatureFile,
+  serviceIds,
+  userId,
+}: {
+  step: Step
+  status: EligibilitySaveStatus
+  formValues: EligibilityFormValues
+  uploadedFiles: EligibilityFileMap
+  signatureFile: File | null
+  serviceIds?: string | null
+  userId?: string | null
+}) => {
+  const formData = new FormData()
+  const getFiles = (label: string) => uploadedFiles[label] ?? []
+
+  formData.append("currentStep", String(step))
+  formData.append("status", status)
+  formData.append("payload", JSON.stringify(buildEligibilityStepPayload(step, formValues)))
+
+  if (serviceIds?.trim()) {
+    formData.append("serviceIds", serviceIds)
+  }
+  if (userId?.trim()) {
+    formData.append("userId", userId)
+  }
+
+  appendSingleFile(
+    formData,
+    "locationPlan",
+    getFiles("Location Plan (1:1250 or 1:2500)")
+  )
+  appendSingleFile(
+    formData,
+    "sitePlan",
+    getFiles("Site Plan (1:200 or 1:500)")
+  )
+  appendSingleFile(
+    formData,
+    "existingAndProposedElevations",
+    getFiles("Existing & Proposed Elevations")
+  )
+  appendRepeatedFiles(
+    formData,
+    "photographsOfSite",
+    getFiles("Photographs of Site")
+  )
+  appendRepeatedFiles(
+    formData,
+    "additionalDrawings",
+    getFiles("Additional Drawings (floor plans, sections etc.)")
+  )
+  appendSingleFile(
+    formData,
+    "treeSurveyReport",
+    getFiles("Tree Survey / BS5837 Report (if available)")
+  )
+  appendSingleFile(
+    formData,
+    "floodRiskAssesmentReport",
+    getFiles("Flood Risk Assessment (if available)")
+  )
+  if (signatureFile) {
+    formData.append("digitalSignatureUrl", signatureFile)
+  }
+
+  return formData
+}
 
 const PLAN_CHECK_LIMITS: Record<PlanType, number> = {
   bronze: 10,
@@ -713,24 +1591,35 @@ function FileUploadArea({
   tooltip?: string
   questionNumber?: number
 }) {
-  const [files, setFiles] = useState<File[]>([])
+  const { uploadedFiles, setUploadedFiles } = useEligibilityAssets()
+  const files = uploadedFiles[label] ?? []
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const addFiles = (nextFiles: File[]) => {
+    if (nextFiles.length === 0) return
+    setUploadedFiles((prev) => ({
+      ...prev,
+      [label]: [...(prev[label] ?? []), ...nextFiles],
+    }))
+  }
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
-    const dropped = Array.from(e.dataTransfer.files)
-    setFiles(prev => [...prev, ...dropped])
+    addFiles(Array.from(e.dataTransfer.files))
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const selected = Array.from(e.target.files)
-      setFiles(prev => [...prev, ...selected])
+      addFiles(Array.from(e.target.files))
+      e.target.value = ""
     }
   }
 
   const removeFile = (idx: number) => {
-    setFiles(prev => prev.filter((_, i) => i !== idx))
+    setUploadedFiles((prev) => ({
+      ...prev,
+      [label]: (prev[label] ?? []).filter((_, i) => i !== idx),
+    }))
   }
 
   const fieldId = getFieldId(label)
@@ -801,9 +1690,27 @@ function SignaturePad({
   questionNumber?: number
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [isSigned, setIsSigned] = useState(false)
+  const { signatureFile, setSignatureFile } = useEligibilityAssets()
+  const [isSigned, setIsSigned] = useState(Boolean(signatureFile))
   const [isDrawing, setIsDrawing] = useState(false)
   const fieldId = getFieldId(label)
+
+  useEffect(() => {
+    setIsSigned(Boolean(signatureFile))
+  }, [signatureFile])
+
+  const persistSignature = () => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    canvas.toBlob((blob) => {
+      if (!blob) return
+      setSignatureFile(
+        new File([blob], "digital-signature.png", {
+          type: "image/png",
+        })
+      )
+    }, "image/png")
+  }
 
   const getPos = (e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) => {
     const rect = canvas.getBoundingClientRect()
@@ -843,7 +1750,11 @@ function SignaturePad({
     ctx.stroke()
   }
 
-  const endDraw = () => setIsDrawing(false)
+  const endDraw = () => {
+    if (!isDrawing) return
+    setIsDrawing(false)
+    persistSignature()
+  }
 
   const clear = () => {
     const canvas = canvasRef.current
@@ -852,6 +1763,7 @@ function SignaturePad({
     if (!ctx) return
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     setIsSigned(false)
+    setSignatureFile(null)
   }
 
   return (
@@ -986,9 +1898,13 @@ function EligibilityCheckPage() {
   const searchParams = useSearchParams()
   const params = useParams()
   const { data, updateSection } = useProject()
-  const { fullName } = useUserIdentity()
+  const { fullName, userId } = useUserIdentity()
   const displayName = fullName || "User"
   const savedFormData = data.eligibility?.formData || {}
+  const projectIdFromQuery =
+    searchParams.get("projectId") ?? searchParams.get("eligibilityProjectId")
+  const existingProjectId = data.eligibility?.projectId ?? projectIdFromQuery ?? null
+  const serviceIds = ELIGIBILITY_SERVICE_ID
 
   const stageParam =
     typeof params?.stage === "string"
@@ -1021,16 +1937,209 @@ function EligibilityCheckPage() {
   const hasSubmittedEligibility = Boolean(data.eligibility?.completedAt)
   const [showVerification, setShowVerification] = useState(hasSubmittedEligibility)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [isSavingDraft, setIsSavingDraft] = useState(false)
+  const [isSavingStep, setIsSavingStep] = useState(false)
+  const [isLoadingEligibility, setIsLoadingEligibility] = useState(false)
+  const [loadEligibilityError, setLoadEligibilityError] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [pendingScrollId, setPendingScrollId] = useState<string | null>(null)
   const [planType, setPlanType] = useState<ActivePlanType>(null)
   const [usedChecks, setUsedChecks] = useState(0)
+  const [uploadedFiles, setUploadedFiles] = useState<EligibilityFileMap>({})
+  const [signatureFile, setSignatureFile] = useState<File | null>(null)
   const planHydratedRef = useRef(false)
+  const fetchedEligibilityProjectRef = useRef<string | null>(null)
 
   const TOTAL_STEPS = 5
   const totalChecks = planType ? PLAN_CHECK_LIMITS[planType] : 0
 
   const nextStep = () => setStep(prev => (prev < TOTAL_STEPS ? ((prev + 1) as Step) : prev))
   const prevStep = () => setStep(prev => (prev > 1 ? ((prev - 1) as Step) : prev))
+
+  useEffect(() => {
+    if (!existingProjectId) return
+    if (fetchedEligibilityProjectRef.current === existingProjectId) return
+
+    let isCancelled = false
+    fetchedEligibilityProjectRef.current = existingProjectId
+
+    const loadSavedEligibility = async () => {
+      setIsLoadingEligibility(true)
+      setLoadEligibilityError(null)
+
+      try {
+        const response = await axiosInstance.get(
+          `/eligibility/${encodeURIComponent(existingProjectId)}`
+        )
+        if (isCancelled) return
+
+        const normalized = normalizeEligibilityResponseFromApi(
+          response.data,
+          existingProjectId
+        )
+
+        updateSection("eligibility", {
+          projectId: normalized.projectId,
+          formData: {
+            ...savedFormData,
+            ...normalized.formData,
+          },
+          isDraft: normalized.isDraft,
+          draftSavedAt: normalized.draftSavedAt,
+          completedAt: normalized.completedAt,
+          isEligible: normalized.isEligible,
+        })
+
+        if (normalized.step && normalized.step >= 1 && normalized.step <= TOTAL_STEPS) {
+          setStep(normalized.step as Step)
+        }
+
+        if (normalized.completedAt || normalized.isEligible) {
+          setShowVerification(true)
+        }
+      } catch {
+        if (!isCancelled) {
+          setLoadEligibilityError("Unable to load the saved eligibility form.")
+          fetchedEligibilityProjectRef.current = null
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingEligibility(false)
+        }
+      }
+    }
+
+    void loadSavedEligibility()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [existingProjectId])
+
+  const upsertEligibilityProject = async (status: EligibilitySaveStatus = "in_progress") => {
+    if (step === 1 && !existingProjectId) {
+      if (!userId) {
+        throw new Error("User ID is missing, so we couldn't create the eligibility project.")
+      }
+
+      const multipartData = buildEligibilityMultipartFormData({
+        step,
+        status,
+        formValues: savedFormData,
+        uploadedFiles,
+        signatureFile,
+        serviceIds,
+        userId,
+      })
+
+      const response = await axiosInstance.post(ELIGIBILITY_CREATE_ENDPOINT, multipartData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+
+      const projectId = extractProjectId(response.data)
+      if (!projectId) {
+        throw new Error("The first-step save succeeded, but no projectId was returned.")
+      }
+
+      updateSection("eligibility", {
+        ...(data.eligibility || {}),
+        projectId,
+      })
+
+      return projectId
+    }
+
+    if (!existingProjectId) {
+      throw new Error("Project ID is missing. Please complete the first step first.")
+    }
+
+    const multipartData = buildEligibilityMultipartFormData({
+      step,
+      status,
+      formValues: savedFormData,
+      uploadedFiles,
+      signatureFile,
+      serviceIds,
+      userId,
+    })
+
+    await axiosInstance.put(`/eligibility/${encodeURIComponent(existingProjectId)}`, multipartData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+
+    return existingProjectId
+  }
+
+  const handleNextStep = async () => {
+    if (step >= TOTAL_STEPS || isSavingStep || isSavingDraft || isAnalyzing || isLoadingEligibility) return
+    if (isReadOnly) {
+      nextStep()
+      return
+    }
+
+    setSubmitError(null)
+    setIsSavingStep(true)
+
+    try {
+      await upsertEligibilityProject("in_progress")
+      nextStep()
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : "Unable to save the current eligibility step."
+      )
+    } finally {
+      setIsSavingStep(false)
+    }
+  }
+
+  const handleSaveDraft = async () => {
+    if (isSavingDraft || isSavingStep || isAnalyzing || isLoadingEligibility) return
+
+    setSubmitError(null)
+    setIsSavingDraft(true)
+
+    try {
+      await upsertEligibilityProject("draft")
+
+      updateSection("eligibility", {
+        ...(data.eligibility || {}),
+        isDraft: true,
+        draftSavedAt: new Date().toISOString(),
+      })
+      alert("Draft saved ✅")
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : "Unable to save the eligibility draft."
+      )
+    } finally {
+      setIsSavingDraft(false)
+    }
+  }
+
+  const handleEligibilitySubmit = async () => {
+    if (hasSubmittedEligibility || isAnalyzing || isSavingDraft || isSavingStep || isLoadingEligibility) return
+
+    setSubmitError(null)
+    setIsAnalyzing(true)
+
+    try {
+      await upsertEligibilityProject("submitted")
+
+      setShowVerification(true)
+      updateSection("eligibility", {
+        ...(data.eligibility || {}),
+        isEligible: true,
+        completedAt: new Date().toISOString(),
+      })
+      window.scrollTo({ top: 0, behavior: "smooth" })
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : "Unable to submit the eligibility form."
+      )
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
 
   const STEP_LABELS = [
     "1. Applicant & Property",
@@ -1236,6 +2345,14 @@ function EligibilityCheckPage() {
               setUsedChecks(prev => (prev < totalChecks ? prev + 1 : prev)),
           }}
         >
+        <EligibilityAssetsContext.Provider
+          value={{
+            uploadedFiles,
+            setUploadedFiles,
+            signatureFile,
+            setSignatureFile,
+          }}
+        >
           <div className={`grid gap-6 transition-all duration-500 ${showVerification ? "grid-cols-12" : "grid-cols-1"}`}>
             <div className={showVerification ? "col-span-8" : "col-span-12"}>
               <div className="rounded-2xl border bg-white p-6 shadow-sm">
@@ -1251,7 +2368,20 @@ function EligibilityCheckPage() {
                   Read-only mode: completed step data is view-only.
                 </div>
               )}
-              <fieldset disabled={isReadOnly} className={isReadOnly ? "opacity-85" : undefined}>
+              {isLoadingEligibility && (
+                <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+                  Loading saved eligibility data...
+                </div>
+              )}
+              {loadEligibilityError && (
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                  {loadEligibilityError}
+                </div>
+              )}
+              <fieldset
+                disabled={isReadOnly || isLoadingEligibility}
+                className={isReadOnly || isLoadingEligibility ? "opacity-85" : undefined}
+              >
 
             {/* ── STEP 1: Applicant & Property (rows 001–007) ── */}
             {step === 1 && (
@@ -1375,18 +2505,21 @@ function EligibilityCheckPage() {
                   <FileUploadArea
                     label="Location Plan (1:1250 or 1:2500)"
                     accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf"
+                    multiple={false}
                     hint="Ordnance Survey based plan showing site in context"
                     onMissingTrigger="No location plan uploaded — we offer professional drawing services (CAD, surveys). Book a consultation."
                   />
                   <FileUploadArea
                     label="Site Plan (1:200 or 1:500)"
                     accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf"
+                    multiple={false}
                     hint="Block plan of the site showing proposed development"
                     onMissingTrigger="No site plan uploaded — our CAD team can prepare this for you."
                   />
                   <FileUploadArea
                     label="Existing & Proposed Elevations"
                     accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf"
+                    multiple={false}
                     hint="All affected elevations at 1:50 or 1:100"
                     onMissingTrigger="No elevations uploaded — our architects can prepare these drawings."
                   />
@@ -1457,6 +2590,7 @@ function EligibilityCheckPage() {
                   <FileUploadArea
                     label="Tree Survey / BS5837 Report (if available)"
                     accept=".pdf,.jpg,.jpeg,.png"
+                    multiple={false}
                     hint="Plan showing tree positions, root protection areas and species"
                     onMissingTrigger="No tree plan uploaded — we can commission a BS5837 tree survey on your behalf."
                   />
@@ -1477,6 +2611,7 @@ function EligibilityCheckPage() {
                   <FileUploadArea
                     label="Flood Risk Assessment (if available)"
                     accept=".pdf"
+                    multiple={false}
                     hint="Required for sites in Flood Zone 2 or 3"
                     onMissingTrigger="No FRA uploaded — we can commission a Flood Risk Assessment for your site."
                   />
@@ -1671,44 +2806,26 @@ function EligibilityCheckPage() {
                 <div className="flex gap-2">
                   {!isReadOnly && (
                     <button
-                      onClick={() => {
-                        updateSection("eligibility", {
-                          ...(data.eligibility || {}),
-                          isDraft: true,
-                          draftSavedAt: new Date().toISOString(),
-                        })
-                        alert("Draft saved ✅")
-                      }}
-                      className="rounded-xl border px-5 py-2 text-sm cursor-pointer transition-colors bg-green-600 hover:bg-green-700 text-white"
+                      onClick={handleSaveDraft}
+                      disabled={isSavingDraft || isSavingStep || isAnalyzing || isLoadingEligibility}
+                      className="rounded-xl border px-5 py-2 text-sm cursor-pointer transition-colors bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      Save as Draft
+                      {isSavingDraft ? "Saving..." : "Save as Draft"}
                     </button>
                   )}
 
                   <button
-                    onClick={nextStep}
-                    className="rounded-xl bg-blue-600 text-white px-5 py-2 text-sm font-semibold cursor-pointer hover:bg-blue-700 transition-colors"
+                    onClick={handleNextStep}
+                    disabled={isSavingStep || isSavingDraft || isAnalyzing || isLoadingEligibility}
+                    className="rounded-xl bg-blue-600 text-white px-5 py-2 text-sm font-semibold cursor-pointer hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Next Step →
+                    {isSavingStep ? "Saving..." : isReadOnly ? "Next Section" : "Next Step"}
                   </button>
                 </div>
               ) : !isReadOnly ? (
                 <button
-                  disabled={hasSubmittedEligibility || isAnalyzing}
-                  onClick={() => {
-                    if (hasSubmittedEligibility || isAnalyzing) return
-                    setIsAnalyzing(true)
-                    setTimeout(() => {
-                      setIsAnalyzing(false)
-                      setShowVerification(true)
-                      updateSection("eligibility", {
-                        ...(data.eligibility || {}),
-                        isEligible: true,
-                        completedAt: new Date().toISOString(),
-                      })
-                      window.scrollTo({ top: 0, behavior: "smooth" })
-                    }, 4500)
-                  }}
+                  disabled={hasSubmittedEligibility || isAnalyzing || isSavingDraft || isSavingStep || isLoadingEligibility}
+                  onClick={handleEligibilitySubmit}
                   className="rounded-xl bg-green-600 text-white px-5 py-2 text-sm font-semibold cursor-pointer hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {hasSubmittedEligibility ? "Submitted" : "Submit"}
@@ -1716,6 +2833,9 @@ function EligibilityCheckPage() {
               ) : null
               }
               </div>
+              {submitError && (
+                <p className="mt-3 text-sm text-red-600">{submitError}</p>
+              )}
             </div>
           </div>
 
@@ -1726,6 +2846,7 @@ function EligibilityCheckPage() {
               </div>
             )}
           </div>
+        </EligibilityAssetsContext.Provider>
         </EligibilityAIContext.Provider>
       </EligibilityStepContext.Provider>
 
@@ -2141,12 +3262,13 @@ function InfoBox({ children }: { children: React.ReactNode }) {
 
 function ChoosePlanCta({ label }: { label: string }) {
   const router = useRouter()
+  const pathname = usePathname()
   const step = useEligibilityStep()
   const fieldId = getFieldId(label)
 
   const handleClick = () => {
     const params = new URLSearchParams()
-    params.set("returnTo", "/dashboard?stage=eligibility")
+    params.set("returnTo", pathname === "/dashboard-eligibility" ? pathname : "/dashboard?stage=eligibility")
     params.set("returnStep", String(step))
     params.set("returnField", fieldId)
     router.push(`/subscription?${params.toString()}`)
@@ -2165,12 +3287,13 @@ function ChoosePlanCta({ label }: { label: string }) {
 
 function UpgradePlanCta({ label }: { label: string }) {
   const router = useRouter()
+  const pathname = usePathname()
   const step = useEligibilityStep()
   const fieldId = getFieldId(label)
 
   const handleClick = () => {
     const params = new URLSearchParams()
-    params.set("returnTo", "/dashboard?stage=eligibility")
+    params.set("returnTo", pathname === "/dashboard-eligibility" ? pathname : "/dashboard?stage=eligibility")
     params.set("returnStep", String(step))
     params.set("returnField", fieldId)
     router.push(`/subscription?${params.toString()}`)

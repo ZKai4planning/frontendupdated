@@ -70,6 +70,7 @@ export type ProfileValidationResult = {
 };
 
 export const MOBILE_NUMBER_LENGTH = 10;
+export const UK_LANDLINE_MAX_LENGTH = 11;
 
 /**
  * Helper to create a guaranteed safe default state.
@@ -109,6 +110,8 @@ const TEXT_PATTERN = /^[\p{L}\p{M}\p{N}#.,'/\- ]+$/u;
 const COUNTRY_CODE_PATTERN = /^\+\d{1,4}$/;
 const PHONE_PATTERN = new RegExp(`^\\d{${MOBILE_NUMBER_LENGTH}}$`);
 const LANDLINE_PATTERN = /^\d{6,15}$/;
+const UK_LANDLINE_WITH_TRUNK_PATTERN = /^0[12]\d{8,9}$/;
+const UK_LANDLINE_WITHOUT_TRUNK_PATTERN = /^[12]\d{8,9}$/;
 const POSTAL_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 -]{2,11}$/;
 
 const FIELD_ORDER: ProfileFieldPath[] = [
@@ -197,6 +200,13 @@ export const sanitizeProfileInput = (profile: ProfileModel): ProfileModel => ({
   },
 });
 
+const isValidUkLandline = (number: string): boolean =>
+  UK_LANDLINE_WITH_TRUNK_PATTERN.test(number) ||
+  UK_LANDLINE_WITHOUT_TRUNK_PATTERN.test(number);
+
+const shouldUseUkLandlineValidation = (countryCode: string): boolean =>
+  !countryCode || countryCode === "+44";
+
 export const validateProfileInput = (profile: ProfileModel): ProfileValidationResult => {
   const sanitized = sanitizeProfileInput(profile);
   const errors: ProfileFieldErrors = {};
@@ -236,18 +246,21 @@ export const validateProfileInput = (profile: ProfileModel): ProfileValidationRe
 
   // 4. Optional: Landline
   if (hasValue(sanitized.landline.number)) {
-    if (!LANDLINE_PATTERN.test(sanitized.landline.number)) {
+    if (shouldUseUkLandlineValidation(sanitized.landline.countryCode)) {
+      if (!isValidUkLandline(sanitized.landline.number)) {
+        errors["landline.number"] =
+          sanitized.landline.countryCode === "+44"
+            ? "Enter a valid UK landline. With +44, use 10 digits starting 1 or 2, or include the leading 0."
+            : "Enter a valid UK landline starting with 01 or 02.";
+      }
+    } else if (!LANDLINE_PATTERN.test(sanitized.landline.number)) {
       errors["landline.number"] = "Landline must be 6-15 digits.";
     }
-    // If number exists, country code is usually expected but not strictly mandatory by your logic, 
-    // but let's validate format if present.
+
     if (hasValue(sanitized.landline.countryCode) && !COUNTRY_CODE_PATTERN.test(sanitized.landline.countryCode)) {
       errors["landline.countryCode"] = "Invalid code format.";
     }
   }
-  // Edge case: If code exists but no number (your JSON case), we allow it (pass), 
-  // or we can enforce that if code is present, number is needed. 
-  // Based on your payload, we allow empty number.
 
   // 5. Address (Optional fields)
   const validateAddressField = (key: keyof AddressModel, min: number, max: number, fieldName: string) => {
