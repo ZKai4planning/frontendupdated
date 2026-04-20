@@ -74,6 +74,13 @@ type ProjectContextType = {
   resetProject: () => void
 }
 
+const PROJECT_STORAGE_KEY = "project-data"
+
+const getPersistedProjectData = (value: ProjectData): ProjectData => {
+  const { eligibility, ...rest } = value
+  return rest
+}
+
 /* ================= CONTEXT ================= */
 
 const ProjectContext = createContext<ProjectContextType | null>(null)
@@ -89,15 +96,15 @@ export function ProjectProvider({
 
   /* Load from sessionStorage */
   useEffect(() => {
-    const saved = sessionStorage.getItem("project-data")
+    const saved = sessionStorage.getItem(PROJECT_STORAGE_KEY)
     if (saved) {
-      setData(JSON.parse(saved))
+      setData(getPersistedProjectData(JSON.parse(saved) as ProjectData))
     }
   }, [])
 
   /* Save to sessionStorage */
   useEffect(() => {
-    sessionStorage.setItem("project-data", JSON.stringify(data))
+    sessionStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(getPersistedProjectData(data)))
   }, [data])
 
   const updateSection = (
@@ -115,7 +122,7 @@ export function ProjectProvider({
 
   const resetProject = () => {
     setData({})
-    sessionStorage.removeItem("project-data")
+    sessionStorage.removeItem(PROJECT_STORAGE_KEY)
   }
 
   return (

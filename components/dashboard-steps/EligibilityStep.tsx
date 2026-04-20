@@ -866,6 +866,26 @@ const buildEligibilityStepPayload = (
   }
 }
 
+const buildSerializableEligibilityFormData = (formValues: EligibilityFormValues) =>
+  Object.entries(formValues).reduce<Record<string, string | string[]>>((accumulator, [key, value]) => {
+    if (value === undefined) return accumulator
+
+    accumulator[key] = Array.isArray(value)
+      ? value.filter((item) => item !== undefined && item !== null && item !== "")
+      : value
+
+    return accumulator
+  }, {})
+
+const buildEligibilityPayload = (formValues: EligibilityFormValues) => ({
+  ...buildEligibilityStepPayload(1, formValues),
+  ...buildEligibilityStepPayload(2, formValues),
+  ...buildEligibilityStepPayload(3, formValues),
+  ...buildEligibilityStepPayload(4, formValues),
+  ...buildEligibilityStepPayload(5, formValues),
+  formData: buildSerializableEligibilityFormData(formValues),
+})
+
 const buildEligibilityMultipartFormData = ({
   step,
   status,
@@ -885,10 +905,11 @@ const buildEligibilityMultipartFormData = ({
 }) => {
   const formData = new FormData()
   const getFiles = (label: string) => uploadedFiles[label] ?? []
+  const payload = buildEligibilityPayload(formValues)
 
   formData.append("currentStep", String(step))
   formData.append("status", status)
-  formData.append("payload", JSON.stringify(buildEligibilityStepPayload(step, formValues)))
+  formData.append("payload", JSON.stringify(payload))
 
   if (serviceIds?.trim()) {
     formData.append("serviceIds", serviceIds)
