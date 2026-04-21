@@ -1699,26 +1699,41 @@ function FileUploadArea({
 }
 
 /* ─────────────────────────────────────────────
-   DIGITAL SIGNATURE PAD
+   DIGITAL SIGNATURE PAD (Corrected)
 ───────────────────────────────────────────── */
+
+// Define the props interface to include strokeWidth
+interface SignaturePadProps {
+  label: string
+  tooltip?: string
+  questionNumber?: number
+  strokeWidth?: number // New: Allows customizing pen thickness
+}
+
 function SignaturePad({
   label,
   tooltip,
   questionNumber,
-}: {
-  label: string
-  tooltip?: string
-  questionNumber?: number
-}) {
+  strokeWidth = 1.5, // Default set to 1.5 (Fine point) instead of 2.5
+}: SignaturePadProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const { signatureFile, setSignatureFile } = useEligibilityAssets()
   const [isSigned, setIsSigned] = useState(Boolean(signatureFile))
   const [isDrawing, setIsDrawing] = useState(false)
   const fieldId = getFieldId(label)
 
+  // Update state when external signature file changes
   useEffect(() => {
     setIsSigned(Boolean(signatureFile))
   }, [signatureFile])
+
+  // Helper: Configure the 2D context for smooth drawing
+  const configureContext = (ctx: CanvasRenderingContext2D) => {
+    ctx.lineWidth = strokeWidth // Slightly thicker for better visibility
+    ctx.lineCap = "round"
+    ctx.lineJoin = "round" // Prevents jagged corners
+    ctx.strokeStyle = "#1e3a5f"
+  }
 
   const persistSignature = () => {
     const canvas = canvasRef.current
@@ -1733,27 +1748,58 @@ function SignaturePad({
     }, "image/png")
   }
 
-  const getPos = (e: React.MouseEvent | React.TouchEvent, canvas: HTMLCanvasElement) => {
+  // FIX: Calculate position considering the scale difference between CSS pixels and Canvas pixels
+  const getPos = (
+    e: React.MouseEvent | React.TouchEvent,
+    canvas: HTMLCanvasElement
+  ) => {
     const rect = canvas.getBoundingClientRect()
+    
+    // Calculate scale factors
+    const scaleX = canvas.width / rect.width
+    const scaleY = canvas.height / rect.height
+
+    let clientX: number
+    let clientY: number
+
     if ("touches" in e) {
-      return {
-        x: e.touches[0].clientX - rect.left,
-        y: e.touches[0].clientY - rect.top,
-      }
+      clientX = e.touches[0].clientX
+      clientY = e.touches[0].clientY
+    } else {
+      clientX = e.clientX
+      clientY = e.clientY
     }
-    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+    }
   }
 
   const startDraw = (e: React.MouseEvent | React.TouchEvent) => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const ctx = canvas.getContext("2d")
+    const ctx = canvas.getContext("2d", { willReadFrequently: true })
     if (!ctx) return
+
+    // Prevent default touch actions (like scrolling) when touching the canvas
+    if ("touches" in e) {
+       // e.preventDefault() is usually handled in CSS touch-action, 
+       // but this ensures safety for older browsers if needed.
+    }
+
     setIsDrawing(true)
     setIsSigned(true)
+    
     const pos = getPos(e, canvas)
+    
+    configureContext(ctx)
     ctx.beginPath()
     ctx.moveTo(pos.x, pos.y)
+    
+    // Draw a single dot if the user just clicks without moving
+    ctx.lineTo(pos.x, pos.y)
+    ctx.stroke()
   }
 
   const draw = (e: React.MouseEvent | React.TouchEvent) => {
@@ -1762,11 +1808,10 @@ function SignaturePad({
     if (!canvas) return
     const ctx = canvas.getContext("2d")
     if (!ctx) return
-    e.preventDefault()
+
+    e.preventDefault() // Stop screen scrolling while drawing on touch devices
+    
     const pos = getPos(e, canvas)
-    ctx.lineWidth = 2
-    ctx.lineCap = "round"
-    ctx.strokeStyle = "#1e3a5f"
     ctx.lineTo(pos.x, pos.y)
     ctx.stroke()
   }
@@ -1782,6 +1827,7 @@ function SignaturePad({
     if (!canvas) return
     const ctx = canvas.getContext("2d")
     if (!ctx) return
+    
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     setIsSigned(false)
     setSignatureFile(null)
@@ -1793,8 +1839,8 @@ function SignaturePad({
       <div className="relative rounded-xl border-2 border-slate-200 bg-white overflow-hidden">
         <canvas
           ref={canvasRef}
-          width={600}
-          height={120}
+          width={600}  // Internal Resolution
+          height={120} // Internal Resolution
           onMouseDown={startDraw}
           onMouseMove={draw}
           onMouseUp={endDraw}
@@ -1802,10 +1848,11 @@ function SignaturePad({
           onTouchStart={startDraw}
           onTouchMove={draw}
           onTouchEnd={endDraw}
-          className="w-full touch-none cursor-crosshair"
+          // "touch-none" is critical: it tells the browser "don't scroll when I touch this"
+          className="w-full touch-none cursor-crosshair block"
         />
         {!isSigned && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
             <div className="flex items-center gap-2 text-slate-300">
               <PenLine className="w-4 h-4" />
               <span className="text-sm">Sign here</span>
@@ -1820,7 +1867,7 @@ function SignaturePad({
         <button
           type="button"
           onClick={clear}
-          className="text-xs text-red-500 hover:underline"
+          className="text-xs text-red-500 hover:underline font-medium"
         >
           Clear
         </button>
@@ -2261,7 +2308,7 @@ function EligibilityCheckPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Welcome back, {displayName}</h1>
           <p className="text-xl text-slate-600 mt-2">
-            Customer ID: <span className="font-medium">ABC123-089</span>
+            Customer ID: <span className="font-medium"> {userId} </span>
           </p>
           <p className="text-sm text-slate-500 mt-1">
             Current Stage:{" "}
@@ -2782,7 +2829,7 @@ function EligibilityCheckPage() {
                   <Input label="Full Name of Signatory" />
                   <Input label="Date (dd/mm/yyyy)" />
                   <Input label="Capacity (Owner / Agent / Other)" />
-                  <SignaturePad label="Digital Signature" />
+                  <SignaturePad label="Digital Signature" strokeWidth={1.5} />
                 </div>
 
                 {/* <InfoBox>
