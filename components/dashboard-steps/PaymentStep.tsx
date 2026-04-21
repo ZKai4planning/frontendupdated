@@ -3,14 +3,22 @@
 import { useState } from "react"
 import { Info, ShieldCheck, UploadCloud } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { useProject } from "@/app/context/ProjectContext"
 
 
 export default function PaymentUI() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { data } = useProject()
   const isReadOnly = searchParams.get("readonly") === "1"
 
   const [file, setFile] = useState<File | null>(null)
+  const serviceCategory = data.service?.category || "Residential: Homeowners & landlords"
+  const servicePlan = data.service?.plan || "House Holder planning consent"
+  const serviceDescription =
+    data.service?.description ||
+    "As a homeowner, I want to build a modest extension (e.g., a rear kitchen/dining room) so that my family has more living space."
+  const serviceImage = data.service?.image || "/Service-01.png"
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
@@ -22,22 +30,22 @@ export default function PaymentUI() {
 
   <div className="relative p-10 text-white space-y-6">
     <h2 className="text-xl font-semibold">
-      Residential: Homeowners & landlords
+      {serviceCategory}
     </h2>
 
     <h3 className="text-xl font-semibold">
-      House Holder planning consent
+      {servicePlan}
     </h3>
 
     
 
     <p className="text-white/70 leading-relaxed text-2xl">
-      As a homeowner, I want to build a modest extension (e.g., a rear kitchen/dining room) so that my family has more living space.
+      {serviceDescription}
     </p>
 
     <img
-      src="Service-01.png"
-      alt="Service1"
+      src={serviceImage}
+      alt={servicePlan}
       className="w-full max-w-xl rounded-xl shadow-lg"
     />
   </div>

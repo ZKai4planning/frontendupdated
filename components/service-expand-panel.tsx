@@ -6,6 +6,8 @@ import { ClientLogin } from "@/components/clientloginform";
 import Image from "next/image";
 import { BorderBeam } from "@/components/ui/border-beam";
 import { Service } from "@/types"; // Import Service type
+import { useProject } from "@/app/context/ProjectContext";
+import { useRouter } from "next/navigation";
 
 interface ServiceExpandPanelProps {
   service: Service;
@@ -15,6 +17,7 @@ interface ServiceExpandPanelProps {
   index: number;
   mobile?: boolean;
   isLaptop?: boolean;
+  applyAction?: "login" | "next-step";
 }
 
 /* ================= ICON MAPPING ================= */
@@ -88,9 +91,12 @@ export default function ServiceExpandPanel({
   index,
   mobile = false,
   isLaptop = false,
+  applyAction = "login",
 }: ServiceExpandPanelProps) {
   const [showLogin, setShowLogin] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
+  const { updateSection } = useProject();
+  const router = useRouter();
   const [selectedFeatureIndex, setSelectedFeatureIndex] = useState(0);
   const [showDetail, setShowDetail] = useState(false);
   const [beamVisible, setBeamVisible] = useState(false);
@@ -180,6 +186,26 @@ export default function ServiceExpandPanel({
     if (!formData.name || !formData.email || !formData.phone) return;
     setShowForm(false);
     setMessages((prev) => [...prev, { sender: "bot", text: "Thank you! Our specialist will contact you shortly." }]);
+  };
+
+  const handleApplyForService = () => {
+    const activeFeature = selectedFeature ?? service.features[0];
+
+    updateSection("service", {
+      serviceId: activeFeature?.subServiceId ?? service.id,
+      parentServiceId: service.id,
+      plan: activeFeature?.title ?? service.title,
+      category: service.label,
+      description: activeFeature?.description ?? service.description,
+      image: service.image,
+    });
+
+    if (applyAction === "next-step") {
+      router.push("/dashboard?stage=payment");
+      return;
+    }
+
+    setShowLogin(true);
   };
 
   return (
@@ -297,7 +323,7 @@ export default function ServiceExpandPanel({
                           <p className={`mt-3 leading-relaxed text-white/70 ${isLaptop ? "text-xs" : "text-sm"}`}>{selectedFeature?.description ?? service.description}</p>
                         </div>
                         <div className="mt-6 flex items-center justify-center gap-4 rounded-2xl px-4 py-3 mb-8">
-                          <button type="button" onClick={() => setShowLogin(true)} className={`rounded-full bg-blue-500 px-5 py-2 font-semibold text-white transition hover:bg-blue-400 ${isLaptop ? "text-xs" : "text-sm"}`}>
+                          <button type="button" onClick={handleApplyForService} className={`rounded-full bg-blue-500 px-5 py-2 font-semibold text-white transition hover:bg-blue-400 ${isLaptop ? "text-xs" : "text-sm"}`}>
                             Apply for this Service
                           </button>
                         </div>

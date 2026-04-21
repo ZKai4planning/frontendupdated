@@ -17,6 +17,7 @@ const mapApiServiceToService = (apiService: ApiServiceData): Service => {
       title: sub.title,
       header: sub.title,
       description: sub.description,
+      subServiceId: sub.subServiceId,
     })),
     cta: "Select & Apply",
     label: apiService.serviceName || "Service Category",
@@ -24,7 +25,11 @@ const mapApiServiceToService = (apiService: ApiServiceData): Service => {
   };
 };
 
-export default function LandingServicesSection() {
+export default function LandingServicesSection({
+  applyAction = "login",
+}: {
+  applyAction?: "login" | "next-step";
+}) {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -178,6 +183,7 @@ export default function LandingServicesSection() {
                 key={service.id}
                 index={index}
                 service={service}
+                applyAction={applyAction}
                 isLaptop={isLaptop}
                 isExpanded={expandedServiceId === service.id}
                 onExpand={() => setExpandedServiceId(service.id)}

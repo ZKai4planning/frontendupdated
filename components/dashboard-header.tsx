@@ -90,9 +90,9 @@
 // }
 "use client"
 
-import { Bell, ChevronDown, ChevronLeft, ChevronRight, FileText, Folder, LogOut, User } from "lucide-react"
+import { Bell, ChevronDown, ChevronLeft, ChevronRight, FileText, Folder, LogOut, Plus, User } from "lucide-react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useRef, useState } from "react"
 import { useUserIdentity } from "@/lib/use-user-identity"
 import { useProject } from "@/app/context/ProjectContext"
@@ -105,16 +105,25 @@ type Breadcrumb = {
 
 type ProjectService = {
   serviceId?: string
+  subServiceId?: string
   title?: string
   serviceName?: string
+  description?: string
+  image?: string
+}
+
+type ProjectCurrentStage = {
+  route?: string
 }
 
 type UserProject = {
   _id?: string
   projectId: string
   services?: ProjectService[]
+  subServices?: ProjectService[]
   status?: string
   currentStep?: number
+  currentStage?: ProjectCurrentStage | null
 }
 
 type ProjectsApiResponse = {
@@ -124,6 +133,23 @@ type ProjectsApiResponse = {
 }
 
 const SELECTED_PROJECT_STORAGE_KEY = "selectedProjectId"
+
+const getPrimaryProjectService = (project?: UserProject | null) =>
+  project?.subServices?.[0] ?? project?.services?.[0]
+
+const resolveStageFromStatus = (status?: string | null) => {
+  const normalized = status?.toLowerCase() ?? ""
+
+  if (normalized.includes("final_quotation")) return "final-quotation"
+  if (normalized.includes("initial_quotation")) return "initial-quotation"
+  if (normalized.includes("consultant")) return "consultant"
+  if (normalized.includes("eligibility")) return "eligibility"
+  if (normalized.includes("payment")) return "payment"
+  if (normalized.includes("upload")) return "upload"
+  if (normalized.includes("review")) return "review"
+
+  return null
+}
 
 interface DashboardHeaderProps {
   breadcrumbs: Breadcrumb[]
@@ -139,6 +165,7 @@ export default function DashboardHeader({
   onToggle,
 }: DashboardHeaderProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [isProjectOpen, setIsProjectOpen] = useState(false)
   const [projects, setProjects] = useState<UserProject[]>([])
@@ -154,15 +181,43 @@ export default function DashboardHeader({
   const breadcrumbTrail = breadcrumbs.filter((crumb) => Boolean(crumb.label))
   const selectedProjectId = data.eligibility?.projectId ?? null
   const selectedProject = projects.find((project) => project.projectId === selectedProjectId)
-  const selectedProjectService = selectedProject?.services?.[0]
+  const selectedProjectService = getPrimaryProjectService(selectedProject)
   const selectedProjectLabel =
     selectedProjectService?.title ||
     selectedProjectService?.serviceName ||
-    (selectedProjectId ? selectedProjectId : "Home Owner")
+    data.service?.plan ||
+    selectedProjectId ||
+    null
+  const hasProjects = projects.length > 0
+  const hasSingleProject = projects.length === 1
 
   const getProjectLabel = (project: UserProject) => {
-    const service = project.services?.[0]
+    const service = getPrimaryProjectService(project)
     return service?.title || service?.serviceName || project.projectId
+  }
+
+  const persistSelectedProject = (project: UserProject) => {
+    const service = getPrimaryProjectService(project)
+
+    updateSection("eligibility", {
+      ...(data.eligibility || {}),
+      projectId: project.projectId,
+    })
+
+    if (service?.serviceId || service?.title || service?.serviceName) {
+      updateSection("service", {
+        serviceId: service.subServiceId || service.serviceId,
+        plan: service.title || service.serviceName,
+        category: service.serviceName,
+        description: service.description,
+        image: service.image,
+      })
+    }
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, project.projectId)
+      window.sessionStorage.removeItem(SELECTED_PROJECT_STORAGE_KEY)
+    }
   }
 
   useEffect(() => {
@@ -206,7 +261,12 @@ export default function DashboardHeader({
         if (isCancelled) return
 
         const projectList = Array.isArray(response.data?.data) ? response.data.data : []
-        setProjects(projectList.filter((project) => Boolean(project.projectId)))
+        const filteredProjects = projectList.filter((project) => Boolean(project.projectId))
+        setProjects(filteredProjects)
+
+        if (filteredProjects.length === 1) {
+          persistSelectedProject(filteredProjects[0])
+        }
       } catch {
         if (!isCancelled) {
           setProjects([])
@@ -242,27 +302,76 @@ export default function DashboardHeader({
     })
   }, [data.eligibility?.projectId])
 
-  const handleProjectSelect = (project: UserProject) => {
-    const service = project.services?.[0]
+  useEffect(() => {
+    if (!selectedProjectId) return
+    const matchingProject = projects.find((project) => project.projectId === selectedProjectId)
+    if (!matchingProject) return
 
+    const service = getPrimaryProjectService(matchingProject)
+    if (!service) return
+
+    updateSection("service", {
+      serviceId: service.subServiceId || service.serviceId,
+      plan: service.title || service.serviceName,
+      category: service.serviceName,
+      description: service.description,
+      image: service.image,
+    })
+  }, [projects, selectedProjectId])
+
+  const handleProjectSelect = async (project: UserProject) => {
+    persistSelectedProject(project)
+    setIsProjectOpen(false)
+
+    try {
+      const response = await axiosInstance.get<{
+        data?: UserProject
+      }>(`/projects/${project.projectId}`)
+
+      const detailedProject = response.data?.data ?? project
+      persistSelectedProject(detailedProject)
+
+      const stageRoute =
+        detailedProject.currentStage?.route ||
+        resolveStageFromStatus(detailedProject.status) ||
+        "overview"
+
+      router.push(
+        stageRoute === "overview"
+          ? "/dashboard"
+          : `/dashboard?stage=${stageRoute}`
+      )
+    } catch {
+      const fallbackStage = resolveStageFromStatus(project.status) || "overview"
+      router.push(
+        fallbackStage === "overview"
+          ? "/dashboard"
+          : `/dashboard?stage=${fallbackStage}`
+      )
+    }
+  }
+
+  const handleStartNewProject = () => {
     updateSection("eligibility", {
-      ...(data.eligibility || {}),
-      projectId: project.projectId,
+      formData: undefined,
+      aiFilled: undefined,
+      aiDismissed: undefined,
+      projectId: undefined,
+      isDraft: undefined,
+      draftSavedAt: undefined,
+      propertyDetails: undefined,
+      dimensions: undefined,
+      constraints: undefined,
+      isEligible: undefined,
+      completedAt: undefined,
     })
 
-    if (service?.serviceId || service?.title) {
-      updateSection("service", {
-        serviceId: service.serviceId,
-        plan: service.title,
-      })
-    }
-
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, project.projectId)
+      window.localStorage.removeItem(SELECTED_PROJECT_STORAGE_KEY)
       window.sessionStorage.removeItem(SELECTED_PROJECT_STORAGE_KEY)
     }
 
-    setIsProjectOpen(false)
+    router.push("/services")
   }
 
   return (
@@ -307,20 +416,41 @@ export default function DashboardHeader({
           {/* ================= RIGHT ================= */}
           <div className="flex items-center gap-6">
             {/* Project Selector */}
+            <div className="flex items-center gap-3">
             <div className="relative" ref={projectRef}>
-              <button
-                type="button"
-                onClick={() => setIsProjectOpen((prev) => !prev)}
-                className="flex max-w-[280px] items-center gap-2 rounded-xl border px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                aria-haspopup="menu"
-                aria-expanded={isProjectOpen}
-              >
-                <Folder className="h-4 w-4 shrink-0 text-blue-600" />
-                <span className="truncate">Project: {selectedProjectLabel}</span>
-                <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
-              </button>
+              {!hasProjects ? (
+                <button
+                  type="button"
+                  onClick={handleStartNewProject}
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  <Folder className="h-4 w-4 shrink-0" />
+                  <span>New Project</span>
+                </button>
+              ) : hasSingleProject ? (
+                <div className="flex max-w-[320px] items-center gap-2 rounded-xl border px-4 py-2 text-sm text-slate-700 bg-slate-50">
+                  <Folder className="h-4 w-4 shrink-0 text-blue-600" />
+                  <span className="truncate">
+                    Project: {selectedProjectLabel || projects[0]?.projectId}
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsProjectOpen((prev) => !prev)}
+                    className="flex max-w-[280px] items-center gap-2 rounded-xl border px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    aria-haspopup="menu"
+                    aria-expanded={isProjectOpen}
+                  >
+                    <Folder className="h-4 w-4 shrink-0 text-blue-600" />
+                    <span className="truncate">
+                      Project: {selectedProjectLabel || "Select project"}
+                    </span>
+                    <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+                  </button>
 
-              {isProjectOpen && (
+                  {isProjectOpen && (
                 <div
                   role="menu"
                   className="absolute right-0 mt-3 w-80 rounded-xl border border-slate-200 bg-white shadow-lg"
@@ -366,7 +496,20 @@ export default function DashboardHeader({
                     ))}
                   </div>
                 </div>
+                  )}
+                </>
               )}
+            </div>
+            {hasProjects ? (
+              <button
+                type="button"
+                onClick={handleStartNewProject}
+                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+              >
+                <Plus className="h-4 w-4 shrink-0" />
+                <span>New Project</span>
+              </button>
+            ) : null}
             </div>
 
             {/* Notification */}

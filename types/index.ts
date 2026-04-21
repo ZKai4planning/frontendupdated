@@ -2,6 +2,7 @@ export interface Feature {
   title: string;
   header?: string;
   description?: string;
+  subServiceId?: string;
 }
 
 export interface Service {

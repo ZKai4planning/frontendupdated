@@ -21,8 +21,12 @@ export type ProjectData = {
 
   service?: {
     serviceId?: string
+    parentServiceId?: string
     plan?: string
     price?: number
+    category?: string
+    description?: string
+    image?: string
   }
 
   /* ✅ UPDATED ELIGIBILITY TYPE */

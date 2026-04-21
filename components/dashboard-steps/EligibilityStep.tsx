@@ -892,7 +892,7 @@ const buildEligibilityMultipartFormData = ({
   formValues,
   uploadedFiles,
   signatureFile,
-  serviceIds,
+  subServices,
   userId,
 }: {
   step: Step
@@ -900,7 +900,7 @@ const buildEligibilityMultipartFormData = ({
   formValues: EligibilityFormValues
   uploadedFiles: EligibilityFileMap
   signatureFile: File | null
-  serviceIds?: string | null
+  subServices?: string | null
   userId?: string | null
 }) => {
   const formData = new FormData()
@@ -911,8 +911,8 @@ const buildEligibilityMultipartFormData = ({
   formData.append("status", status)
   formData.append("payload", JSON.stringify(payload))
 
-  if (serviceIds?.trim()) {
-    formData.append("serviceIds", serviceIds)
+  if (subServices?.trim()) {
+    formData.append("subServices", subServices)
   }
   if (userId?.trim()) {
     formData.append("userId", userId)
@@ -1925,7 +1925,7 @@ function EligibilityCheckPage() {
   const projectIdFromQuery =
     searchParams.get("projectId") ?? searchParams.get("eligibilityProjectId")
   const existingProjectId = data.eligibility?.projectId ?? projectIdFromQuery ?? null
-  const serviceIds = ELIGIBILITY_SERVICE_ID
+  const subServices = data.service?.serviceId?.trim() || ELIGIBILITY_SERVICE_ID
 
   const stageParam =
     typeof params?.stage === "string"
@@ -2049,7 +2049,7 @@ function EligibilityCheckPage() {
         formValues: savedFormData,
         uploadedFiles,
         signatureFile,
-        serviceIds,
+        subServices,
         userId,
       })
 
@@ -2080,7 +2080,7 @@ function EligibilityCheckPage() {
       formValues: savedFormData,
       uploadedFiles,
       signatureFile,
-      serviceIds,
+      subServices,
       userId,
     })
 
