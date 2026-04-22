@@ -100,11 +100,15 @@ const normalizeProject = (value: unknown): NormalizedProject | null => {
     ? record.services
         .map((service) => normalizeProjectService(service, "serviceId"))
         .filter(Boolean) as ProjectService[]
+    : normalizeProjectService(record.service, "serviceId")
+      ? [normalizeProjectService(record.service, "serviceId") as ProjectService]
     : undefined
   const subServices = Array.isArray(record.subServices)
     ? record.subServices
         .map((service) => normalizeProjectService(service, "subServiceId"))
         .filter(Boolean) as ProjectService[]
+    : normalizeProjectService(record.subService, "subServiceId")
+      ? [normalizeProjectService(record.subService, "subServiceId") as ProjectService]
     : undefined
 
   return {
@@ -112,9 +116,9 @@ const normalizeProject = (value: unknown): NormalizedProject | null => {
     projectId,
     services,
     subServices,
-    status: toStringSafe(record.status),
+    status: toStringSafe(record.status ?? record.projectStatus),
     currentStep: toNumberSafe(record.currentStep),
-    currentStage: normalizeProjectStage(record.currentStage),
+    currentStage: normalizeProjectStage(record.currentStage ?? record.projectStage),
   }
 }
 

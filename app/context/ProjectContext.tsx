@@ -36,6 +36,7 @@ export type ProjectData = {
     aiFilled?: Record<string, boolean>
     aiDismissed?: Record<string, boolean>
     projectId?: string
+    projectStageId?: string
     isDraft?: boolean
     draftSavedAt?: string
 

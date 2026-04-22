@@ -97,7 +97,7 @@ import { useEffect, useRef, useState } from "react"
 import { useUserIdentity } from "@/lib/use-user-identity"
 import { useProject } from "@/app/context/ProjectContext"
 import axiosInstance from "@/lib/axiosinstance"
-import { extractProjectsFromResponse } from "@/lib/project-api"
+import { extractProjectFromResponse, extractProjectsFromResponse } from "@/lib/project-api"
 import { resolveProjectServiceName, useServiceCatalog } from "@/lib/use-service-catalog"
 
 type Breadcrumb = {
@@ -115,6 +115,7 @@ type ProjectService = {
 }
 
 type ProjectCurrentStage = {
+  stageId?: string
   route?: string
 }
 
@@ -135,6 +136,7 @@ type ProjectsApiResponse = {
 }
 
 const SELECTED_PROJECT_STORAGE_KEY = "selectedProjectId"
+const SELECTED_PROJECT_STAGE_STORAGE_KEY = "selectedProjectStageId"
 
 const getPrimaryProjectService = (project?: UserProject | null) =>
   project?.subServices?.[0] ?? project?.services?.[0]
@@ -204,6 +206,7 @@ export default function DashboardHeader({
     updateSection("eligibility", {
       ...(data.eligibility || {}),
       projectId: project.projectId,
+      projectStageId: project.currentStage?.stageId,
     })
 
     if (service?.serviceId || service?.title || service?.serviceName) {
@@ -221,6 +224,10 @@ export default function DashboardHeader({
     if (typeof window !== "undefined") {
       window.localStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, project.projectId)
       window.sessionStorage.removeItem(SELECTED_PROJECT_STORAGE_KEY)
+      if (project.currentStage?.stageId) {
+        window.localStorage.setItem(SELECTED_PROJECT_STAGE_STORAGE_KEY, project.currentStage.stageId)
+        window.sessionStorage.removeItem(SELECTED_PROJECT_STAGE_STORAGE_KEY)
+      }
     }
   }
 
@@ -306,6 +313,22 @@ export default function DashboardHeader({
   }, [data.eligibility?.projectId])
 
   useEffect(() => {
+    if (typeof window === "undefined") return
+    if (data.eligibility?.projectStageId) return
+
+    const storedProjectStageId =
+      window.localStorage.getItem(SELECTED_PROJECT_STAGE_STORAGE_KEY) ||
+      window.sessionStorage.getItem(SELECTED_PROJECT_STAGE_STORAGE_KEY)
+
+    if (!storedProjectStageId) return
+
+    updateSection("eligibility", {
+      ...(data.eligibility || {}),
+      projectStageId: storedProjectStageId,
+    })
+  }, [data.eligibility?.projectStageId])
+
+  useEffect(() => {
     if (!selectedProjectId) return
     const matchingProject = projects.find((project) => project.projectId === selectedProjectId)
     if (!matchingProject) return
@@ -332,7 +355,7 @@ export default function DashboardHeader({
         data?: UserProject
       }>(`/projects/${project.projectId}`)
 
-      const detailedProject = response.data?.data ?? project
+      const detailedProject = extractProjectFromResponse(response.data) ?? project
       persistSelectedProject(detailedProject)
 
       const stageRoute =

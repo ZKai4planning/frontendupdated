@@ -40,6 +40,8 @@ type UploadedFileEntry = {
   id: string
   file: File | null
   description: string
+  remoteFileName?: string
+  remoteFileUrl?: string
 }
 type EligibilityFileMap = Record<string, UploadedFileEntry[]>
 
@@ -54,6 +56,10 @@ const DEFAULT_ELIGIBILITY_TOOLTIP = ""
 const ELIGIBILITY_SERVICE_ID = "grexnb"
 const ELIGIBILITY_CREATE_ENDPOINT =
   process.env.NEXT_PUBLIC_ELIGIBILITY_CREATE_ENDPOINT ?? "/eligibility"
+const SELECTED_PROJECT_STORAGE_KEY = "selectedProjectId"
+const SELECTED_PROJECT_STAGE_STORAGE_KEY = "selectedProjectStageId"
+const MAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024
+const MAX_UPLOAD_FILE_SIZE_LABEL = "10 MB"
 
 const EligibilityStepContext = React.createContext<Step>(1)
 const EligibilityAIContext = React.createContext({
@@ -94,10 +100,17 @@ const asArrayValue = (value: EligibilityFormValue): string[] =>
 
 const yesNoToBooleanString = (value: string) => (value.trim().toLowerCase().startsWith("y") ? "true" : "false")
 
-const createUploadEntry = (description = "", file: File | null = null): UploadedFileEntry => ({
+const createUploadEntry = (
+  description = "",
+  file: File | null = null,
+  remoteFileName?: string,
+  remoteFileUrl?: string
+): UploadedFileEntry => ({
   id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   file,
   description,
+  remoteFileName,
+  remoteFileUrl,
 })
 
 const appendMultipartValue = (formData: FormData, key: string, value: string) => {
@@ -112,6 +125,41 @@ const appendSingleFile = (formData: FormData, key: string, files: File[] | undef
 const appendRepeatedFiles = (formData: FormData, key: string, files: File[] | undefined) => {
   if (!files || files.length === 0) return
   files.forEach((file) => formData.append(key, file))
+}
+
+const validateUploadFiles = (files: File[]) => {
+  const oversizedFile = files.find((file) => file.size > MAX_UPLOAD_FILE_SIZE_BYTES)
+
+  if (!oversizedFile) {
+    return { validFiles: files, error: null as string | null }
+  }
+
+  return {
+    validFiles: files.filter((file) => file.size <= MAX_UPLOAD_FILE_SIZE_BYTES),
+    error: `${oversizedFile.name} exceeds the ${MAX_UPLOAD_FILE_SIZE_LABEL} limit. Please upload a smaller file.`,
+  }
+}
+
+const getEligibilityActionErrorMessage = (error: unknown, fallback: string) => {
+  if (typeof error === "object" && error !== null) {
+    const maybeMessage = "message" in error ? error.message : null
+    if (typeof maybeMessage === "string" && maybeMessage.includes("File size too large")) {
+      return `One of the uploaded files exceeds the ${MAX_UPLOAD_FILE_SIZE_LABEL} limit. Please upload a smaller file.`
+    }
+  }
+
+  return error instanceof Error ? error.message : fallback
+}
+
+const hasUploadedAsset = (entry: UploadedFileEntry) => Boolean(entry.file || entry.remoteFileUrl)
+
+const getUploadedAssetName = (entry: UploadedFileEntry) =>
+  entry.file?.name || entry.remoteFileName || entry.description || "Uploaded file"
+
+const getFileNameFromUrl = (url: string) => {
+  const cleanUrl = url.split("?")[0]
+  const lastSegment = cleanUrl.split("/").pop() ?? ""
+  return decodeURIComponent(lastSegment) || "Uploaded file"
 }
 
 const extractProjectId = (payload: unknown): string | null => {
@@ -778,6 +826,64 @@ const normalizeEligibilityResponseFromApi = (payload: unknown, fallbackProjectId
   }
 }
 
+const normalizeRemoteUploadEntry = (
+  value: unknown,
+  fallbackDescription = "",
+  fallbackName?: string
+): UploadedFileEntry | null => {
+  if (typeof value === "string" && value.trim()) {
+    const remoteFileUrl = value.trim()
+    const remoteFileName = fallbackName ?? getFileNameFromUrl(remoteFileUrl)
+    return createUploadEntry(fallbackDescription || remoteFileName, null, remoteFileName, remoteFileUrl)
+  }
+
+  if (!isRecord(value)) return null
+
+  const remoteFileUrl = extractStringFromPaths(value, [["fileUrl"], ["url"], ["secure_url"]])
+  if (!remoteFileUrl) return null
+
+  const remoteFileName =
+    extractStringFromPaths(value, [["fileName"], ["name"], ["title"]]) ??
+    fallbackName ??
+    getFileNameFromUrl(remoteFileUrl)
+
+  return createUploadEntry(fallbackDescription || remoteFileName, null, remoteFileName, remoteFileUrl)
+}
+
+const normalizeEligibilityUploadsFromApi = (payload: unknown): EligibilityFileMap => {
+  const record = unwrapEligibilityRecord(payload)
+  if (!record) return {}
+
+  const plans = getPathValue(record, ["worksAndMaterials", "plansDrawingsPhotographs"])
+  if (!isRecord(plans)) return {}
+
+  const uploaded: EligibilityFileMap = {}
+
+  const setUploads = (label: string, rawValue: unknown, fallbackDescriptions: string[] = []) => {
+    if (!Array.isArray(rawValue)) return
+
+    const entries = rawValue
+      .map((item, index) =>
+        normalizeRemoteUploadEntry(item, fallbackDescriptions[index] ?? "", fallbackDescriptions[index])
+      )
+      .filter((entry): entry is UploadedFileEntry => Boolean(entry))
+
+    if (entries.length > 0) {
+      uploaded[label] = entries
+    }
+  }
+
+  setUploads(
+    "Existing & Proposed Elevations",
+    plans.existingAndProposedElevations,
+    ["Existing elevation", "Proposed elevation"]
+  )
+  setUploads("Photographs of Site", plans.photographsOfSite)
+  setUploads("Additional Drawings (floor plans, sections etc.)", plans.additionalDrawings)
+
+  return uploaded
+}
+
 const getBooleanFieldValue = (
   formValues: EligibilityFormValues,
   label: string,
@@ -954,6 +1060,7 @@ const buildEligibilityMultipartFormData = ({
   signatureFile,
   subServices,
   userId,
+  projectStageId,
 }: {
   step: Step
   status: EligibilitySaveStatus
@@ -962,25 +1069,23 @@ const buildEligibilityMultipartFormData = ({
   signatureFile: File | null
   subServices?: string | null
   userId?: string | null
+  projectStageId?: string | null
 }) => {
   const formData = new FormData()
   const getEntries = (label: string) => uploadedFiles[label] ?? []
-  const getFiles = (label: string) =>
+  const getFiles = (label: string, limit?: number) =>
     getEntries(label)
       .map((entry) => entry.file)
       .filter((file): file is File => Boolean(file))
+      .slice(0, limit)
   const payload = buildEligibilityPayload(formValues)
-  const appendUploadMetadata = (key: string, label: string) => {
-    const entries = getEntries(label)
+  const appendUploadFileNames = (key: string, label: string) => {
+    const labels = getEntries(label)
       .filter((entry) => entry.file)
-      .map((entry, index) => ({
-        order: index + 1,
-        title: entry.description.trim() || entry.file?.name || `File ${index + 1}`,
-        fileName: entry.file?.name ?? "",
-      }))
+      .map((entry, index) => entry.description.trim() || entry.file?.name || `File ${index + 1}`)
 
-    if (entries.length > 0) {
-      formData.append(`${key}Meta`, JSON.stringify(entries))
+    if (labels.length > 0) {
+      labels.forEach((item) => formData.append(key, item))
     }
   }
 
@@ -989,10 +1094,13 @@ const buildEligibilityMultipartFormData = ({
   formData.append("payload", JSON.stringify(payload))
 
   if (subServices?.trim()) {
-    formData.append("subServices", subServices)
+    formData.append("subServiceId", subServices)
   }
   if (userId?.trim()) {
     formData.append("userId", userId)
+  }
+  if (projectStageId?.trim()) {
+    formData.append("projectStageId", projectStageId)
   }
 
   appendSingleFile(
@@ -1008,22 +1116,8 @@ const buildEligibilityMultipartFormData = ({
   appendRepeatedFiles(
     formData,
     "existingAndProposedElevations",
-    getFiles("Existing & Proposed Elevations")
+    getFiles("Existing & Proposed Elevations", 2)
   )
-  const elevationEntries = getEntries("Existing & Proposed Elevations").filter((entry) => entry.file)
-  const existingElevation = elevationEntries.find((entry) =>
-    entry.description.trim().toLowerCase().includes("existing")
-  )?.file
-  const proposedElevation = elevationEntries.find((entry) =>
-    entry.description.trim().toLowerCase().includes("proposed")
-  )?.file
-
-  if (existingElevation) {
-    formData.append("existingElevation", existingElevation)
-  }
-  if (proposedElevation) {
-    formData.append("proposedElevation", proposedElevation)
-  }
   appendRepeatedFiles(
     formData,
     "photographsOfSite",
@@ -1044,9 +1138,8 @@ const buildEligibilityMultipartFormData = ({
     "floodRiskAssesmentReport",
     getFiles("Flood Risk Assessment (if available)")
   )
-  appendUploadMetadata("existingAndProposedElevations", "Existing & Proposed Elevations")
-  appendUploadMetadata("photographsOfSite", "Photographs of Site")
-  appendUploadMetadata("additionalDrawings", "Additional Drawings (floor plans, sections etc.)")
+  appendUploadFileNames("photographsOfSiteFileNames", "Photographs of Site")
+  appendUploadFileNames("additionalDrawingsFileNames", "Additional Drawings (floor plans, sections etc.)")
   if (signatureFile) {
     formData.append("digitalSignatureUrl", signatureFile)
   }
@@ -1733,14 +1826,24 @@ function FileUploadArea({
   const { uploadedFiles, setUploadedFiles } = useEligibilityAssets()
   const files = uploadedFiles[label] ?? []
   const inputRef = useRef<HTMLInputElement>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
 
   const addFiles = (nextFiles: File[]) => {
     if (nextFiles.length === 0) return
+    const { validFiles, error } = validateUploadFiles(nextFiles)
+    setUploadError(error)
+    if (validFiles.length === 0) {
+      setUploadSuccess(null)
+      return
+    }
+    setUploadSuccess(validFiles.length === 1 ? "File uploaded successfully." : "Files uploaded successfully.")
+
     setUploadedFiles((prev) => ({
       ...prev,
       [label]: [
         ...(prev[label] ?? []),
-        ...nextFiles.map((file) => createUploadEntry(file.name, file)),
+        ...validFiles.map((file) => createUploadEntry(file.name, file)),
       ],
     }))
   }
@@ -1792,6 +1895,13 @@ function FileUploadArea({
         />
       </div>
 
+      {uploadError && (
+        <p className="mt-2 text-xs text-red-600">{uploadError}</p>
+      )}
+      {uploadSuccess && (
+        <p className="mt-2 text-xs text-green-600">{uploadSuccess}</p>
+      )}
+
       {files.length > 0 && (
         <ul className="mt-3 space-y-2">
           {files.map((f, i) => (
@@ -1799,14 +1909,29 @@ function FileUploadArea({
               key={i}
               className="flex items-center justify-between rounded-lg border bg-white px-3 py-2 text-xs text-slate-700 shadow-sm"
             >
-              <span className="truncate max-w-[200px]">{f.file?.name ?? f.description}</span>
-              <button
-                type="button"
-                onClick={e => { e.stopPropagation(); removeFile(i) }}
-                className="text-slate-400 hover:text-red-500 transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="truncate max-w-[200px]">{getUploadedAssetName(f)}</span>
+                {f.remoteFileUrl && (
+                  <a
+                    href={f.remoteFileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="shrink-0 text-[11px] font-medium text-blue-600 hover:text-blue-700"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    View
+                  </a>
+                )}
+              </div>
+              {f.file && (
+                <button
+                  type="button"
+                  onClick={e => { e.stopPropagation(); removeFile(i) }}
+                  className="text-slate-400 hover:text-red-500 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </li>
           ))}
         </ul>
@@ -1851,6 +1976,8 @@ function StructuredFileUploadArea({
   const entries = uploadedFiles[label] ?? []
   const baseLabels = slotLabels ?? Array.from({ length: minSlots }, () => "")
   const slotCount = Math.max(entries.length, baseLabels.length, minSlots)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null)
 
   const ensureSlotEntry = (index: number) => {
     const nextEntries = [...(uploadedFiles[label] ?? [])]
@@ -1870,6 +1997,20 @@ function StructuredFileUploadArea({
   }
 
   const setSlotFile = (index: number, file: File | null) => {
+    if (file) {
+      const { validFiles, error } = validateUploadFiles([file])
+      setUploadError(error)
+      if (validFiles.length === 0) {
+        setUploadSuccess(null)
+        return
+      }
+      file = validFiles[0]
+      setUploadSuccess("File uploaded successfully.")
+    } else {
+      setUploadError(null)
+      setUploadSuccess(null)
+    }
+
     updateEntries((currentEntries) => {
       const nextEntries = [...currentEntries]
 
@@ -1887,6 +2028,8 @@ function StructuredFileUploadArea({
         ...current,
         file,
         description: nextDescription,
+        remoteFileName: undefined,
+        remoteFileUrl: undefined,
       }
 
       return nextEntries
@@ -1927,6 +2070,8 @@ function StructuredFileUploadArea({
         ...nextEntries[index],
         file: null,
         description: baseLabels[index] ?? "",
+        remoteFileName: undefined,
+        remoteFileUrl: undefined,
       }
 
       return nextEntries
@@ -1950,12 +2095,14 @@ function StructuredFileUploadArea({
     }
   })
 
-  const uploadedCount = entries.filter((entry) => entry.file).length
+  const uploadedCount = entries.filter((entry) => hasUploadedAsset(entry)).length
 
   return (
     <div className="col-span-2" id={fieldId}>
       <FieldLabel label={label} tooltip={tooltip} questionNumber={questionNumber} />
       {hint && <p className="mb-3 text-xs text-slate-400">{hint}</p>}
+      {uploadError && <p className="mb-3 text-xs text-red-600">{uploadError}</p>}
+      {uploadSuccess && <p className="mb-3 text-xs text-green-600">{uploadSuccess}</p>}
 
       <div
         className={
@@ -1966,7 +2113,7 @@ function StructuredFileUploadArea({
       >
         {slots.map(({ entry, index, slotLabel }) => {
           const isExtraSlot = index >= baseLabels.length
-          const canRemoveSlot = Boolean(entry.file) || (isExtraSlot && slotCount > minSlots)
+          const canRemoveSlot = Boolean(entry.file) || (isExtraSlot && !entry.remoteFileUrl && slotCount > minSlots)
 
           return (
             <div
@@ -1990,7 +2137,7 @@ function StructuredFileUploadArea({
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white px-4 py-2 text-sm text-slate-600 hover:border-blue-400 hover:text-blue-600">
                   <Upload className="h-4 w-4" />
-                  <span>{entry.file ? "Replace file" : "Upload file"}</span>
+                  <span>{hasUploadedAsset(entry) ? "Replace file" : "Upload file"}</span>
                   <input
                     type="file"
                     accept={accept}
@@ -2007,8 +2154,18 @@ function StructuredFileUploadArea({
 
                 <div className="flex min-w-0 items-center gap-3">
                   <span className="truncate text-xs text-slate-500">
-                    {entry.file ? entry.file.name : "No file selected"}
+                    {hasUploadedAsset(entry) ? getUploadedAssetName(entry) : "No file selected"}
                   </span>
+                  {entry.remoteFileUrl && (
+                    <a
+                      href={entry.remoteFileUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="shrink-0 text-[11px] font-medium text-blue-600 hover:text-blue-700"
+                    >
+                      View
+                    </a>
+                  )}
                   {canRemoveSlot && (
                     <button
                       type="button"
@@ -2318,9 +2475,12 @@ function EligibilityCheckPage() {
   const { fullName, userId } = useUserIdentity()
   const displayName = fullName || "User"
   const savedFormData = data.eligibility?.formData || {}
+  const [storedProjectId, setStoredProjectId] = useState<string | null>(null)
+  const [storedProjectStageId, setStoredProjectStageId] = useState<string | null>(null)
   const projectIdFromQuery =
     searchParams.get("projectId") ?? searchParams.get("eligibilityProjectId")
-  const existingProjectId = data.eligibility?.projectId ?? projectIdFromQuery ?? null
+  const existingProjectId =
+    data.eligibility?.projectId ?? projectIdFromQuery ?? storedProjectId ?? null
   const subServices = data.service?.serviceId?.trim() || ELIGIBILITY_SERVICE_ID
 
   const stageParam =
@@ -2341,6 +2501,12 @@ function EligibilityCheckPage() {
   )
   const currentStageIndex =
     currentProjectStepIndex >= 0 ? normalizeProjectStepIndex(currentProjectStepIndex) : 0
+  const routeProjectStageId =
+    PROJECT_FLOW[currentStageIndex]?.id ??
+    PROJECT_FLOW.find((step) => step.route === "eligibility" || step.legacyRoutes?.includes("eligibility"))?.id ??
+    null
+  const existingProjectStageId =
+    routeProjectStageId ?? data.eligibility?.projectStageId ?? storedProjectStageId ?? null
   const currentProjectStep = resolveProjectProgressIndex(currentStageIndex, progressParam)
   const visibleProjectFlow = getRoadmapProjectFlow(currentProjectStep)
   const progress = getJourneyProgressPercent(currentProjectStep)
@@ -2352,6 +2518,7 @@ function EligibilityCheckPage() {
 
   const [step, setStep] = useState<Step>(1)
   const hasSubmittedEligibility = Boolean(data.eligibility?.completedAt)
+  const isReviewOnly = isReadOnly || hasSubmittedEligibility
   const [showVerification, setShowVerification] = useState(hasSubmittedEligibility)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isSavingDraft, setIsSavingDraft] = useState(false)
@@ -2374,6 +2541,30 @@ function EligibilityCheckPage() {
   const prevStep = () => setStep(prev => (prev > 1 ? ((prev - 1) as Step) : prev))
 
   useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const persistedProjectId =
+      window.localStorage.getItem(SELECTED_PROJECT_STORAGE_KEY) ||
+      window.sessionStorage.getItem(SELECTED_PROJECT_STORAGE_KEY)
+    const persistedProjectStageId =
+      window.localStorage.getItem(SELECTED_PROJECT_STAGE_STORAGE_KEY) ||
+      window.sessionStorage.getItem(SELECTED_PROJECT_STAGE_STORAGE_KEY)
+
+    if (!persistedProjectId) return
+
+    setStoredProjectId(persistedProjectId)
+    setStoredProjectStageId(persistedProjectStageId)
+
+    if (!data.eligibility?.projectId || (!data.eligibility?.projectStageId && persistedProjectStageId)) {
+      updateSection("eligibility", {
+        ...(data.eligibility || {}),
+        projectId: persistedProjectId,
+        projectStageId: data.eligibility?.projectStageId ?? persistedProjectStageId ?? undefined,
+      })
+    }
+  }, [data.eligibility?.projectId, data.eligibility?.projectStageId, updateSection, data.eligibility])
+
+  useEffect(() => {
     if (!existingProjectId) return
     if (fetchedEligibilityProjectRef.current === existingProjectId) return
 
@@ -2394,6 +2585,7 @@ function EligibilityCheckPage() {
           response.data,
           existingProjectId
         )
+        const normalizedUploads = normalizeEligibilityUploadsFromApi(response.data)
 
         updateSection("eligibility", {
           projectId: normalized.projectId,
@@ -2406,6 +2598,7 @@ function EligibilityCheckPage() {
           completedAt: normalized.completedAt,
           isEligible: normalized.isEligible,
         })
+        setUploadedFiles(normalizedUploads)
 
         if (normalized.step && normalized.step >= 1 && normalized.step <= TOTAL_STEPS) {
           setStep(normalized.step as Step)
@@ -2438,6 +2631,9 @@ function EligibilityCheckPage() {
       if (!userId) {
         throw new Error("User ID is missing, so we couldn't create the eligibility project.")
       }
+      if (!existingProjectStageId) {
+        throw new Error("Project stage is missing, so we couldn't create the eligibility project.")
+      }
 
       const multipartData = buildEligibilityMultipartFormData({
         step,
@@ -2447,6 +2643,7 @@ function EligibilityCheckPage() {
         signatureFile,
         subServices,
         userId,
+        projectStageId: existingProjectStageId,
       })
 
       const response = await axiosInstance.post(ELIGIBILITY_CREATE_ENDPOINT, multipartData, {
@@ -2478,6 +2675,7 @@ function EligibilityCheckPage() {
       signatureFile,
       subServices,
       userId,
+      projectStageId: existingProjectStageId,
     })
 
     await axiosInstance.put(`/eligibility/${encodeURIComponent(existingProjectId)}`, multipartData, {
@@ -2489,7 +2687,7 @@ function EligibilityCheckPage() {
 
   const handleNextStep = async () => {
     if (step >= TOTAL_STEPS || isSavingStep || isSavingDraft || isAnalyzing || isLoadingEligibility) return
-    if (isReadOnly) {
+    if (isReviewOnly) {
       nextStep()
       return
     }
@@ -2501,9 +2699,7 @@ function EligibilityCheckPage() {
       await upsertEligibilityProject("in_progress")
       nextStep()
     } catch (error) {
-      setSubmitError(
-        error instanceof Error ? error.message : "Unable to save the current eligibility step."
-      )
+      setSubmitError(getEligibilityActionErrorMessage(error, "Unable to save the current eligibility step."))
     } finally {
       setIsSavingStep(false)
     }
@@ -2525,9 +2721,7 @@ function EligibilityCheckPage() {
       })
       alert("Draft saved ✅")
     } catch (error) {
-      setSubmitError(
-        error instanceof Error ? error.message : "Unable to save the eligibility draft."
-      )
+      setSubmitError(getEligibilityActionErrorMessage(error, "Unable to save the eligibility draft."))
     } finally {
       setIsSavingDraft(false)
     }
@@ -2550,9 +2744,7 @@ function EligibilityCheckPage() {
       })
       window.scrollTo({ top: 0, behavior: "smooth" })
     } catch (error) {
-      setSubmitError(
-        error instanceof Error ? error.message : "Unable to submit the eligibility form."
-      )
+      setSubmitError(getEligibilityActionErrorMessage(error, "Unable to submit the eligibility form."))
     } finally {
       setIsAnalyzing(false)
     }
@@ -2780,9 +2972,11 @@ function EligibilityCheckPage() {
                   <StepLabel key={i} active={step === i + 1}>{label}</StepLabel>
                 ))}
               </div>
-              {isReadOnly && (
+              {isReviewOnly && (
                 <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                  Read-only mode: completed step data is view-only.
+                  {hasSubmittedEligibility
+                    ? "Completed eligibility form: sections are view-only, but you can move through the steps."
+                    : "Read-only mode: completed step data is view-only."}
                 </div>
               )}
               {isLoadingEligibility && (
@@ -2796,8 +2990,8 @@ function EligibilityCheckPage() {
                 </div>
               )}
               <fieldset
-                disabled={isReadOnly || isLoadingEligibility}
-                className={isReadOnly || isLoadingEligibility ? "opacity-85" : undefined}
+                disabled={isReviewOnly || isLoadingEligibility}
+                className={isReviewOnly || isLoadingEligibility ? "opacity-85" : undefined}
               >
 
             {/* ── STEP 1: Applicant & Property (rows 001–007) ── */}
@@ -2807,7 +3001,7 @@ function EligibilityCheckPage() {
                 <div className="grid grid-cols-2 gap-6 mb-6">
                   <Input label="Applicant Full Name" />
                   <Input label="Contact Email / Phone" />
-                  <Input label="Site Address" />
+                  <AddressLinesField label="Site Address" />
                   <Input label="Postcode" />
                 </div>
 
@@ -3321,7 +3515,7 @@ function EligibilityCheckPage() {
               {/* ⭐ RIGHT SIDE */}
               {step < TOTAL_STEPS ? (
                 <div className="flex gap-2">
-                  {!isReadOnly && (
+                  {!isReviewOnly && (
                     <button
                       onClick={handleSaveDraft}
                       disabled={isSavingDraft || isSavingStep || isAnalyzing || isLoadingEligibility}
@@ -3336,10 +3530,10 @@ function EligibilityCheckPage() {
                     disabled={isSavingStep || isSavingDraft || isAnalyzing || isLoadingEligibility}
                     className="rounded-xl bg-blue-600 text-white px-5 py-2 text-sm font-semibold cursor-pointer hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isSavingStep ? "Saving..." : isReadOnly ? "Next Section" : "Next Step"}
+                    {isSavingStep ? "Saving..." : isReviewOnly ? "Next Section" : "Next Step"}
                   </button>
                 </div>
-              ) : !isReadOnly ? (
+              ) : !isReviewOnly ? (
                 <button
                   disabled={hasSubmittedEligibility || isAnalyzing || isSavingDraft || isSavingStep || isLoadingEligibility}
                   onClick={handleEligibilitySubmit}
@@ -3548,6 +3742,54 @@ function Input({
         }
         className="mt-1 w-full rounded-xl border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 transition-shadow"
       />
+    </div>
+  )
+}
+
+function AddressLinesField({
+  label,
+  tooltip,
+  questionNumber,
+}: {
+  label: string
+  tooltip?: string
+  questionNumber?: number
+}) {
+  const { data, updateSection } = useProject()
+  const value = asStringValue(data.eligibility?.formData?.[label])
+  const [addressLine1 = "", addressLine2 = ""] = value.split(/\r?\n/, 2)
+  const fieldId = getFieldId(label)
+
+  const updateAddress = (line1: string, line2: string) => {
+    const nextValue = [line1.trim(), line2.trim()].filter(Boolean).join("\n")
+
+    updateSection("eligibility", {
+      formData: { ...(data.eligibility?.formData || {}), [label]: nextValue },
+    })
+  }
+
+  return (
+    <div id={fieldId}>
+      <FieldLabel
+        label={label}
+        tooltip={tooltip}
+        questionNumber={questionNumber}
+        wrapperClassName="mb-0"
+      />
+      <div className="mt-1 space-y-3">
+        <input
+          value={addressLine1}
+          placeholder="Address line 1"
+          onChange={(e) => updateAddress(e.target.value, addressLine2)}
+          className="w-full rounded-xl border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 transition-shadow"
+        />
+        <input
+          value={addressLine2}
+          placeholder="Address line 2"
+          onChange={(e) => updateAddress(addressLine1, e.target.value)}
+          className="w-full rounded-xl border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 transition-shadow"
+        />
+      </div>
     </div>
   )
 }

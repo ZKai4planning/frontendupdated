@@ -9,20 +9,28 @@ type ProjectServiceLike = {
   subServiceId?: string
   title?: string
   serviceName?: string
+  name?: string
 }
+
+const getDisplayServiceLabel = (service?: {
+  title?: string
+  serviceName?: string
+  name?: string
+}) => service?.title || service?.serviceName || service?.name || null
 
 const buildServiceLabelMap = (services: ApiServiceData[]) => {
   const labelMap: Record<string, string> = {}
 
   services.forEach((service) => {
-    const serviceLabel = service.title || service.serviceName || service.serviceId
-    if (service.serviceId) {
+    const serviceLabel = getDisplayServiceLabel(service)
+    if (service.serviceId && serviceLabel) {
       labelMap[service.serviceId] = serviceLabel
     }
 
     service.subServices.forEach((subService) => {
-      if (subService.subServiceId) {
-        labelMap[subService.subServiceId] = subService.title || serviceLabel
+      const subServiceLabel = getDisplayServiceLabel(subService) || serviceLabel
+      if (subService.subServiceId && subServiceLabel) {
+        labelMap[subService.subServiceId] = subServiceLabel
       }
     })
   })
@@ -39,6 +47,7 @@ export const resolveProjectServiceName = (
   return (
     service.title ||
     service.serviceName ||
+    service.name ||
     (service.subServiceId ? serviceLabelMap[service.subServiceId] : null) ||
     (service.serviceId ? serviceLabelMap[service.serviceId] : null) ||
     null
