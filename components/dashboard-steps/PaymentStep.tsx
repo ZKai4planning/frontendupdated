@@ -1,9 +1,10 @@
 "use client"
 
 import { useState } from "react"
-import { Info, ShieldCheck, UploadCloud } from "lucide-react"
+import { Info, UploadCloud } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useProject } from "@/app/context/ProjectContext"
+import Image from "next/image"
 
 
 export default function PaymentUI() {
@@ -21,52 +22,67 @@ export default function PaymentUI() {
   const serviceImage = data.service?.image || "/Service-01.png"
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-6">
+    <div className="bg-gray-100 flex items-center justify-center p-6">
       <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-2 gap-10">
-        
+
         {/* LEFT CARD */}
         <div className="relative rounded-2xl overflow-hidden shadow-xl">
-  <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
 
-  <div className="relative p-10 text-white space-y-6">
-    <h2 className="text-xl font-semibold">
-      {serviceCategory}
-    </h2>
+          <div className="relative z-10 p-10 text-white space-y-4 flex flex-col h-full">
 
-    <h3 className="text-xl font-semibold">
-      {servicePlan}
-    </h3>
+            {/* Top Section: Text */}
+            <div className="space-y-3 flex-1">
+              <div className="inline-block px-2.5 py-0.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-300 text-[10px] sm:text-xs font-bold uppercase tracking-wider">
+                {serviceCategory}
+              </div>
 
-    
+              <h2 className="text-lg sm:text-xl lg:text-2xl font-bold leading-tight">
+                {servicePlan}
+              </h2>
 
-    <p className="text-white/70 leading-relaxed text-2xl">
-      {serviceDescription}
-    </p>
+              <p className="text-gray-300 leading-relaxed text-lg sm:text-sm lg:text-base font-light">
+                {serviceDescription}
+              </p>
+            </div>
 
-    <img
-      src={serviceImage}
-      alt={servicePlan}
-      className="w-full max-w-xl rounded-xl shadow-lg"
-    />
-  </div>
-</div>
+            {/* Bottom Section: Image */}
+            {/* Reduced vertical margin around image */}
+            <div className="mt-4 relative w-full aspect-video rounded-xl overflow-hidden shadow-2xl border border-white/10">
+              <Image
+                src={serviceImage}
+                alt={servicePlan}
+                fill
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, 50vw"
+                priority
+              />
+            </div>
+          </div>
+        </div>
 
 
         {/* RIGHT CARD */}
         <div className="bg-white rounded-2xl shadow-xl p-6 space-y-6">
-          
+
+          {/* Header */}
+          <div>
+            <h3 className="text-lg sm:text-xl font-bold text-slate-800">Payment Details</h3>
+            <p className="text-xs sm:text-sm text-slate-500">Please complete the payment details below.</p>
+          </div>
+
           {/* Fee Breakdown */}
           <div className="border rounded-xl p-4">
             <h3 className="font-semibold text-sm mb-3">Fee Breakdown</h3>
             <div className="flex justify-between text-sm text-gray-600">
               <span>Initial Deposit</span>
               <span>£40.00</span>
-              
+
             </div>
             <div className="flex justify-between text-sm text-gray-600 mt-2">
               <span>Subsequent Charges</span>
               <span>£100.00</span>
-              
+
             </div>
             <div className="border-t mt-3 pt-3 flex justify-between font-semibold">
               <span>Total</span>
@@ -80,14 +96,14 @@ export default function PaymentUI() {
           </div> */}
 
           <div className="relative group inline-flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-      <Info className="w-4 h-4 text-blue-500" />
-      <span className="underline decoration-dotted underline-offset-4">
-        How to make payment?
-      </span>
+            <Info className="w-4 h-4 text-blue-500" />
+            <span className="underline decoration-dotted underline-offset-4">
+              How to make payment?
+            </span>
 
-      {/* Tooltip */}
-      <div
-        className="
+            {/* Tooltip */}
+            <div
+              className="
           absolute left-0 top-full mt-2 w-64
           rounded-xl bg-white p-4 text-sm text-gray-700
           shadow-xl border border-gray-200
@@ -96,17 +112,17 @@ export default function PaymentUI() {
           transition-all duration-200
           z-50
         "
-      >
-        <p className="font-semibold text-gray-900 mb-1">
-          Payment Instructions
-        </p>
-        <p>
-          You can complete your payment online using a debit card,
-          credit card, or net banking. Once paid, your order will be
-          processed immediately.
-        </p>
-      </div>
-    </div>
+            >
+              <p className="font-semibold text-gray-900 mb-1">
+                Payment Instructions
+              </p>
+              <p>
+                You can complete your payment online using a debit card,
+                credit card, or net banking. Once paid, your order will be
+                processed immediately.
+              </p>
+            </div>
+          </div>
 
           {/* Transaction Ref */}
           <input
@@ -147,8 +163,8 @@ export default function PaymentUI() {
             Submit
           </button>
           <div className="flex justify-between text-sm text-gray-600 mt-2">
-              <span>Refund Policy</span> 
-            </div>
+            <span>Refund Policy</span>
+          </div>
         </div>
       </div>
     </div>

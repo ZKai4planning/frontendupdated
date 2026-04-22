@@ -1,6 +1,6 @@
 export function BlueprintLeftSection() {
   return (
-    <div className="lg:col-span-7 relative bg-slate-50 dark:bg-slate-950/50 p-8 flex flex-col justify-between overflow-hidden min-h-[400px]">
+    <div className="lg:col-span-7 relative bg-slate-50 dark:bg-slate-950/50 p-8 flex flex-col justify-between overflow-hidden min-h-100">
       {/* Graph Paper Texture */}
       <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/graph-paper.png')]"></div>
 
@@ -29,7 +29,7 @@ export function BlueprintLeftSection() {
       {/* AI Insight Card */}
       <div className="relative group cursor-help w-fit">
         <div className="flex items-center gap-4 p-4 border border-primary/20 bg-white dark:bg-slate-900 rounded-lg shadow-sm">
-          <div className="flex-shrink-0 size-10 rounded bg-primary/5 flex items-center justify-center text-primary">
+          <div className="shrink-0 size-10 rounded bg-primary/5 flex items-center justify-center text-primary">
             <span className="material-symbols-outlined">lightbulb</span>
           </div>
           <div>

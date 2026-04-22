@@ -104,7 +104,7 @@ export default function ServiceExpandPanel({
 
   const [showChat, setShowChat] = useState(false);
   const [showChat1, setShowChat1] = useState(false);
-  
+
   // Chat State
   const [messages, setMessages] = useState<{ sender: "user" | "bot"; text: string }[]>([
     { sender: "bot", text: "Thank you for your enquiry. Our planning specialist will connect with you shortly." }
@@ -327,7 +327,7 @@ export default function ServiceExpandPanel({
                             Apply for this Service
                           </button>
                         </div>
-                        
+
                         {/* Help Section */}
                         <div className="mt-auto flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-linear-to-r from-white/10 via-white/5 to-transparent px-2 py-4">
                           <div className="flex items-center gap-3">
@@ -427,14 +427,14 @@ export default function ServiceExpandPanel({
               <h3 className="font-semibold text-slate-800 dark:text-white">Service Enquiry</h3>
               <button onClick={() => setShowChat1(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white"><span className="material-symbols-outlined">close</span></button>
             </div>
-            
+
             <div className="flex-1 p-4 overflow-y-auto space-y-3">
               {messages.map((msg, index) => (
                 <div key={index} className={`px-4 py-2 rounded-xl max-w-[85%] ${msg.sender === "user" ? "ml-auto bg-blue-500 text-white" : "bg-blue-500/10 text-blue-700 dark:text-blue-300"}`}>
                   {msg.text}
                 </div>
               ))}
-              
+
               {showDecisionButtons && (
                 <div className="flex gap-3">
                   <button onClick={handleYes} className="px-4 py-2 rounded-full bg-green-500 text-white text-sm font-semibold hover:bg-green-400">Yes</button>

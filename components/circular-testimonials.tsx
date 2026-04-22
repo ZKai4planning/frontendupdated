@@ -357,7 +357,7 @@ import React, {
 } from "react";
 import { FaArrowLeft, FaArrowRight } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
-import Image from "next/image"; 
+import Image from "next/image";
 
 interface Testimonial {
   quote: string;
@@ -416,7 +416,7 @@ export const CircularTestimonials = ({
   const colorArrowBg = colors.arrowBackground ?? "#141414";
   const colorArrowFg = colors.arrowForeground ?? "#f1f1f7";
   const colorArrowHoverBg = colors.arrowHoverBackground ?? "#00a6fb";
-  
+
   const fontSizeName = fontSizes.name ?? "1.5rem";
   const fontSizeDesignation = fontSizes.designation ?? "0.925rem";
   const fontSizeQuote = fontSizes.quote ?? "1.125rem";
@@ -481,7 +481,7 @@ export const CircularTestimonials = ({
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-    
+
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
@@ -511,7 +511,7 @@ export const CircularTestimonials = ({
         setActiveIndex((prev) => (prev + 1) % testimonialsLength);
       }, 5000);
     }
-    
+
     return () => {
       clearAutoplayTimer();
     };
@@ -601,7 +601,7 @@ export const CircularTestimonials = ({
   return (
     <div className="w-full max-w-280 p-5 sm:p-6 md:p-8">
       <div className="grid gap-10 sm:gap-14 md:grid-cols-[24rem_minmax(0,1fr)] md:gap-20">
-        
+
         {/* Images Section */}
         <div
           className="relative w-full aspect-square max-h-96 perspective-[1000px]"
@@ -615,11 +615,10 @@ export const CircularTestimonials = ({
               alt={testimonial.name}
               fill // Replaces absolute positioning logic for size
               sizes="(max-width: 768px) 100vw, 33vw" // Helps Next.js optimize bandwidth
-              className={`absolute rounded-3xl object-cover shadow-[0_10px_30px_rgba(0,0,0,0.2)] transition duration-300 ${
-                index === displayIndex
+              className={`absolute rounded-3xl object-cover shadow-[0_10px_30px_rgba(0,0,0,0.2)] transition duration-300 ${index === displayIndex
                   ? "cursor-pointer ring-2 ring-blue-400/60"
                   : "cursor-pointer hover:ring-2 hover:ring-white/30"
-              }`}
+                }`}
               style={getImageStyle(index)}
               onClick={() => {
                 setActiveIndex(index);

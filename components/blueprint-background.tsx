@@ -2,16 +2,16 @@ export function BlueprintBackground() {
   return (
     <div className="absolute inset-0 pointer-events-none overflow-hidden opacity-20 dark:opacity-10">
       {/* Zone A Primary Flow */}
-      <div className="absolute top-20 left-20 w-[400px] h-[300px] border border-primary/40 flex items-center justify-center">
+      <div className="absolute top-20 left-20 w-100 h-75 border border-primary/40 flex items-center justify-center">
         <span className="text-[10px] text-primary rotate-90 absolute -right-8">ZONE_A_PRIMARY_FLOW</span>
         <div className="w-full h-px bg-primary/20"></div>
       </div>
 
       {/* Bottom Right Quarter Circle */}
-      <div className="absolute bottom-40 right-10 w-[500px] h-[500px] border-l border-t border-primary/40 rounded-tl-full"></div>
+      <div className="absolute bottom-40 right-10 w-125 h-125 border-l border-t border-primary/40 rounded-tl-full"></div>
 
       {/* Center Circle */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] border border-primary/10 rounded-full"></div>
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-200 h-200 border border-primary/10 rounded-full"></div>
 
       {/* Dimension Line */}
       <div className="absolute top-1/4 right-1/4 flex flex-col items-center">

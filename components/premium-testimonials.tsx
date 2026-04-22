@@ -173,7 +173,7 @@
 //             backgroundSize: '400% 400%'
 //           }}
 //         />
-        
+
 //         {/* Moving light orbs - Changed to Dark Teal and Deep Blue */}
 //         <motion.div
 //           className="absolute top-1/3 left-1/5 w-72 h-72 bg-teal-950/40 rounded-full blur-3xl"
@@ -281,7 +281,7 @@
 //               Industry Leaders
 //             </motion.span>
 //           </motion.h2>
-          
+
 //           <motion.p 
 //             className="text-xl sm:text-2xl text-white/60 max-w-4xl mx-auto leading-relaxed"
 //             variants={fadeInUp}
@@ -356,7 +356,7 @@
 //                             transition={{ duration: 3, repeat: Infinity }}
 //                           />
 //                         </div>
-                        
+
 //                         {/* Floating ring animation - Dark Slate */}
 //                         <motion.div
 //                           className="absolute inset-0 border-2 border-slate-600/30 rounded-full"
@@ -377,7 +377,7 @@
 //                       <p className="text-white/50 mb-4">
 //                         {testimonials[currentIndex].company}
 //                       </p>
-                      
+
 //                       {/* Star Rating - Changed to Slate/Gray */}
 //                       <div className="flex justify-center md:justify-start gap-1 mb-6">
 //                         {[...Array(testimonials[currentIndex].rating)].map((_, i) => (
@@ -509,7 +509,7 @@
 
 "use client";
 
-import { motion, AnimatePresence, Variants  } from 'framer-motion';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
 import { Quote, ArrowLeft, ArrowRight, Sparkles } from 'lucide-react';
 
@@ -648,20 +648,20 @@ export function PremiumTestimonials() {
     })
   };
 
-const fadeInUp: Variants = {
-  hidden: {
-    opacity: 0,
-    y: 30,
-  },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.6,
-      ease: "easeOut", // ✅ FIX
+  const fadeInUp: Variants = {
+    hidden: {
+      opacity: 0,
+      y: 30,
     },
-  },
-}
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.6,
+        ease: "easeOut", // ✅ FIX
+      },
+    },
+  }
 
   const staggerContainer = {
     hidden: { opacity: 0 },
@@ -689,7 +689,7 @@ const fadeInUp: Variants = {
       {/* Enhanced Background Effects */}
       <div className="absolute inset-0">
         {/* Animated gradient mesh - Changed to Dark Slate/Blue */}
-        <motion.div 
+        <motion.div
           className="absolute inset-0 bg-gradient-to-br from-slate-900/40 via-slate-950/20 to-zinc-900/40"
           animate={{
             backgroundPosition: ['0% 0%', '100% 100%', '0% 0%'],
@@ -703,7 +703,7 @@ const fadeInUp: Variants = {
             backgroundSize: '400% 400%'
           }}
         />
-        
+
         {/* Moving light orbs - Changed to Dark Teal and Deep Blue */}
         <motion.div
           className="absolute top-1/3 left-1/5 w-72 h-72 bg-teal-950/40 rounded-full blur-3xl"
@@ -764,7 +764,7 @@ const fadeInUp: Variants = {
         ))}
       </div>
 
-      <motion.div 
+      <motion.div
         ref={containerRef}
         className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
         variants={staggerContainer}
@@ -773,7 +773,7 @@ const fadeInUp: Variants = {
         viewport={{ once: true, margin: "-100px" }}
       >
         {/* Header */}
-        <motion.div 
+        <motion.div
           className="text-center mb-20"
           variants={fadeInUp}
         >
@@ -794,7 +794,7 @@ const fadeInUp: Variants = {
             <div className="w-2 h-2 bg-slate-400 rounded-full animate-pulse" />
           </motion.div>
 
-          <motion.h2 
+          <motion.h2
             className="text-3xl sm:text-5xl md:text-7xl font-bold mb-6 sm:mb-8 tracking-tight"
             variants={fadeInUp}
           >
@@ -805,7 +805,7 @@ const fadeInUp: Variants = {
               Trusted by
             </span>
             <br />
-            <motion.span 
+            <motion.span
               className="bg-gradient-to-r from-slate-300 via-zinc-200 to-slate-400"
               animate={{
                 backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
@@ -823,8 +823,8 @@ const fadeInUp: Variants = {
               Industry Leaders
             </motion.span>
           </motion.h2>
-          
-          <motion.p 
+
+          <motion.p
             className="text-lg sm:text-xl md:text-2xl text-white/60 max-w-4xl mx-auto leading-relaxed"
             variants={fadeInUp}
           >
@@ -920,8 +920,8 @@ const fadeInUp: Variants = {
                       transition={{ duration: 0.3 }}
                     >
                       <div className="relative mx-auto h-24 w-24 overflow-hidden rounded-full border-4 border-slate-700/30 md:mx-0">
-                        <img 
-                          src={testimonials[currentIndex].avatar} 
+                        <img
+                          src={testimonials[currentIndex].avatar}
                           alt={testimonials[currentIndex].name}
                           className="h-full w-full object-cover"
                           style={avatarBlurStyle}
@@ -933,41 +933,41 @@ const fadeInUp: Variants = {
                         />
                       </div>
 
-             <motion.div
-                          className="absolute inset-0 border-2 border-slate-600/30 rounded-full"
-                          animate={{ 
-                            scale: [1, 1.4, 1],
-                            opacity: [0.5, 0, 0.5]
-                          }}
-                          transition={{ duration: 2, repeat: Infinity }}
-                        />
-                      </motion.div>
+                      <motion.div
+                        className="absolute inset-0 border-2 border-slate-600/30 rounded-full"
+                        animate={{
+                          scale: [1, 1.4, 1],
+                          opacity: [0.5, 0, 0.5]
+                        }}
+                        transition={{ duration: 2, repeat: Infinity }}
+                      />
+                    </motion.div>
 
                     <h3 className="mb-2 text-2xl font-bold text-white">
                       <span className="inline-block" style={textBlurStyle}>
-                      {testimonials[currentIndex].name}
+                        {testimonials[currentIndex].name}
                       </span>
                     </h3>
                     <p className="mb-1 font-medium text-blue-400">
                       <span className="inline-block" style={textBlurStyle}>
-                      {testimonials[currentIndex].role}
+                        {testimonials[currentIndex].role}
                       </span>
                     </p>
                     <p className="mb-4 text-white/50">
                       <span className="inline-block" style={textBlurStyle}>
-                      {testimonials[currentIndex].company}
+                        {testimonials[currentIndex].company}
                       </span>
                     </p>
                   </div>
 
                   <div className="flex-1">
-                    <motion.blockquote 
+                    <motion.blockquote
                       className="mb-6 text-base italic leading-relaxed text-white/80 sm:mb-8 sm:text-lg md:text-2xl"
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: 0.2, duration: 0.5 }}
                     >
-                      "{testimonials[currentIndex].text}"
+                      &quot;{testimonials[currentIndex].text}&quot;
                     </motion.blockquote>
 
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -1012,11 +1012,10 @@ const fadeInUp: Variants = {
                     setDirection(index > currentIndex ? 1 : -1);
                     setCurrentIndex(index);
                   }}
-                  className={`w-3 h-3 rounded-full transition-all ${
-                    index === currentIndex 
-                      ? 'bg-slate-300 scale-125' 
+                  className={`w-3 h-3 rounded-full transition-all ${index === currentIndex
+                      ? 'bg-slate-300 scale-125'
                       : 'bg-white/20 hover:bg-white/40'
-                  }`}
+                    }`}
                   whileHover={{ scale: 1.2 }}
                   whileTap={{ scale: 0.9 }}
                 />

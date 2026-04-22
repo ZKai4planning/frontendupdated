@@ -131,9 +131,8 @@ const Carousel: React.FC = () => {
     const diff = i - currentIndex;
     const dragOffset = isDragging ? dragDistance * 0.3 : 0;
 
-    return `${base} translateX(${diff * 150 + dragOffset}px) scale(${
-      diff === 0 ? 1 : 0.85
-    }) rotateY(${diff * -25}deg)`;
+    return `${base} translateX(${diff * 150 + dragOffset}px) scale(${diff === 0 ? 1 : 0.85
+      }) rotateY(${diff * -25}deg)`;
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -150,7 +149,11 @@ const Carousel: React.FC = () => {
   const handleRelease = () => {
     if (!isDragging) return;
     if (Math.abs(dragDistance) > 50) {
-      dragDistance > 0 ? prevSlide() : nextSlide();
+      if (dragDistance > 0) {
+        prevSlide();
+      } else {
+        nextSlide();
+      }
     }
     setIsDragging(false);
     setDragDistance(0);

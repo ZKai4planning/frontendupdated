@@ -47,7 +47,7 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     id: "Menu",
     label: "Menu",
     icon: FiGrid,
-    
+
   },
 
   /* ================= AI ================= */

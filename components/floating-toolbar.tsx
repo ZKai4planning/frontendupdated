@@ -31,8 +31,8 @@ export function FloatingToolbarPassword() {
         <span className="material-symbols-outlined text-[16px]">language</span>
         <span className="text-[8px] font-bold uppercase tracking-wider hidden sm:block">EN_US</span>
       </button>
-      
-      
+
+
     </div>
   )
 }

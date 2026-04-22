@@ -208,9 +208,8 @@ function TimelineItem({ item }: { item: ActivityItem }) {
     <div className="relative flex gap-6">
       {/* ICON */}
       <div
-        className={`relative z-10 flex items-center justify-center w-10 h-10 rounded-full text-white ${
-          colorMap[item.type]
-        }`}
+        className={`relative z-10 flex items-center justify-center w-10 h-10 rounded-full text-white ${colorMap[item.type]
+          }`}
       >
         {iconMap[item.type]}
       </div>
@@ -227,9 +226,8 @@ function TimelineItem({ item }: { item: ActivityItem }) {
           </span>
 
           <span
-            className={`ml-auto text-xs px-3 py-1 rounded-full ${
-              badgeMap[item.type]
-            }`}
+            className={`ml-auto text-xs px-3 py-1 rounded-full ${badgeMap[item.type]
+              }`}
           >
             {item.type}
           </span>

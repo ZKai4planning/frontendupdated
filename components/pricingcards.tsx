@@ -15,7 +15,7 @@ const plans = [
     description: "Essential",
     button: "Get Started",
     highlighted: false,
-    credits:10,
+    credits: 10,
     features: [
       "~30% Self-Service",
       "Basic AI guidance",
@@ -53,7 +53,7 @@ const plans = [
     badge: "Most popular",
     credits: 250,
     features: [
-       "~60–70% Self-Service",
+      "~60–70% Self-Service",
       "Higher level of AI Tool kit",
       "Advanced document generation",
       "Priority Agent consultation (1–2 sessions)",
@@ -76,7 +76,7 @@ const plans = [
       "Agent manages communication & coordination",
       "Milestone approvals & final documentation handled",
       "Turnkey document preparation & submission support",
-    
+
     ],
   },
 ];
@@ -131,80 +131,76 @@ export default function PricingCards() {
           return (
             <Card
               key={plan.name}
-              className={`relative rounded-2xl border transition-all duration-300 shadow-sm ${
-                isBronze
+              className={`relative rounded-2xl border transition-all duration-300 shadow-sm ${isBronze
                   ? "bg-[#0B1224] text-white border-blue-500/40 shadow-blue-500/20"
                   : "bg-[#0B1224]/60 text-white/60 border-white/10"
-              }`}
+                }`}
             >
-            {plan.badge && (
-             
+              {plan.badge && (
+
                 <div className="absolute top-4 right-4 bg-zinc-800 text-white text-xs px-2 py-1 rounded-full">
                   {plan.badge}
                 </div>
-            )}
+              )}
 
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold">
-                {plan.name}
-              </CardTitle>
-              <p
-                className={`text-sm ${
-                  isBronze ? "text-zinc-400" : "text-white/50"
-                }`}
-              >
-                {plan.description}
-              </p>
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold">
+                  {plan.name}
+                </CardTitle>
+                <p
+                  className={`text-sm ${isBronze ? "text-zinc-400" : "text-white/50"
+                    }`}
+                >
+                  {plan.description}
+                </p>
 
-              <div className="flex items-baseline gap-2 mt-3">
-                <span className="text-3xl font-bold">{plan.price}</span>
-                <span className="text-sm line-through opacity-60">
-                  {plan.oldPrice}
-                </span>
-              </div>
+                <div className="flex items-baseline gap-2 mt-3">
+                  <span className="text-3xl font-bold">{plan.price}</span>
+                  <span className="text-sm line-through opacity-60">
+                    {plan.oldPrice}
+                  </span>
+                </div>
 
-              <Button
-                className={`mt-4 w-full rounded-xl ${
-                  isBronze
-                    ? "bg-white text-black hover:bg-gray-200"
-                    : "bg-white/20 text-white/60"
-                }`}
-                variant={isBronze ? "secondary" : "default"}
-                disabled={isDisabled}
-                onClick={() => {
-                  if (isDisabled) return;
-                  setSelectedPlan(plan);
-                  setShowSuccess(false);
-                }}
-              >
-                {plan.button}
-              </Button>
-            </CardHeader>
+                <Button
+                  className={`mt-4 w-full rounded-xl ${isBronze
+                      ? "bg-white text-black hover:bg-gray-200"
+                      : "bg-white/20 text-white/60"
+                    }`}
+                  variant={isBronze ? "secondary" : "default"}
+                  disabled={isDisabled}
+                  onClick={() => {
+                    if (isDisabled) return;
+                    setSelectedPlan(plan);
+                    setShowSuccess(false);
+                  }}
+                >
+                  {plan.button}
+                </Button>
+              </CardHeader>
 
-            <CardContent className="flex flex-col h-full">
-              <ul className="space-y-3 text-sm">
-                {plan.features.map((feature, i) => (
-                  <li key={i} className="flex items-start gap-2">
-                    <Check
-                      className={`w-4 h-4 mt-0.5 ${
-                        isBronze ? "text-green-400" : "text-white/40"
-                      }`}
-                    />
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
+              <CardContent className="flex flex-col h-full">
+                <ul className="space-y-3 text-sm">
+                  {plan.features.map((feature, i) => (
+                    <li key={i} className="flex items-start gap-2">
+                      <Check
+                        className={`w-4 h-4 mt-0.5 ${isBronze ? "text-green-400" : "text-white/40"
+                          }`}
+                      />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
 
-              <Link
-                href="https://api.whatsapp.com/send/?phone=+447777788885
+                <Link
+                  href="https://api.whatsapp.com/send/?phone=+447777788885
  &text=Hello%21+I+have+a+query.&type=phone_number&app_absent=0"
-                className="mt-auto pt-6 text-xs opacity-80 hover:opacity-100 transition-opacity flex items-center gap-2"
-              >
-                <MessageCircle className="w-4 h-4 text-green-400" />
-                <span>Have a Question?   Connect with us</span>
-              </Link>
-            </CardContent>
-          </Card>
+                  className="mt-auto pt-6 text-xs opacity-80 hover:opacity-100 transition-opacity flex items-center gap-2"
+                >
+                  <MessageCircle className="w-4 h-4 text-green-400" />
+                  <span>Have a Question?   Connect with us</span>
+                </Link>
+              </CardContent>
+            </Card>
           );
         })}
       </div>

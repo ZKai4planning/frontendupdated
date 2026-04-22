@@ -76,8 +76,8 @@ export default function ReviewPage() {
     typeof params?.stage === "string"
       ? params.stage
       : Array.isArray(params?.stage)
-      ? params.stage[0]
-      : undefined
+        ? params.stage[0]
+        : undefined
 
   const stageFromQuery = searchParams.get("stage")
   const progressParam = searchParams.get("progress")
@@ -154,56 +154,56 @@ export default function ReviewPage() {
       </div>
 
       {/* ================= ROADMAP ================= */}
-       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 mb-8">
-              {/* LEFT — GREETING */}
-              <div className="grid grid-cols-12 gap-6">
-                  {/* ================= LEFT COLUMN ================= */}
-                  <div className="col-span-8 space-y-6">
-                      {/* ===== Project Roadmap ===== */}
-                      <div className="rounded-2xl border bg-white p-6 shadow-sm">
-                          <div className="flex items-center justify-between mb-6">
-                              <h2 className="font-semibold text-slate-800">
-                                  Project Stages
-                              </h2>
-                              <span className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-                                  STEP {currentProjectStep + 1} OF {visibleProjectFlow.length}
-                              </span>
-                          </div>
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 mb-8">
+        {/* LEFT — GREETING */}
+        <div className="grid grid-cols-12 gap-6">
+          {/* ================= LEFT COLUMN ================= */}
+          <div className="col-span-8 space-y-6">
+            {/* ===== Project Roadmap ===== */}
+            <div className="rounded-2xl border bg-white p-6 shadow-sm">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="font-semibold text-slate-800">
+                  Project Stages
+                </h2>
+                <span className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                  STEP {currentProjectStep + 1} OF {visibleProjectFlow.length}
+                </span>
+              </div>
 
-                          <div className="flex items-center justify-between min-h-[100px] overflow-x-auto pb-2">
-                              {visibleProjectFlow.map((stepItem, index) => {
-                                const stepItemIndex = getProjectStepIndexById(stepItem.id)
-                                const status =
-                                  stepItemIndex < currentProjectStep
-                                    ? "completed"
-                                    : stepItemIndex === currentProjectStep
-                                    ? "active"
-                                    : undefined
+              <div className="flex items-center justify-between min-h-25 overflow-x-auto pb-2">
+                {visibleProjectFlow.map((stepItem, index) => {
+                  const stepItemIndex = getProjectStepIndexById(stepItem.id)
+                  const status =
+                    stepItemIndex < currentProjectStep
+                      ? "completed"
+                      : stepItemIndex === currentProjectStep
+                        ? "active"
+                        : undefined
 
-                                return (
-                                  <div key={stepItem.id} className="flex items-center">
-                                    <RoadmapStep
-                                      label={stepItem.label}
-                                      status={status}
-                                      icon={stepItem.icon}
-                                      onClick={() => {
-                                        if (stepItemIndex <= currentProjectStep && stepItem.route !== "#") {
-                                          const readonlyParam = stepItemIndex < currentProjectStep ? "&readonly=1" : ""
-                                          router.push(
-                                            `/dashboard?stage=${stepItem.route}&progress=${currentProjectStep}${readonlyParam}`
-                                          )
-                                        }
-                                      }}
-                                    />
-                                    {index !== visibleProjectFlow.length - 1 && <RoadmapLine />}
-                                  </div>
-                                )
-                              })}
-                          </div>
-                      </div>
-                  </div>
+                  return (
+                    <div key={stepItem.id} className="flex items-center">
+                      <RoadmapStep
+                        label={stepItem.label}
+                        status={status}
+                        icon={stepItem.icon}
+                        onClick={() => {
+                          if (stepItemIndex <= currentProjectStep && stepItem.route !== "#") {
+                            const readonlyParam = stepItemIndex < currentProjectStep ? "&readonly=1" : ""
+                            router.push(
+                              `/dashboard?stage=${stepItem.route}&progress=${currentProjectStep}${readonlyParam}`
+                            )
+                          }
+                        }}
+                      />
+                      {index !== visibleProjectFlow.length - 1 && <RoadmapLine />}
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
 
-                  {/* ================= RIGHT COLUMN ================= */}
+          {/* ================= RIGHT COLUMN ================= */}
           <div className="col-span-4 space-y-6">
             <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-lg">
 
@@ -223,8 +223,8 @@ export default function ReviewPage() {
 
 
 
-              </div>
-          </div>
+        </div>
+      </div>
 
       <div className="grid grid-cols-12 gap-6">
 
@@ -258,7 +258,7 @@ export default function ReviewPage() {
         </div>
 
         {/* ================= RIGHT COLUMN ================= */}
-        
+
       </div>
     </main>
   )
@@ -280,17 +280,16 @@ function RoadmapStep({
   return (
     <div
       onClick={onClick}
-      className={`flex flex-col items-center gap-2 min-w-[110px] ${onClick ? "cursor-pointer" : ""}`}
+      className={`flex flex-col items-center gap-2 min-w-27.5 ${onClick ? "cursor-pointer" : ""}`}
     >
       <div
         className={`w-10 h-10 rounded-full flex items-center justify-center duration-300
-        ${
-          status === "completed"
+        ${status === "completed"
             ? "bg-blue-600 text-white"
             : status === "active"
-            ? "border-2 border-blue-600 text-blue-600 bg-white animate-pulse"
-            : "bg-slate-200 text-slate-500"
-        }`}
+              ? "border-2 border-blue-600 text-blue-600 bg-white animate-pulse"
+              : "bg-slate-200 text-slate-500"
+          }`}
       >
         {status === "completed" ? (
           <CheckCircle className="w-5 h-5" />
@@ -300,9 +299,8 @@ function RoadmapStep({
       </div>
 
       <span
-        className={`text-xs text-center ${
-          status ? "text-blue-600 font-medium" : "text-slate-400"
-        }`}
+        className={`text-xs text-center ${status ? "text-blue-600 font-medium" : "text-slate-400"
+          }`}
       >
         {label}
       </span>
@@ -311,5 +309,5 @@ function RoadmapStep({
 }
 
 function RoadmapLine() {
-  return <div className="h-[2px] bg-slate-200 w-8 lg:flex-1 lg:w-auto" />
+  return <div className="h-0.5 bg-slate-200 w-8 lg:flex-1 lg:w-auto" />
 }

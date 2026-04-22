@@ -366,7 +366,7 @@ export default function QuickAccessHub() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {services.map((service, index) => {
             const isHovered = hoveredCard === service.id
-            
+
             return (
               <motion.button
                 key={service.id}
@@ -514,7 +514,7 @@ export default function QuickAccessHub() {
                 <h5 className="text-sm font-bold text-white/80 uppercase tracking-wider mb-4">
                   Key Features
                 </h5>
-                
+
                 <div className="space-y-3 mb-8">
                   {activeService.features.map((feature, idx) => (
                     <motion.div
@@ -549,7 +549,7 @@ export default function QuickAccessHub() {
                       arrow_forward
                     </span>
                   </button>
-                  
+
                   <button
                     onClick={closeModal}
                     className="px-6 py-3 rounded-xl border border-white/20 hover:bg-white/5 text-sm font-semibold transition active:scale-95"

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ClientLogin } from "@/components//clientloginform" 
+import { ClientLogin } from "@/components//clientloginform"
 import { motion } from "framer-motion"
 import { Logo } from "./landing-log"
 

@@ -100,7 +100,7 @@ export function ClientLogin() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
-  
+
 
     if (!identifier) {
       toast.error("Please enter your email")
@@ -133,7 +133,7 @@ export function ClientLogin() {
 
 
 
- 
+
 
 
 
@@ -143,7 +143,7 @@ export function ClientLogin() {
         setIsSending(true)
         const res = await axiosInstance.post("/auth/send-otp", {
           identifier,
-         
+
         })
 
         const data = res.data as {
@@ -284,7 +284,7 @@ export function ClientLogin() {
 
       <form className="space-y-5" onSubmit={handleSubmit}>
         {/* FULL NAME */}
-   
+
 
         {/* EMAIL */}
         <div>

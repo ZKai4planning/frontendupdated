@@ -1,8 +1,8 @@
 "use client"
 
 import { useState } from "react"
-import {Logo} from "@/components/landing-log"
-import { ClientLogin } from "@/components//clientloginform" 
+import { Logo } from "@/components/landing-log"
+import { ClientLogin } from "@/components//clientloginform"
 import { motion } from "framer-motion"
 
 export function LoginHeader() {

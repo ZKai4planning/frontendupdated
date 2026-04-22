@@ -1,5 +1,5 @@
 "use client"
- 
+
 export default function GetStarted() {
   return (
     <div className="bg-neutral-900 text-white rounded-2xl p-6 w-full max-w-xl shadow-2xl">
@@ -7,7 +7,7 @@ export default function GetStarted() {
       <p className="text-sm text-white/60 mb-6">
         Set up your workspace to start collecting feedback.
       </p>
- 
+
       <ul className="space-y-2 text-sm">
         <Step active label="Setup Domain" />
         <Step label="Install the widget" />
@@ -20,8 +20,8 @@ export default function GetStarted() {
     </div>
   )
 }
- 
- 
+
+
 function Step({
   label,
   active,
@@ -35,9 +35,8 @@ function Step({
       ${active ? "bg-white/10" : "bg-white/5"}`}
     >
       <span
-        className={`w-2 h-2 rounded-full ${
-          active ? "bg-blue-500" : "bg-white/30"
-        }`}
+        className={`w-2 h-2 rounded-full ${active ? "bg-blue-500" : "bg-white/30"
+          }`}
       />
       {label}
     </li>

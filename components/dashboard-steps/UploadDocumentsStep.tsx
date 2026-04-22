@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
-import { CheckCircle, FileText} from "lucide-react"
+import { CheckCircle, FileText } from "lucide-react"
 import { useParams, usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useUserIdentity } from "@/lib/use-user-identity"
 import {
@@ -69,8 +69,8 @@ export default function UploadDocumentsDashboard() {
     typeof params?.stage === "string"
       ? params.stage
       : Array.isArray(params?.stage)
-      ? params.stage[0]
-      : undefined
+        ? params.stage[0]
+        : undefined
 
   const stageFromQuery = searchParams.get("stage")
   const progressParam = searchParams.get("progress")
@@ -88,17 +88,18 @@ export default function UploadDocumentsDashboard() {
     ...visibleProjectFlow.map((stepItem) => {
       const stepItemIndex = getProjectStepIndexById(stepItem.id)
       return ({
-      id: stepItem.id,
-      label: stepItem.label,
-      icon: stepItem.icon,
-      stage: stepItem.route,
-      status:
-        stepItemIndex < currentProjectStep
-          ? ("completed" as const)
-          : stepItemIndex === currentProjectStep
-          ? ("active" as const)
-          : undefined,
-    })}),
+        id: stepItem.id,
+        label: stepItem.label,
+        icon: stepItem.icon,
+        stage: stepItem.route,
+        status:
+          stepItemIndex < currentProjectStep
+            ? ("completed" as const)
+            : stepItemIndex === currentProjectStep
+              ? ("active" as const)
+              : undefined,
+      })
+    }),
   ]
   const progress = getJourneyProgressPercent(currentProjectStep)
 
@@ -177,133 +178,133 @@ export default function UploadDocumentsDashboard() {
       {/* ================= ROADMAP ================= */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
 
-  {/* ================= LEFT COLUMN ================= */}
-  <div className="lg:col-span-8 space-y-6">
+        {/* ================= LEFT COLUMN ================= */}
+        <div className="lg:col-span-8 space-y-6">
 
-    <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
-      
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="font-semibold text-slate-800">
-          Project Stages
-        </h2>
-        <span className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
-          STEP {currentProjectStep + 1} OF {roadmapSteps.length}
-        </span>
-      </div>
+          <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
 
-      {/* Roadmap Container */}
-      <div className="overflow-x-auto">
-        <div className="flex items-center justify-between overflow-x-auto pb-2 min-h-[100px]">
-          {roadmapSteps.map((stepItem, index) => {
-            return (
-              <React.Fragment key={stepItem.id}>
-                <RoadmapStep
-                  label={stepItem.label}
-                  status={stepItem.status}
-                  icon={stepItem.icon}
-                  onClick={() => {
-                    const stepItemIndex = getProjectStepIndexById(stepItem.id)
-                    if (stepItemIndex <= currentProjectStep && stepItem.stage !== "#") {
-                      const readonlyParam = stepItemIndex < currentProjectStep ? "&readonly=1" : ""
-                      router.push(
-                        `/dashboard?stage=${stepItem.stage}&progress=${currentProjectStep}${readonlyParam}`
-                      )
-                    }
-                  }}
-                />
-                {index !== roadmapSteps.length - 1 && <RoadmapLine />}
-              </React.Fragment>
-            )
-          })}
-        </div>
-      </div>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="font-semibold text-slate-800">
+                Project Stages
+              </h2>
+              <span className="text-xs font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                STEP {currentProjectStep + 1} OF {roadmapSteps.length}
+              </span>
+            </div>
 
-    </div>
-  </div>
-
-  {/* ================= RIGHT COLUMN ================= */}
-  <div className="lg:col-span-4 space-y-6">
-
-    <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-lg flex flex-col min-h-[200px]">
-
-      <h3 className="text-lg font-semibold mb-3">
-        Upload Supporting Documents
-      </h3>
-
-      <p className="text-sm opacity-90 leading-relaxed">
-        To proceed with your planning application, please upload your
-        existing and proposed drawings, site photographs, and any relevant
-        surveys. This allows your consultant to prepare the application
-        for council submission.
-      </p>
-
-    </div>
-  </div>
-
-</div>
-
-
-
-
-        <div className="grid grid-cols-12 gap-6 transition-all duration-500">
-
-          {/* LEFT — DOCUMENTS */}
-          <div className="col-span-8 space-y-4">
-            {documents.map(doc => (
-              <DocumentCard
-                key={doc.id}
-                doc={doc}
-                onUpload={() => handleUpload(doc.id)}
-                disabled={isReadOnly}
-              />
-            ))}
-          </div>
-
-          {/* RIGHT — STATUS */}
-          <div className="col-span-4 space-y-6">
-
-            <div className="rounded-2xl bg-blue-600 p-6 text-white shadow-lg">
-              <p className="text-xs uppercase tracking-wide opacity-80 mb-2">
-                Upload Status
-              </p>
-
-              <h3 className="text-lg font-semibold mb-3">
-                Documents Required
-              </h3>
-
-              <p className="text-sm opacity-90 mb-4">
-                Please upload all required documents to proceed.
-              </p>
-
-              <div className="rounded-xl bg-white/20 px-4 py-3 text-sm space-y-2">
-                <p className="font-semibold">
-                  📄 {uploadedCount} of {documents.length} uploaded
-                </p>
-
-                {!allUploaded && (
-                  <p className="text-yellow-200 text-sm">
-                    Some documents still pending
-                  </p>
-                )}
-
-                {allUploaded && (
-                  <p className="text-green-200 text-sm">
-                    All documents uploaded
-                  </p>
-                )}
+            {/* Roadmap Container */}
+            <div className="overflow-x-auto">
+              <div className="flex items-center justify-between overflow-x-auto pb-2 min-h-25">
+                {roadmapSteps.map((stepItem, index) => {
+                  return (
+                    <React.Fragment key={stepItem.id}>
+                      <RoadmapStep
+                        label={stepItem.label}
+                        status={stepItem.status}
+                        icon={stepItem.icon}
+                        onClick={() => {
+                          const stepItemIndex = getProjectStepIndexById(stepItem.id)
+                          if (stepItemIndex <= currentProjectStep && stepItem.stage !== "#") {
+                            const readonlyParam = stepItemIndex < currentProjectStep ? "&readonly=1" : ""
+                            router.push(
+                              `/dashboard?stage=${stepItem.stage}&progress=${currentProjectStep}${readonlyParam}`
+                            )
+                          }
+                        }}
+                      />
+                      {index !== roadmapSteps.length - 1 && <RoadmapLine />}
+                    </React.Fragment>
+                  )
+                })}
               </div>
             </div>
 
-            <button
-              disabled={isReadOnly}
-              onClick={() => router.push("/dashboard?stage=final-quotation")}
-              className="w-full rounded-xl bg-green-600 text-white py-3 font-semibold
-              disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
-            >
-              Continue 
-            </button>
           </div>
         </div>
+
+        {/* ================= RIGHT COLUMN ================= */}
+        <div className="lg:col-span-4 space-y-6">
+
+          <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-lg flex flex-col min-h-50">
+
+            <h3 className="text-lg font-semibold mb-3">
+              Upload Supporting Documents
+            </h3>
+
+            <p className="text-sm opacity-90 leading-relaxed">
+              To proceed with your planning application, please upload your
+              existing and proposed drawings, site photographs, and any relevant
+              surveys. This allows your consultant to prepare the application
+              for council submission.
+            </p>
+
+          </div>
+        </div>
+
+      </div>
+
+
+
+
+      <div className="grid grid-cols-12 gap-6 transition-all duration-500">
+
+        {/* LEFT — DOCUMENTS */}
+        <div className="col-span-8 space-y-4">
+          {documents.map(doc => (
+            <DocumentCard
+              key={doc.id}
+              doc={doc}
+              onUpload={() => handleUpload(doc.id)}
+              disabled={isReadOnly}
+            />
+          ))}
+        </div>
+
+        {/* RIGHT — STATUS */}
+        <div className="col-span-4 space-y-6">
+
+          <div className="rounded-2xl bg-blue-600 p-6 text-white shadow-lg">
+            <p className="text-xs uppercase tracking-wide opacity-80 mb-2">
+              Upload Status
+            </p>
+
+            <h3 className="text-lg font-semibold mb-3">
+              Documents Required
+            </h3>
+
+            <p className="text-sm opacity-90 mb-4">
+              Please upload all required documents to proceed.
+            </p>
+
+            <div className="rounded-xl bg-white/20 px-4 py-3 text-sm space-y-2">
+              <p className="font-semibold">
+                📄 {uploadedCount} of {documents.length} uploaded
+              </p>
+
+              {!allUploaded && (
+                <p className="text-yellow-200 text-sm">
+                  Some documents still pending
+                </p>
+              )}
+
+              {allUploaded && (
+                <p className="text-green-200 text-sm">
+                  All documents uploaded
+                </p>
+              )}
+            </div>
+          </div>
+
+          <button
+            disabled={isReadOnly}
+            onClick={() => router.push("/dashboard?stage=final-quotation")}
+            className="w-full rounded-xl bg-green-600 text-white py-3 font-semibold
+              disabled:opacity-40 cursor-pointer disabled:cursor-not-allowed"
+          >
+            Continue
+          </button>
+        </div>
+      </div>
     </main>
   )
 }
@@ -325,10 +326,9 @@ function DocumentCard({
       <div className="flex items-start gap-4">
         <div
           className={`w-10 h-10 rounded-xl flex items-center justify-center
-            ${
-              doc.status === "uploaded"
-                ? "bg-green-100 text-green-600"
-                : "bg-slate-100 text-slate-500"
+            ${doc.status === "uploaded"
+              ? "bg-green-100 text-green-600"
+              : "bg-slate-100 text-slate-500"
             }
           `}
         >
@@ -388,42 +388,40 @@ function RoadmapStep({
 }) {
   return (
     <div
-          onClick={onClick}
-          className={`flex flex-col items-center gap-2 min-w-[110px] ${onClick ? "cursor-pointer" : ""}`}
-        >
-          <div
-            className={`
+      onClick={onClick}
+      className={`flex flex-col items-center gap-2 min-w-27.5 ${onClick ? "cursor-pointer" : ""}`}
+    >
+      <div
+        className={`
               w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200
-              ${
-                status === "completed"
-                  ? "bg-blue-600 text-white"
-                  : status === "active"
-                  ? "border-2 border-blue-600 text-blue-600 bg-white animate-pulse"
-                  : "bg-slate-200 text-slate-500"
-              }
+              ${status === "completed"
+            ? "bg-blue-600 text-white"
+            : status === "active"
+              ? "border-2 border-blue-600 text-blue-600 bg-white animate-pulse"
+              : "bg-slate-200 text-slate-500"
+          }
             `}
-          >
-            {status === "completed" ? (
-              <CheckCircle className="w-5 h-5" />
-            ) : (
-              <Icon className="w-5 h-5" />
-            )}
-          </div>
-    
-           <span
-            className={`text-xs text-center ${
-              status ? "text-blue-600 font-medium" : "text-slate-400"
-            }`}
-          >
-            {label}
-          </span>
-        </div>
+      >
+        {status === "completed" ? (
+          <CheckCircle className="w-5 h-5" />
+        ) : (
+          <Icon className="w-5 h-5" />
+        )}
+      </div>
+
+      <span
+        className={`text-xs text-center ${status ? "text-blue-600 font-medium" : "text-slate-400"
+          }`}
+      >
+        {label}
+      </span>
+    </div>
   )
 }
 
 function RoadmapLine() {
   return (
-    <div className="h-[2px] bg-slate-200 w-8 lg:flex-1 lg:w-auto" />
+    <div className="h-0.5 bg-slate-200 w-8 lg:flex-1 lg:w-auto" />
   )
 }
 

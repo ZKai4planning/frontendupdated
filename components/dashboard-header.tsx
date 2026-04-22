@@ -421,99 +421,98 @@ export default function DashboardHeader({
           <div className="flex items-center gap-6">
             {/* Project Selector */}
             <div className="flex items-center gap-3">
-            <div className="relative" ref={projectRef}>
-              {!hasProjects ? (
+              <div className="relative" ref={projectRef}>
+                {!hasProjects ? (
+                  <button
+                    type="button"
+                    onClick={handleStartNewProject}
+                    className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                  >
+                    <Folder className="h-4 w-4 shrink-0" />
+                    <span>New Project</span>
+                  </button>
+                ) : hasSingleProject ? (
+                  <div className="flex max-w-[320px] items-center gap-2 rounded-xl border px-4 py-2 text-sm text-slate-700 bg-slate-50">
+                    <Folder className="h-4 w-4 shrink-0 text-blue-600" />
+                    <span className="truncate">
+                      Project: {selectedProjectLabel || projects[0]?.projectId}
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setIsProjectOpen((prev) => !prev)}
+                      className="flex max-w-70 items-center gap-2 rounded-xl border px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                      aria-haspopup="menu"
+                      aria-expanded={isProjectOpen}
+                    >
+                      <Folder className="h-4 w-4 shrink-0 text-blue-600" />
+                      <span className="truncate">
+                        Project: {selectedProjectLabel || "Select project"}
+                      </span>
+                      <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
+                    </button>
+
+                    {isProjectOpen && (
+                      <div
+                        role="menu"
+                        className="absolute right-0 mt-3 w-80 rounded-xl border border-slate-200 bg-white shadow-lg"
+                      >
+                        <div className="border-b border-slate-100 px-4 py-3">
+                          <p className="text-sm font-semibold text-slate-900">Projects</p>
+                          <p className="text-xs text-slate-500">
+                            Select a project to continue
+                          </p>
+                        </div>
+
+                        <div className="max-h-80 overflow-y-auto py-2">
+                          {isLoadingProjects && (
+                            <p className="px-4 py-2 text-sm text-slate-500">Loading projects...</p>
+                          )}
+
+                          {!isLoadingProjects && projectsError && (
+                            <p className="px-4 py-2 text-sm text-red-600">{projectsError}</p>
+                          )}
+
+                          {!isLoadingProjects && !projectsError && projects.length === 0 && (
+                            <p className="px-4 py-2 text-sm text-slate-500">No projects found</p>
+                          )}
+
+                          {!isLoadingProjects && !projectsError && projects.map((project) => (
+                            <button
+                              key={project.projectId}
+                              type="button"
+                              role="menuitem"
+                              onClick={() => handleProjectSelect(project)}
+                              className={`w-full px-4 py-3 text-left hover:bg-slate-50 ${selectedProjectId === project.projectId ? "bg-blue-50" : ""
+                                }`}
+                            >
+                              <span className="block truncate text-sm font-medium text-slate-900">
+                                {getProjectLabel(project)}
+                              </span>
+                              <span className="mt-0.5 block text-xs text-slate-500">
+                                {project.projectId}
+                                {project.status ? ` · ${project.status.replace(/_/g, " ")}` : ""}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              {hasProjects ? (
                 <button
                   type="button"
                   onClick={handleStartNewProject}
                   className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
                 >
-                  <Folder className="h-4 w-4 shrink-0" />
+                  <Plus className="h-4 w-4 shrink-0" />
                   <span>New Project</span>
                 </button>
-              ) : hasSingleProject ? (
-                <div className="flex max-w-[320px] items-center gap-2 rounded-xl border px-4 py-2 text-sm text-slate-700 bg-slate-50">
-                  <Folder className="h-4 w-4 shrink-0 text-blue-600" />
-                  <span className="truncate">
-                    Project: {selectedProjectLabel || projects[0]?.projectId}
-                  </span>
-                </div>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => setIsProjectOpen((prev) => !prev)}
-                    className="flex max-w-[280px] items-center gap-2 rounded-xl border px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                    aria-haspopup="menu"
-                    aria-expanded={isProjectOpen}
-                  >
-                    <Folder className="h-4 w-4 shrink-0 text-blue-600" />
-                    <span className="truncate">
-                      Project: {selectedProjectLabel || "Select project"}
-                    </span>
-                    <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
-                  </button>
-
-                  {isProjectOpen && (
-                <div
-                  role="menu"
-                  className="absolute right-0 mt-3 w-80 rounded-xl border border-slate-200 bg-white shadow-lg"
-                >
-                  <div className="border-b border-slate-100 px-4 py-3">
-                    <p className="text-sm font-semibold text-slate-900">Projects</p>
-                    <p className="text-xs text-slate-500">
-                      Select a project to continue
-                    </p>
-                  </div>
-
-                  <div className="max-h-80 overflow-y-auto py-2">
-                    {isLoadingProjects && (
-                      <p className="px-4 py-2 text-sm text-slate-500">Loading projects...</p>
-                    )}
-
-                    {!isLoadingProjects && projectsError && (
-                      <p className="px-4 py-2 text-sm text-red-600">{projectsError}</p>
-                    )}
-
-                    {!isLoadingProjects && !projectsError && projects.length === 0 && (
-                      <p className="px-4 py-2 text-sm text-slate-500">No projects found</p>
-                    )}
-
-                    {!isLoadingProjects && !projectsError && projects.map((project) => (
-                      <button
-                        key={project.projectId}
-                        type="button"
-                        role="menuitem"
-                        onClick={() => handleProjectSelect(project)}
-                        className={`w-full px-4 py-3 text-left hover:bg-slate-50 ${
-                          selectedProjectId === project.projectId ? "bg-blue-50" : ""
-                        }`}
-                      >
-                        <span className="block truncate text-sm font-medium text-slate-900">
-                          {getProjectLabel(project)}
-                        </span>
-                        <span className="mt-0.5 block text-xs text-slate-500">
-                          {project.projectId}
-                          {project.status ? ` · ${project.status.replace(/_/g, " ")}` : ""}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                  )}
-                </>
-              )}
-            </div>
-            {hasProjects ? (
-              <button
-                type="button"
-                onClick={handleStartNewProject}
-                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-              >
-                <Plus className="h-4 w-4 shrink-0" />
-                <span>New Project</span>
-              </button>
-            ) : null}
+              ) : null}
             </div>
 
             {/* Notification */}

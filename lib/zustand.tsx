@@ -41,9 +41,9 @@ export const useAuthStore = create<AuthState>((set, get) => {
     token: stored?.token ?? null,
     userId: stored?.userId ?? null,
 
-  /* =========================
-     SET TOKEN (IN-MEMORY ONLY)
-  ========================= */
+    /* =========================
+       SET TOKEN (IN-MEMORY ONLY)
+    ========================= */
     setToken: (token: string) => {
       try {
         const decoded = jwtDecode<JwtPayload>(token);
@@ -58,8 +58,8 @@ export const useAuthStore = create<AuthState>((set, get) => {
           const payload = JSON.stringify({ token, userId });
           window.localStorage.setItem("currentAuth", payload);
         }
-      } catch (error) {
-        console.error("Invalid JWT token");
+      } catch (error: unknown) {
+        console.error("Invalid JWT token", error);
         set({ token: null, userId: null });
         if (typeof window !== "undefined") {
           window.localStorage.removeItem("currentAuth");
@@ -68,9 +68,9 @@ export const useAuthStore = create<AuthState>((set, get) => {
       }
     },
 
-  /* =========================
-     SET USER ID
-  ========================= */
+    /* =========================
+       SET USER ID
+    ========================= */
     setUserId: (userId: string | null) => {
       const token = get().token;
       set({ userId });
@@ -81,9 +81,9 @@ export const useAuthStore = create<AuthState>((set, get) => {
       }
     },
 
-  /* =========================
-     LOGOUT / CLEAR
-  ========================= */
+    /* =========================
+       LOGOUT / CLEAR
+    ========================= */
     clearAuth: () => {
       set({ token: null, userId: null });
       if (typeof window !== "undefined") {

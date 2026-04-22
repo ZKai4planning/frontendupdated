@@ -126,7 +126,7 @@ export default function ConsultantSchedulePage() {
             </div>
 
             {/* Scrollable on mobile */}
-            <div className="flex items-center justify-between overflow-x-auto pb-2 min-h-[100px]">
+            <div className="flex items-center justify-between overflow-x-auto pb-2 min-h-25">
               {visibleProjectFlow.map((stepItem, index) => {
                 const stepItemIndex = getProjectStepIndexById(stepItem.id)
                 const status =
@@ -136,7 +136,7 @@ export default function ConsultantSchedulePage() {
                       ? "active"
                       : stepItemIndex === currentProjectStep + 1
                         ? "upcoming"
-                      : undefined
+                        : undefined
 
                 return (
                   <React.Fragment key={stepItem.id}>
@@ -191,7 +191,7 @@ export default function ConsultantSchedulePage() {
           </div>
         </div>
       </div>
-      
+
       <div className="w-full lg:max-w-md rounded-2xl bg-blue-500 p-6 text-white shadow-lg">
 
         <p className="text-sm opacity-90 mb-4 leading-relaxed">
@@ -233,21 +233,19 @@ function RoadmapStep({
   return (
     <div
       onClick={onClick}
-      className={`flex flex-col items-center gap-2 min-w-[110px] ${
-        onClick ? "cursor-pointer" : ""
-      }`}
+      className={`flex flex-col items-center gap-2 min-w-27.5 ${onClick ? "cursor-pointer" : ""
+        }`}
     >
       <div
         className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200
-        ${
-          status === "completed"
+        ${status === "completed"
             ? "bg-blue-600 text-white"
             : status === "active"
-            ? "border-2 border-blue-600 text-blue-600 bg-white animate-pulse"
-            : status === "upcoming"
-            ? "border border-blue-600 text-blue-600 bg-blue-50 animate-bounce"
-            : "bg-slate-200 text-slate-400"
-        }`}
+              ? "border-2 border-blue-600 text-blue-600 bg-white animate-pulse"
+              : status === "upcoming"
+                ? "border border-blue-600 text-blue-600 bg-blue-50 animate-bounce"
+                : "bg-slate-200 text-slate-400"
+          }`}
       >
         {status === "completed" ? (
           <CheckCircle className="w-5 h-5" />
@@ -267,5 +265,5 @@ function RoadmapStep({
 
 
 function RoadmapLine() {
-  return <div className="h-[2px] bg-slate-200 w-8 lg:flex-1 lg:w-auto" />
+  return <div className="h-0.5 bg-slate-200 w-8 lg:flex-1 lg:w-auto" />
 }

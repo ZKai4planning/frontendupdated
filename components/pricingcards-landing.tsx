@@ -92,11 +92,10 @@ export default function PricingCardsLanding() {
           return (
             <Card
               key={plan.name}
-              className={`relative rounded-2xl border shadow-lg transition-all duration-300 ${
-                isRestricted
+              className={`relative rounded-2xl border shadow-lg transition-all duration-300 ${isRestricted
                   ? "bg-[#0B1224]/60 text-white/70 border-white/10 blur-[3px] opacity-65"
                   : "bg-[#0B1224] text-white border-blue-500/40"
-              }`}
+                }`}
               style={isRestricted ? restrictedCardBlurStyle : undefined}
             >
               {plan.badge && (
@@ -116,13 +115,12 @@ export default function PricingCardsLanding() {
 
                 <Button
                   disabled={isRestricted || isBronzeComingSoon}
-                  className={`mt-4 w-full rounded-xl ${
-                    isRestricted
+                  className={`mt-4 w-full rounded-xl ${isRestricted
                       ? "bg-white/20 text-white/60 cursor-not-allowed"
                       : isBronzeComingSoon
                         ? "cursor-not-allowed bg-white/70 text-black/80 blur-[1px]"
                         : "bg-white text-black hover:bg-gray-200"
-                  }`}
+                    }`}
                   style={isBronzeComingSoon ? disabledButtonBlurStyle : undefined}
                 >
                   {isBronzeComingSoon
@@ -136,9 +134,8 @@ export default function PricingCardsLanding() {
                   {plan.features.map((feature, i) => (
                     <li key={i} className="flex items-start gap-2">
                       <Check
-                        className={`w-4 h-4 mt-1 ${
-                          isRestricted ? "text-white/40" : "text-green-400"
-                        }`}
+                        className={`w-4 h-4 mt-1 ${isRestricted ? "text-white/40" : "text-green-400"
+                          }`}
                       />
                       <span>{feature}</span>
                     </li>

@@ -434,7 +434,7 @@ export function CookieConsent() {
                 </div>
 
                 <Button
-                  className="h-10 w-full rounded-xl border border-blue-300/50 bg-gradient-to-r from-blue-300 to-blue-400 text-zinc-950 font-semibold shadow-lg shadow-blue-900/20 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-200 hover:to-blue-300 hover:shadow-blue-900/30 focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
+                  className="h-10 w-full rounded-xl border border-blue-300/50 bg-linear-to-r from-blue-300 to-blue-400 text-zinc-950 font-semibold shadow-lg shadow-blue-900/20 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-200 hover:to-blue-300 hover:shadow-blue-900/30 focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
                   style={{
                     color: "#020617",
                     WebkitTextFillColor: "#020617",
@@ -458,7 +458,7 @@ export function CookieConsent() {
                   className="h-10 w-full rounded-xl border border-zinc-700 bg-zinc-900/80 text-zinc-200 transition-all duration-200 hover:-translate-y-0.5 hover:bg-zinc-800 hover:text-white"
                   onClick={() => setShowDetails(true)}
                 >
-                  Manage 
+                  Manage
                 </Button>
               </div>
             </div>
@@ -573,7 +573,7 @@ export function CookieConsent() {
                   Cancel
                 </Button>
                 <Button
-                  className="h-10 rounded-xl border border-blue-300/50 bg-gradient-to-r from-blue-300 to-blue-400 px-8 text-zinc-950 font-semibold shadow-lg shadow-blue-900/20 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-200 hover:to-blue-300 hover:shadow-blue-900/30 focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
+                  className="h-10 rounded-xl border border-blue-300/50 bg-linear-to-r from-blue-300 to-blue-400 px-8 text-zinc-950 font-semibold shadow-lg shadow-blue-900/20 transition-all duration-200 hover:-translate-y-0.5 hover:from-blue-200 hover:to-blue-300 hover:shadow-blue-900/30 focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900"
                   style={{
                     color: "#020617",
                     WebkitTextFillColor: "#020617",
