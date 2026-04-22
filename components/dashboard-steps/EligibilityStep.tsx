@@ -36,7 +36,12 @@ type ActivePlanType = PlanType | null
 type EligibilitySaveStatus = "in_progress" | "draft" | "submitted"
 type EligibilityFormValue = string | string[] | undefined
 type EligibilityFormValues = Record<string, EligibilityFormValue>
-type EligibilityFileMap = Record<string, File[]>
+type UploadedFileEntry = {
+  id: string
+  file: File | null
+  description: string
+}
+type EligibilityFileMap = Record<string, UploadedFileEntry[]>
 
 type EligibilityAssetsContextValue = {
   uploadedFiles: EligibilityFileMap
@@ -88,6 +93,12 @@ const asArrayValue = (value: EligibilityFormValue): string[] =>
   Array.isArray(value) ? value : []
 
 const yesNoToBooleanString = (value: string) => (value.trim().toLowerCase().startsWith("y") ? "true" : "false")
+
+const createUploadEntry = (description = "", file: File | null = null): UploadedFileEntry => ({
+  id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  file,
+  description,
+})
 
 const appendMultipartValue = (formData: FormData, key: string, value: string) => {
   formData.append(key, value)
@@ -320,6 +331,38 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
     {
       label: "Agent Contact",
       paths: [["applicantAndProperty", "agentDetails", "agentContactEmailPhone"]],
+    },
+    {
+      label: "Have you previously applied to the council?",
+      paths: [["applicantAndProperty", "councilApplicationHistory", "hasPreviousCouncilApplication"]],
+    },
+    {
+      label: "What was previously proposed, and was it approved, refused, or withdrawn?",
+      paths: [["applicantAndProperty", "councilApplicationHistory", "previousProposalDetails"]],
+    },
+    {
+      label: "Planning Reference Number *",
+      paths: [["applicantAndProperty", "councilApplicationHistory", "planningReferenceNumber"]],
+    },
+    {
+      label: "Which council have you applied for?",
+      paths: [["applicantAndProperty", "councilApplicationHistory", "councilName"]],
+    },
+    {
+      label: "Type of Application *",
+      paths: [["applicantAndProperty", "councilApplicationHistory", "previousApplicationType"]],
+    },
+    {
+      label: "Type of Development Previously Proposed",
+      paths: [["applicantAndProperty", "councilApplicationHistory", "previousDevelopmentType"]],
+    },
+    {
+      label: "What are you planning to apply for now?",
+      paths: [["applicantAndProperty", "councilApplicationHistory", "currentPlanDetails"]],
+    },
+    {
+      label: "Is this project similar to the previous application or different this time?",
+      paths: [["applicantAndProperty", "councilApplicationHistory", "projectComparison"]],
     },
     {
       label: "Property Type",
@@ -766,6 +809,23 @@ const buildEligibilityStepPayload = (
             agentAddress: getValue("Agent Address"),
             agentContactEmailPhone: getValue("Agent Contact"),
           },
+          councilApplicationHistory: {
+            hasPreviousCouncilApplication: getBooleanFieldValue(
+              formValues,
+              "Have you previously applied to the council?"
+            ),
+            previousProposalDetails: getValue(
+              "What was previously proposed, and was it approved, refused, or withdrawn?"
+            ),
+            planningReferenceNumber: getValue("Planning Reference Number *"),
+            councilName: getValue("Which council have you applied for?"),
+            previousApplicationType: getValue("Type of Application *"),
+            previousDevelopmentType: getValue("Type of Development Previously Proposed"),
+            currentPlanDetails: getValue("What are you planning to apply for now?"),
+            projectComparison: getValue(
+              "Is this project similar to the previous application or different this time?"
+            ),
+          },
           propertyAndOwnership: {
             propertyType: getValue("Property Type"),
             ownershipStatus: getValue("Ownership Status"),
@@ -904,8 +964,25 @@ const buildEligibilityMultipartFormData = ({
   userId?: string | null
 }) => {
   const formData = new FormData()
-  const getFiles = (label: string) => uploadedFiles[label] ?? []
+  const getEntries = (label: string) => uploadedFiles[label] ?? []
+  const getFiles = (label: string) =>
+    getEntries(label)
+      .map((entry) => entry.file)
+      .filter((file): file is File => Boolean(file))
   const payload = buildEligibilityPayload(formValues)
+  const appendUploadMetadata = (key: string, label: string) => {
+    const entries = getEntries(label)
+      .filter((entry) => entry.file)
+      .map((entry, index) => ({
+        order: index + 1,
+        title: entry.description.trim() || entry.file?.name || `File ${index + 1}`,
+        fileName: entry.file?.name ?? "",
+      }))
+
+    if (entries.length > 0) {
+      formData.append(`${key}Meta`, JSON.stringify(entries))
+    }
+  }
 
   formData.append("currentStep", String(step))
   formData.append("status", status)
@@ -928,11 +1005,25 @@ const buildEligibilityMultipartFormData = ({
     "sitePlan",
     getFiles("Site Plan (1:200 or 1:500)")
   )
-  appendSingleFile(
+  appendRepeatedFiles(
     formData,
     "existingAndProposedElevations",
     getFiles("Existing & Proposed Elevations")
   )
+  const elevationEntries = getEntries("Existing & Proposed Elevations").filter((entry) => entry.file)
+  const existingElevation = elevationEntries.find((entry) =>
+    entry.description.trim().toLowerCase().includes("existing")
+  )?.file
+  const proposedElevation = elevationEntries.find((entry) =>
+    entry.description.trim().toLowerCase().includes("proposed")
+  )?.file
+
+  if (existingElevation) {
+    formData.append("existingElevation", existingElevation)
+  }
+  if (proposedElevation) {
+    formData.append("proposedElevation", proposedElevation)
+  }
   appendRepeatedFiles(
     formData,
     "photographsOfSite",
@@ -946,13 +1037,16 @@ const buildEligibilityMultipartFormData = ({
   appendSingleFile(
     formData,
     "treeSurveyReport",
-    getFiles("Tree Survey / BS5837 Report (if available)")
+    getFiles("Arboriculture Report / BS5837 Report (if available)")
   )
   appendSingleFile(
     formData,
     "floodRiskAssesmentReport",
     getFiles("Flood Risk Assessment (if available)")
   )
+  appendUploadMetadata("existingAndProposedElevations", "Existing & Proposed Elevations")
+  appendUploadMetadata("photographsOfSite", "Photographs of Site")
+  appendUploadMetadata("additionalDrawings", "Additional Drawings (floor plans, sections etc.)")
   if (signatureFile) {
     formData.append("digitalSignatureUrl", signatureFile)
   }
@@ -1026,6 +1120,22 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
   "Agent Name": "Name of the planning agent or firm.",
   "Agent Address": "Address of the planning agent or firm.",
   "Agent Contact": "Best email or phone for the agent.",
+  "Have you previously applied to the council?":
+    "Tell us whether there has already been a council application connected to this site or proposal.",
+  "What was previously proposed, and was it approved, refused, or withdrawn?":
+    "Summarise the earlier scheme and confirm whether it was approved, refused, or withdrawn.",
+  "Planning Reference Number *":
+    "Reference number issued by the council for the earlier application.",
+  "Which council have you applied for?":
+    "Name of the council that handled the earlier application.",
+  "Type of Application *":
+    "Type of planning application previously submitted to the council.",
+  "Type of Development Previously Proposed":
+    "Select the development type that was proposed before.",
+  "What are you planning to apply for now?":
+    "Describe the current scheme you want to submit now.",
+  "Is this project similar to the previous application or different this time?":
+    "Tell us whether the current proposal is similar to or different from the earlier one.",
   "Property Type": "Select the type of existing property.",
   "Ownership Status": "Choose the ownership situation for the site.",
   "Conservation Area or Near Listed Building?":
@@ -1061,7 +1171,7 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
     "Helps assess potential tree protection constraints.",
   "Tree Species (if known)": "If known, specify tree species near the works.",
   "Approximate Tree Height (m)": "Estimated height of nearby trees in meters.",
-  "Tree Survey / BS5837 Report (if available)":
+  "Arboriculture Report / BS5837 Report (if available)":
     "Upload an arboricultural survey if available.",
   "Is the site in Flood Zone 2 or 3?": "Flood zones may require additional assessments.",
   "Any known contamination on site?": "Known contamination can trigger further reports.",
@@ -1113,6 +1223,14 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Agent Name",
   "Agent Address",
   "Agent Contact",
+  "Have you previously applied to the council?",
+  "What was previously proposed, and was it approved, refused, or withdrawn?",
+  "Planning Reference Number *",
+  "Which council have you applied for?",
+  "Type of Application *",
+  "Type of Development Previously Proposed",
+  "What are you planning to apply for now?",
+  "Is this project similar to the previous application or different this time?",
   "Property Type",
   "Ownership Status",
   "Conservation Area or Near Listed Building?",
@@ -1143,7 +1261,7 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Trees within falling distance of works?",
   "Tree Species (if known)",
   "Approximate Tree Height (m)",
-  "Tree Survey / BS5837 Report (if available)",
+  "Arboriculture Report / BS5837 Report (if available)",
   "Is the site in Flood Zone 2 or 3?",
   "Any known contamination on site?",
   "Flood Risk Assessment (if available)",
@@ -1620,7 +1738,10 @@ function FileUploadArea({
     if (nextFiles.length === 0) return
     setUploadedFiles((prev) => ({
       ...prev,
-      [label]: [...(prev[label] ?? []), ...nextFiles],
+      [label]: [
+        ...(prev[label] ?? []),
+        ...nextFiles.map((file) => createUploadEntry(file.name, file)),
+      ],
     }))
   }
 
@@ -1678,7 +1799,7 @@ function FileUploadArea({
               key={i}
               className="flex items-center justify-between rounded-lg border bg-white px-3 py-2 text-xs text-slate-700 shadow-sm"
             >
-              <span className="truncate max-w-[200px]">{f.name}</span>
+              <span className="truncate max-w-[200px]">{f.file?.name ?? f.description}</span>
               <button
                 type="button"
                 onClick={e => { e.stopPropagation(); removeFile(i) }}
@@ -1692,6 +1813,233 @@ function FileUploadArea({
       )}
 
       {files.length === 0 && onMissingTrigger && (
+        <ConsultationTrigger message={onMissingTrigger} />
+      )}
+    </div>
+  )
+}
+
+function StructuredFileUploadArea({
+  label,
+  accept = "*",
+  hint,
+  onMissingTrigger,
+  tooltip,
+  questionNumber,
+  minSlots = 1,
+  slotLabels,
+  allowAddMore = false,
+  descriptionPlaceholder = "Describe what this file is",
+  showDescriptionInput = true,
+  singleRow = false,
+}: {
+  label: string
+  accept?: string
+  hint?: string
+  onMissingTrigger?: string
+  tooltip?: string
+  questionNumber?: number
+  minSlots?: number
+  slotLabels?: string[]
+  allowAddMore?: boolean
+  descriptionPlaceholder?: string
+  showDescriptionInput?: boolean
+  singleRow?: boolean
+}) {
+  const { uploadedFiles, setUploadedFiles } = useEligibilityAssets()
+  const fieldId = getFieldId(label)
+  const entries = uploadedFiles[label] ?? []
+  const baseLabels = slotLabels ?? Array.from({ length: minSlots }, () => "")
+  const slotCount = Math.max(entries.length, baseLabels.length, minSlots)
+
+  const ensureSlotEntry = (index: number) => {
+    const nextEntries = [...(uploadedFiles[label] ?? [])]
+
+    while (nextEntries.length <= index) {
+      nextEntries.push(createUploadEntry(baseLabels[nextEntries.length] ?? ""))
+    }
+
+    return nextEntries
+  }
+
+  const updateEntries = (updater: (entries: UploadedFileEntry[]) => UploadedFileEntry[]) => {
+    setUploadedFiles((prev) => ({
+      ...prev,
+      [label]: updater(prev[label] ?? []),
+    }))
+  }
+
+  const setSlotFile = (index: number, file: File | null) => {
+    updateEntries((currentEntries) => {
+      const nextEntries = [...currentEntries]
+
+      while (nextEntries.length <= index) {
+        nextEntries.push(createUploadEntry(baseLabels[nextEntries.length] ?? ""))
+      }
+
+      const current = nextEntries[index]
+      const nextDescription =
+        current.description ||
+        baseLabels[index] ||
+        (file ? file.name.replace(/\.[^.]+$/, "") : "")
+
+      nextEntries[index] = {
+        ...current,
+        file,
+        description: nextDescription,
+      }
+
+      return nextEntries
+    })
+  }
+
+  const setSlotDescription = (index: number, description: string) => {
+    updateEntries((currentEntries) => {
+      const nextEntries = [...currentEntries]
+
+      while (nextEntries.length <= index) {
+        nextEntries.push(createUploadEntry(baseLabels[nextEntries.length] ?? ""))
+      }
+
+      nextEntries[index] = {
+        ...nextEntries[index],
+        description,
+      }
+
+      return nextEntries
+    })
+  }
+
+  const clearSlot = (index: number) => {
+    updateEntries((currentEntries) => {
+      const nextEntries = [...currentEntries]
+
+      while (nextEntries.length <= index) {
+        nextEntries.push(createUploadEntry(baseLabels[nextEntries.length] ?? ""))
+      }
+
+      if (index >= baseLabels.length && nextEntries.length > minSlots) {
+        nextEntries.splice(index, 1)
+        return nextEntries
+      }
+
+      nextEntries[index] = {
+        ...nextEntries[index],
+        file: null,
+        description: baseLabels[index] ?? "",
+      }
+
+      return nextEntries
+    })
+  }
+
+  const addSlot = () => {
+    updateEntries((currentEntries) => [...currentEntries, createUploadEntry("")])
+  }
+
+  const slots = Array.from({ length: slotCount }, (_, index) => {
+    const entry = entries[index] ?? {
+      id: `${label}-${index}`,
+      file: null,
+      description: baseLabels[index] ?? "",
+    }
+    return {
+      entry,
+      index,
+      slotLabel: baseLabels[index] ?? `File ${index + 1}`,
+    }
+  })
+
+  const uploadedCount = entries.filter((entry) => entry.file).length
+
+  return (
+    <div className="col-span-2" id={fieldId}>
+      <FieldLabel label={label} tooltip={tooltip} questionNumber={questionNumber} />
+      {hint && <p className="mb-3 text-xs text-slate-400">{hint}</p>}
+
+      <div
+        className={
+          singleRow
+            ? "grid grid-flow-col auto-cols-[minmax(220px,1fr)] gap-3 overflow-x-auto pb-2"
+            : "grid grid-cols-1 gap-3 lg:grid-cols-2"
+        }
+      >
+        {slots.map(({ entry, index, slotLabel }) => {
+          const isExtraSlot = index >= baseLabels.length
+          const canRemoveSlot = Boolean(entry.file) || (isExtraSlot && slotCount > minSlots)
+
+          return (
+            <div
+              key={entry.id || `${label}-${index}`}
+              className={`rounded-xl border bg-slate-50 p-4 ${singleRow ? "min-w-[220px]" : ""}`}
+            >
+              {slotLabels && (
+                <p className="mb-3 text-sm font-semibold text-slate-700">{slotLabel}</p>
+              )}
+
+              {showDescriptionInput && (
+                <input
+                  type="text"
+                  value={entry.description}
+                  onChange={(e) => setSlotDescription(index, e.target.value)}
+                  placeholder={slotLabels ? slotLabel : descriptionPlaceholder}
+                  className="mb-3 w-full rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
+                />
+              )}
+
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-slate-300 bg-white px-4 py-2 text-sm text-slate-600 hover:border-blue-400 hover:text-blue-600">
+                  <Upload className="h-4 w-4" />
+                  <span>{entry.file ? "Replace file" : "Upload file"}</span>
+                  <input
+                    type="file"
+                    accept={accept}
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] ?? null
+                      if (file) {
+                        setSlotFile(index, file)
+                      }
+                      e.target.value = ""
+                    }}
+                  />
+                </label>
+
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="truncate text-xs text-slate-500">
+                    {entry.file ? entry.file.name : "No file selected"}
+                  </span>
+                  {canRemoveSlot && (
+                    <button
+                      type="button"
+                      onClick={() => clearSlot(index)}
+                      className="text-slate-400 transition-colors hover:text-red-500"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {allowAddMore && (
+        <button
+          type="button"
+          onClick={addSlot}
+          className="mt-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100"
+        >
+          Add another file
+        </button>
+      )}
+
+      <p className="mt-2 text-xs text-slate-400">
+        Uploaded files: {uploadedCount}
+      </p>
+
+      {uploadedCount === 0 && onMissingTrigger && (
         <ConsultationTrigger message={onMissingTrigger} />
       )}
     </div>
@@ -1862,7 +2210,8 @@ function SignaturePad({
       </div>
       <div className="flex justify-between items-center mt-2">
         <p className="text-xs text-slate-400">
-          Draw your signature above using a mouse or touch
+          Draw your normal signature inside the box using your mouse, finger, or stylus. If you make a mistake,
+          click Clear and sign again before submitting.
         </p>
         <button
           type="button"
@@ -2462,6 +2811,8 @@ function EligibilityCheckPage() {
                   <Input label="Postcode" />
                 </div>
 
+                {false && (
+                  <>
                 {/* Agent Details */}
                 <SectionHeading>Agent Details</SectionHeading>
 
@@ -2486,6 +2837,91 @@ function EligibilityCheckPage() {
                           <Input label="Agent Name" />
                           <Input label="Agent Address" />
                           <Input label="Agent Contact" />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+                  </>
+                )}
+
+                <SectionHeading>Council Information</SectionHeading>
+                {(() => {
+                  const previousCouncilApplication =
+                    savedFormData["Have you previously applied to the council?"]
+
+                  return (
+                    <div className="grid grid-cols-2 gap-6 mb-6">
+                      <div className="col-span-2">
+                        <RadioGroupField
+                          label="Have you previously applied to the council?"
+                          options={["Yes", "No"]}
+                          tooltip="If yes, we will collect details about the earlier council application before proceeding."
+                        />
+                      </div>
+
+                      {previousCouncilApplication === "Yes" && (
+                        <div className="col-span-2 grid grid-cols-2 gap-6 animate-in fade-in duration-300">
+                          <div className="col-span-2">
+                            <FieldLabel
+                              label="What was previously proposed, and was it approved, refused, or withdrawn?"
+                              wrapperClassName="mb-1"
+                            />
+                            <textarea
+                              rows={3}
+                              placeholder="Describe the earlier proposal, what was applied for, and whether it was approved, refused, or withdrawn..."
+                              className="w-full rounded-xl border px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
+                              value={asStringValue(
+                                savedFormData[
+                                  "What was previously proposed, and was it approved, refused, or withdrawn?"
+                                ]
+                              )}
+                              onChange={e =>
+                                updateSection("eligibility", {
+                                  formData: {
+                                    ...savedFormData,
+                                    "What was previously proposed, and was it approved, refused, or withdrawn?":
+                                      e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                          </div>
+                          <Input label="Planning Reference Number *" />
+                          <Input label="Which council have you applied for?" />
+                          <Input label="Type of Application *" />
+                          <Input
+                            label="Type of Development Previously Proposed"
+                            placeholder="For example: boundary wall, bridge, rear extension, access road"
+                          />
+
+                          <div className="col-span-2">
+                            <FieldLabel
+                              label="What are you planning to apply for now?"
+                              wrapperClassName="mb-1"
+                            />
+                            <textarea
+                              rows={3}
+                              placeholder="Describe the project you want to apply for now..."
+                              className="w-full rounded-xl border px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
+                              value={asStringValue(savedFormData["What are you planning to apply for now?"])}
+                              onChange={e =>
+                                updateSection("eligibility", {
+                                  formData: {
+                                    ...savedFormData,
+                                    "What are you planning to apply for now?": e.target.value,
+                                  },
+                                })
+                              }
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <RadioGroupField
+                              label="Is this project similar to the previous application or different this time?"
+                              options={["Yes", "No"]}
+                              tooltip="Let us know whether the new proposal is broadly the same as the earlier application or a different scheme."
+                            />
+                          </div>
                         </div>
                       )}
                     </div>
@@ -2545,8 +2981,8 @@ function EligibilityCheckPage() {
                 <div className="grid grid-cols-2 gap-6 mb-6">
                   <Input label="Existing Property Width (m)" />
                   <Input label="Existing Property Depth (m)" />
+                  <Input label="Proposed Extension Width (m)" />
                   <Input label="Proposed Extension Depth (m)" />
-                  <Input label="Proposed Extension Height (m)" />
                   <Input label="Ridge / Eaves Height (m)" />
                   <Input label="Distance from Boundary (m)" />
                 </div>
@@ -2568,7 +3004,7 @@ function EligibilityCheckPage() {
                   />
                 </div>
 
-                <SectionHeading>Plans, Drawings & Photographs (Row 009)</SectionHeading>
+                <SectionHeading>Plans, Drawings & Photographs</SectionHeading>
                 <div className="grid grid-cols-2 gap-4 mb-2">
                   <FileUploadArea
                     label="Location Plan (1:1250 or 1:2500)"
@@ -2584,23 +3020,32 @@ function EligibilityCheckPage() {
                     hint="Block plan of the site showing proposed development"
                     onMissingTrigger="No site plan uploaded — our CAD team can prepare this for you."
                   />
-                  <FileUploadArea
+                  <StructuredFileUploadArea
                     label="Existing & Proposed Elevations"
                     accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf"
-                    multiple={false}
                     hint="All affected elevations at 1:50 or 1:100"
+                    slotLabels={["Existing elevation", "Proposed elevation"]}
+                    showDescriptionInput={false}
                     onMissingTrigger="No elevations uploaded — our architects can prepare these drawings."
                   />
-                  <FileUploadArea
+                  <StructuredFileUploadArea
                     label="Photographs of Site"
                     accept=".jpg,.jpeg,.png"
                     hint="Current site photos showing all elevations"
+                    minSlots={5}
+                    singleRow
+                    allowAddMore
+                    descriptionPlaceholder="For example: front view, rear garden, side boundary"
                     onMissingTrigger="No photographs uploaded — please add photos of the existing property."
                   />
-                  <FileUploadArea
+                  <StructuredFileUploadArea
                     label="Additional Drawings (floor plans, sections etc.)"
                     accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf"
                     hint="Any other supporting drawings"
+                    minSlots={5}
+                    singleRow
+                    allowAddMore
+                    descriptionPlaceholder="For example: ground floor plan, roof plan, section A-A"
                     onMissingTrigger="Consider uploading floor plans or sections to support your application."
                   />
                 </div>
@@ -2626,7 +3071,7 @@ function EligibilityCheckPage() {
                   />
                 </div>
 
-                <SectionHeading>Access & Parking (Row 010)</SectionHeading>
+                <SectionHeading>Access & Parking</SectionHeading>
                 <div className="grid grid-cols-2 gap-6 mb-6">
                   <RadioGroupField
                     label="New or altered vehicle access?"
@@ -2641,30 +3086,30 @@ function EligibilityCheckPage() {
                   />
                 </div>
 
-                <SectionHeading>Trees, Hedges & Landscaping (Row 011)</SectionHeading>
+                <SectionHeading>Trees, Hedges & Landscaping</SectionHeading>
                 <div className="grid grid-cols-2 gap-6 mb-6">
                   <RadioGroupField
                     label="Trees with TPO on or near site?"
                     options={["Yes", "No", "Don't know"]}
-                    consultTrigger="A Tree Survey (BS5837) may be required. We can arrange this for you."
+                    consultTrigger="AArboriculture Report (BS5837) may be required. We can arrange this for you."
                   />
                   <RadioGroupField
                     label="Trees within falling distance of works?"
                     options={["Yes", "No", "Don't know"]}
-                    consultTrigger="A Tree Survey (BS5837) may be required. We can arrange this for you."
+                    consultTrigger="AArboriculture Report (BS5837) may be required. We can arrange this for you."
                   />
                   <Input label="Tree Species (if known)" />
                   <Input label="Approximate Tree Height (m)" />
                   <FileUploadArea
-                    label="Tree Survey / BS5837 Report (if available)"
+                    label="Arboriculture Report / BS5837 Report (if available)"
                     accept=".pdf,.jpg,.jpeg,.png"
                     multiple={false}
                     hint="Plan showing tree positions, root protection areas and species"
-                    onMissingTrigger="No tree plan uploaded — we can commission a BS5837 tree survey on your behalf."
+                    onMissingTrigger="No tree plan uploaded — we can commission a BS5837Arboriculture Report on your behalf."
                   />
                 </div>
 
-                <SectionHeading>Flood & Environmental Risk (Row 012)</SectionHeading>
+                <SectionHeading>Flood & Environmental Risk</SectionHeading>
                 <div className="grid grid-cols-2 gap-6 mb-6">
                   <RadioGroupField
                     label="Is the site in Flood Zone 2 or 3?"
@@ -2685,7 +3130,7 @@ function EligibilityCheckPage() {
                   />
                 </div>
 
-                <SectionHeading>Pre-Application Advice (Row 014)</SectionHeading>
+                {/* <SectionHeading>Pre-Application Advice</SectionHeading>
                 <div className="grid grid-cols-2 gap-6 mb-2">
                   <RadioGroupField
                     label="Has pre-application advice been sought?"
@@ -2718,7 +3163,7 @@ function EligibilityCheckPage() {
             {/* ── STEP 4: Utilities, Ownership Certificates & Additional Consents (rows 013, 015, 016) ── */}
             {step === 4 && (
               <>
-                <SectionHeading>Utilities & Waste (Row 013)</SectionHeading>
+                <SectionHeading>Utilities & Waste</SectionHeading>
                 <div className="grid grid-cols-2 gap-6 mb-6">
                   <SelectField label="Water Supply" options={[
                     "Mains connected", "Borehole / private supply", "Not applicable", "Don't know",
@@ -2739,7 +3184,7 @@ function EligibilityCheckPage() {
                   <Input label="Details of Renewable / Energy Measures (if applicable)" />
                 </div>
 
-                <SectionHeading>Ownership Certificate (Row 015)</SectionHeading>
+                <SectionHeading>Ownership Certificate</SectionHeading>
                 <div className="grid grid-cols-2 gap-6 mb-6">
                   <SelectField
                     label="Which Ownership Certificate applies?"
@@ -2771,7 +3216,7 @@ function EligibilityCheckPage() {
                   </div>
                 </div>
 
-                <SectionHeading>Additional Consents Required (Row 016)</SectionHeading>
+                <SectionHeading>Additional Consents Required</SectionHeading>
                 <div className="grid grid-cols-2 gap-6 mb-2">
                   <CheckboxGroup
                     label="Additional Consents"
@@ -2825,6 +3270,10 @@ function EligibilityCheckPage() {
                 </div>
 
                 <SectionHeading>Digital Signature</SectionHeading>
+                <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                  Draw your signature exactly as you normally sign. Use a mouse on desktop or your finger/stylus on
+                  touch devices, and if the signature is not clear, press Clear and draw it again.
+                </div>
                 <div className="grid grid-cols-2 gap-6 mb-6">
                   <Input label="Full Name of Signatory" />
                   <Input label="Date (dd/mm/yyyy)" />

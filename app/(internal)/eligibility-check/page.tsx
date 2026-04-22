@@ -262,7 +262,7 @@ export default function EligibilityCheckPage() {
                   <Input label="Existing Property Width (m)" defaultValue={formData.dimensions.existingPropertyWidthM} />
                   <Input label="Existing Property Depth (m)" defaultValue={formData.dimensions.existingPropertyDepthM} />
                   <Input label="Proposed Extension Depth (m)" defaultValue={formData.dimensions.proposedExtensionDepthM} />
-                  <Input label="Proposed Extension Height (m)" defaultValue={formData.dimensions.proposedExtensionHeightM} />
+                  <Input label="Proposed Extension width (m)" defaultValue={formData.dimensions.proposedExtensionHeightM} />
                   <Select label="External Materials" defaultValue={formData.dimensions.externalMaterials} options={["Match existing","Different materials","Not decided / Don’t know"]} />
                   <Input label="Brief Description of Proposed Works" defaultValue={formData.dimensions.briefDescription} />
                 </div>

@@ -97,6 +97,8 @@ import { useEffect, useRef, useState } from "react"
 import { useUserIdentity } from "@/lib/use-user-identity"
 import { useProject } from "@/app/context/ProjectContext"
 import axiosInstance from "@/lib/axiosinstance"
+import { extractProjectsFromResponse } from "@/lib/project-api"
+import { resolveProjectServiceName, useServiceCatalog } from "@/lib/use-service-catalog"
 
 type Breadcrumb = {
   label: string
@@ -175,6 +177,7 @@ export default function DashboardHeader({
   const projectRef = useRef<HTMLDivElement | null>(null)
   const { fullName, email, profilePictureUrl, userId } = useUserIdentity()
   const { data, updateSection } = useProject()
+  const serviceLabelMap = useServiceCatalog()
   const displayName = fullName || userName || "User"
   const displayEmail = email || "No email available"
   const avatarSrc = profilePictureUrl || "/profile.jpg"
@@ -183,8 +186,7 @@ export default function DashboardHeader({
   const selectedProject = projects.find((project) => project.projectId === selectedProjectId)
   const selectedProjectService = getPrimaryProjectService(selectedProject)
   const selectedProjectLabel =
-    selectedProjectService?.title ||
-    selectedProjectService?.serviceName ||
+    resolveProjectServiceName(selectedProjectService, serviceLabelMap) ||
     data.service?.plan ||
     selectedProjectId ||
     null
@@ -193,7 +195,7 @@ export default function DashboardHeader({
 
   const getProjectLabel = (project: UserProject) => {
     const service = getPrimaryProjectService(project)
-    return service?.title || service?.serviceName || project.projectId
+    return resolveProjectServiceName(service, serviceLabelMap) || project.projectId
   }
 
   const persistSelectedProject = (project: UserProject) => {
@@ -205,10 +207,12 @@ export default function DashboardHeader({
     })
 
     if (service?.serviceId || service?.title || service?.serviceName) {
+      const resolvedServiceName = resolveProjectServiceName(service, serviceLabelMap)
+
       updateSection("service", {
         serviceId: service.subServiceId || service.serviceId,
-        plan: service.title || service.serviceName,
-        category: service.serviceName,
+        plan: resolvedServiceName || service.title || service.serviceName,
+        category: service.serviceName || resolvedServiceName,
         description: service.description,
         image: service.image,
       })
@@ -260,8 +264,7 @@ export default function DashboardHeader({
 
         if (isCancelled) return
 
-        const projectList = Array.isArray(response.data?.data) ? response.data.data : []
-        const filteredProjects = projectList.filter((project) => Boolean(project.projectId))
+        const filteredProjects = extractProjectsFromResponse(response.data)
         setProjects(filteredProjects)
 
         if (filteredProjects.length === 1) {
@@ -309,15 +312,16 @@ export default function DashboardHeader({
 
     const service = getPrimaryProjectService(matchingProject)
     if (!service) return
+    const resolvedServiceName = resolveProjectServiceName(service, serviceLabelMap)
 
     updateSection("service", {
       serviceId: service.subServiceId || service.serviceId,
-      plan: service.title || service.serviceName,
-      category: service.serviceName,
+      plan: resolvedServiceName || service.title || service.serviceName,
+      category: service.serviceName || resolvedServiceName,
       description: service.description,
       image: service.image,
     })
-  }, [projects, selectedProjectId])
+  }, [projects, selectedProjectId, serviceLabelMap])
 
   const handleProjectSelect = async (project: UserProject) => {
     persistSelectedProject(project)

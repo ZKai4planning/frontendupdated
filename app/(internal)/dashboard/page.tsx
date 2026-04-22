@@ -29,6 +29,8 @@ import {
   resolveProjectProgressIndex,
 } from "@/lib/project-flow"
 import { useUserIdentity } from "@/lib/use-user-identity"
+import { extractProjectFromResponse } from "@/lib/project-api"
+import { resolveProjectServiceName, useServiceCatalog } from "@/lib/use-service-catalog"
 
 type StepStatus = "completed" | "active"
 
@@ -140,6 +142,7 @@ function DashboardOverview() {
   const searchParams = useSearchParams()
   const { data } = useProject()
   const { fullName } = useUserIdentity()
+  const serviceLabelMap = useServiceCatalog()
 
   const displayName = fullName || "User"
   const selectedProjectId = data.eligibility?.projectId ?? null
@@ -167,7 +170,7 @@ function DashboardOverview() {
         )
 
         if (isCancelled) return
-        setProjectDetail(response.data?.data ?? null)
+        setProjectDetail(extractProjectFromResponse(response.data))
       } catch {
         if (isCancelled) return
         setProjectDetail(null)
@@ -230,8 +233,7 @@ function DashboardOverview() {
   const projectStatusLabel = formatProjectStatus(projectDetail?.status)
   const primaryProjectService = getPrimaryProjectService(projectDetail)
   const projectServiceLabel =
-    primaryProjectService?.title ||
-    primaryProjectService?.serviceName ||
+    resolveProjectServiceName(primaryProjectService, serviceLabelMap) ||
     data.service?.plan ||
     "No service selected"
   const projectSummaryText =
