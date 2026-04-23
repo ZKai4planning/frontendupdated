@@ -244,6 +244,69 @@ const getFirstPathValue = (record: Record<string, unknown>, paths: string[][]) =
   return undefined
 }
 
+const splitApplicantFullName = (value: unknown) => {
+  if (typeof value !== "string") {
+    return { firstName: "", middleName: "", lastName: "" }
+  }
+
+  const parts = value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+
+  if (parts.length === 0) {
+    return { firstName: "", middleName: "", lastName: "" }
+  }
+
+  if (parts.length === 1) {
+    return { firstName: parts[0], middleName: "", lastName: "" }
+  }
+
+  if (parts.length === 2) {
+    return { firstName: parts[0], middleName: "", lastName: parts[1] }
+  }
+
+  return {
+    firstName: parts[0],
+    middleName: parts.slice(1, -1).join(" "),
+    lastName: parts[parts.length - 1],
+  }
+}
+
+const extractLegacyApplicantContact = (value: unknown) => {
+  if (typeof value !== "string") {
+    return { emailAddress: "", countryCode: "", phoneNumber: "" }
+  }
+
+  const emailMatch = value.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)
+  const phoneMatch = value.match(/\+?\d[\d\s()\-]{5,}\d/)
+  const phoneValue = phoneMatch?.[0]?.trim() ?? ""
+  const countryCodeMatch = phoneValue.match(/^\+\d{1,4}/)
+  const countryCode = countryCodeMatch?.[0] ?? ""
+  const phoneNumber = countryCode
+    ? phoneValue.slice(countryCode.length).trim().replace(/^[\s\-()]+/, "")
+    : phoneValue
+
+  return {
+    emailAddress: emailMatch?.[0] ?? "",
+    countryCode,
+    phoneNumber,
+  }
+}
+
+const splitLegacySiteAddress = (value: unknown) => {
+  if (typeof value !== "string") {
+    return { line1: "", line2: "" }
+  }
+
+  const [line1 = "", line2 = ""] = value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  return { line1, line2 }
+}
+
 const normalizeBooleanLike = (value: unknown): boolean | null => {
   if (typeof value === "boolean") return value
   if (typeof value === "number") return value !== 0
@@ -349,20 +412,43 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
     mode?: "display" | "declaration" | "array"
   }> = [
     {
-      label: "Applicant Full Name",
-      paths: [["applicantAndProperty", "applicantDetails", "fullName"]],
+      label: "Applicant First Name",
+      paths: [["applicantAndProperty", "applicantDetails", "firstName"]],
     },
     {
-      label: "Contact Email / Phone",
-      paths: [["applicantAndProperty", "applicantDetails", "contactEmailPhone"]],
+      label: "Applicant Middle Name",
+      paths: [["applicantAndProperty", "applicantDetails", "middleName"]],
     },
     {
-      label: "Site Address",
-      paths: [["applicantAndProperty", "applicantDetails", "siteAddress"]],
+      label: "Applicant Last Name",
+      paths: [["applicantAndProperty", "applicantDetails", "lastName"]],
+    },
+    {
+      label: "Email Address",
+      paths: [["applicantAndProperty", "applicantDetails", "emailAddress"]],
+    },
+    {
+      label: "Country Code",
+      paths: [["applicantAndProperty", "applicantDetails", "countryCode"]],
+    },
+    {
+      label: "Phone Number",
+      paths: [["applicantAndProperty", "applicantDetails", "phoneNumber"]],
+    },
+    {
+      label: "Site Address Line 1",
+      paths: [["applicantAndProperty", "applicantDetails", "siteAddress", "line1"]],
+    },
+    {
+      label: "Site Address Line 2",
+      paths: [["applicantAndProperty", "applicantDetails", "siteAddress", "line2"]],
     },
     {
       label: "Postcode",
-      paths: [["applicantAndProperty", "applicantDetails", "postcode"]],
+      paths: [
+        ["applicantAndProperty", "applicantDetails", "siteAddress", "postcode"],
+        ["applicantAndProperty", "applicantDetails", "postcode"],
+      ],
     },
     {
       label: "Are you using a planning agent?",
@@ -403,10 +489,6 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
     {
       label: "Type of Development Previously Proposed",
       paths: [["applicantAndProperty", "councilApplicationHistory", "previousDevelopmentType"]],
-    },
-    {
-      label: "What are you planning to apply for now?",
-      paths: [["applicantAndProperty", "councilApplicationHistory", "currentPlanDetails"]],
     },
     {
       label: "Is this project similar to the previous application or different this time?",
@@ -744,6 +826,41 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
     setEligibilityFormValue(formData, label, getFirstPathValue(record, paths), mode)
   })
 
+  const setMissingValue = (label: string, value: unknown) => {
+    if (asStringValue(formData[label]).trim()) return
+    setEligibilityFormValue(formData, label, value)
+  }
+
+  const legacyFullName =
+    getFirstPathValue(record, [["applicantAndProperty", "applicantDetails", "fullName"]]) ??
+    formData["Applicant Full Name"]
+  const legacyContact =
+    getFirstPathValue(record, [["applicantAndProperty", "applicantDetails", "contactEmailPhone"]]) ??
+    formData["Contact Email / Phone"]
+  const legacySiteAddress =
+    getFirstPathValue(record, [["applicantAndProperty", "applicantDetails", "siteAddress"]]) ??
+    formData["Site Address"]
+  const legacyPostcode =
+    getFirstPathValue(record, [["applicantAndProperty", "applicantDetails", "postcode"]]) ??
+    formData["Postcode"]
+  const legacyCouncil = formData["Council"]
+
+  const legacyNameParts = splitApplicantFullName(legacyFullName)
+  setMissingValue("Applicant First Name", legacyNameParts.firstName)
+  setMissingValue("Applicant Middle Name", legacyNameParts.middleName)
+  setMissingValue("Applicant Last Name", legacyNameParts.lastName)
+
+  const legacyContactDetails = extractLegacyApplicantContact(legacyContact)
+  setMissingValue("Email Address", legacyContactDetails.emailAddress)
+  setMissingValue("Country Code", legacyContactDetails.countryCode)
+  setMissingValue("Phone Number", legacyContactDetails.phoneNumber)
+
+  const legacyAddressLines = splitLegacySiteAddress(legacySiteAddress)
+  setMissingValue("Site Address Line 1", legacyAddressLines.line1)
+  setMissingValue("Site Address Line 2", legacyAddressLines.line2)
+  setMissingValue("Postcode", legacyPostcode)
+  setMissingValue("Which council have you applied for?", legacyCouncil)
+
   return formData
 }
 
@@ -898,16 +1015,30 @@ const buildEligibilityStepPayload = (
   formValues: EligibilityFormValues
 ) => {
   const getValue = (label: string) => asStringValue(formValues[label])
+  const buildApplicantSiteAddress = () => {
+    const line1 = getValue("Site Address Line 1")
+    const line2 = getValue("Site Address Line 2")
+    const postcode = getValue("Postcode")
+
+    if (![line1, line2, postcode].some(Boolean)) {
+      return undefined
+    }
+
+    return { line1, line2, postcode }
+  }
 
   switch (step) {
     case 1:
       return {
         applicantAndProperty: {
           applicantDetails: {
-            fullName: getValue("Applicant Full Name"),
-            contactEmailPhone: getValue("Contact Email / Phone"),
-            siteAddress: getValue("Site Address"),
-            postcode: getValue("Postcode"),
+            firstName: getValue("Applicant First Name"),
+            middleName: getValue("Applicant Middle Name"),
+            lastName: getValue("Applicant Last Name"),
+            emailAddress: getValue("Email Address"),
+            countryCode: getValue("Country Code"),
+            phoneNumber: getValue("Phone Number"),
+            siteAddress: buildApplicantSiteAddress(),
           },
           agentDetails: {
             usesPlanningAgent: getBooleanFieldValue(formValues, "Are you using a planning agent?"),
@@ -927,7 +1058,6 @@ const buildEligibilityStepPayload = (
             councilName: getValue("Which council have you applied for?"),
             previousApplicationType: getValue("Type of Application *"),
             previousDevelopmentType: getValue("Type of Development Previously Proposed"),
-            currentPlanDetails: getValue("What are you planning to apply for now?"),
             projectComparison: getValue(
               "Is this project similar to the previous application or different this time?"
             ),
@@ -1205,10 +1335,17 @@ const mapAICheckToFieldValue = (label: string, result: AICheckResult) => {
 }
 
 const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
-  "Applicant Full Name": "Enter the full legal name of the primary applicant.",
-  "Contact Email / Phone": "We use this to contact you about eligibility questions or next steps.",
-  "Site Address": "Full address of the property where the works are proposed.",
+  "Applicant First Name": "Enter the applicant's first name.",
+  "Applicant Middle Name": "Enter the applicant's middle name if applicable.",
+  "Applicant Last Name": "Enter the applicant's last name.",
+  "Email Address": "We use this email to contact you about eligibility questions or next steps.",
+  "Country Code": "Enter the dialing code for the applicant's phone number, such as +44.",
+  "Phone Number": "Enter the applicant's main contact number without the country code.",
+  "Site Address Line 1": "Primary address line for the property where the works are proposed.",
+  "Site Address Line 2": "Optional second address line for the property.",
   "Postcode": "Postcode helps us identify planning constraints in your area.",
+  "Which council have you applied for?":
+    "Name of the council that handled the earlier application.",
   "Are you using a planning agent?": "Tell us if a professional is acting on your behalf for the application.",
   "Agent Name": "Name of the planning agent or firm.",
   "Agent Address": "Address of the planning agent or firm.",
@@ -1219,14 +1356,10 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
     "Summarise the earlier scheme and confirm whether it was approved, refused, or withdrawn.",
   "Planning Reference Number *":
     "Reference number issued by the council for the earlier application.",
-  "Which council have you applied for?":
-    "Name of the council that handled the earlier application.",
   "Type of Application *":
     "Type of planning application previously submitted to the council.",
   "Type of Development Previously Proposed":
     "Select the development type that was proposed before.",
-  "What are you planning to apply for now?":
-    "Describe the current scheme you want to submit now.",
   "Is this project similar to the previous application or different this time?":
     "Tell us whether the current proposal is similar to or different from the earlier one.",
   "Property Type": "Select the type of existing property.",
@@ -1308,9 +1441,14 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
 }
 
 const ELIGIBILITY_QUESTION_ORDER = [
-  "Applicant Full Name",
-  "Contact Email / Phone",
-  "Site Address",
+  "Applicant First Name",
+  "Applicant Middle Name",
+  "Applicant Last Name",
+  "Email Address",
+  "Phone Number",
+  "Site Address Line 1",
+  "Site Address Line 2",
+  "Which council have you applied for?",
   "Postcode",
   "Are you using a planning agent?",
   "Agent Name",
@@ -1319,10 +1457,8 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Have you previously applied to the council?",
   "What was previously proposed, and was it approved, refused, or withdrawn?",
   "Planning Reference Number *",
-  "Which council have you applied for?",
   "Type of Application *",
   "Type of Development Previously Proposed",
-  "What are you planning to apply for now?",
   "Is this project similar to the previous application or different this time?",
   "Property Type",
   "Ownership Status",
@@ -2998,11 +3134,22 @@ function EligibilityCheckPage() {
             {step === 1 && (
               <>
                 <SectionHeading>Applicant Details</SectionHeading>
-                <div className="grid grid-cols-2 gap-6 mb-6">
-                  <Input label="Applicant Full Name" />
-                  <Input label="Contact Email / Phone" />
-                  <AddressLinesField label="Site Address" />
-                  <Input label="Postcode" />
+                <div className="mb-6 space-y-6">
+                  <div className="grid gap-6 md:grid-cols-3">
+                    <Input label="Applicant First Name" />
+                    <Input label="Applicant Middle Name" />
+                    <Input label="Applicant Last Name" />
+                  </div>
+                  <div className="grid gap-6 md:grid-cols-3">
+                    <Input label="Email Address" />
+                    <PhoneNumberField />
+                    <Input label="Site Address Line 1" />
+                  </div>
+                  <div className="grid gap-6 md:grid-cols-3">
+                    <Input label="Site Address Line 2" />
+                    <Input label="Which council have you applied for?" />
+                    <Input label="Postcode" />
+                  </div>
                 </div>
 
                 {false && (
@@ -3039,7 +3186,7 @@ function EligibilityCheckPage() {
                   </>
                 )}
 
-                <SectionHeading>Council Information</SectionHeading>
+                <SectionHeading>Pre-Application Check</SectionHeading>
                 {(() => {
                   const previousCouncilApplication =
                     savedFormData["Have you previously applied to the council?"]
@@ -3082,33 +3229,16 @@ function EligibilityCheckPage() {
                             />
                           </div>
                           <Input label="Planning Reference Number *" />
-                          <Input label="Which council have you applied for?" />
+                          <Input
+                            label="Which council have you applied for?"
+                            questionNumber={0}
+                            fieldIdOverride="eligibility-field-which-council-have-you-applied-for-pre-application"
+                          />
                           <Input label="Type of Application *" />
                           <Input
                             label="Type of Development Previously Proposed"
                             placeholder="For example: boundary wall, bridge, rear extension, access road"
                           />
-
-                          <div className="col-span-2">
-                            <FieldLabel
-                              label="What are you planning to apply for now?"
-                              wrapperClassName="mb-1"
-                            />
-                            <textarea
-                              rows={3}
-                              placeholder="Describe the project you want to apply for now..."
-                              className="w-full rounded-xl border px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
-                              value={asStringValue(savedFormData["What are you planning to apply for now?"])}
-                              onChange={e =>
-                                updateSection("eligibility", {
-                                  formData: {
-                                    ...savedFormData,
-                                    "What are you planning to apply for now?": e.target.value,
-                                  },
-                                })
-                              }
-                            />
-                          </div>
                           <div className="col-span-2">
                             <RadioGroupField
                               label="Is this project similar to the previous application or different this time?"
@@ -3714,15 +3844,17 @@ function Input({
   placeholder,
   tooltip,
   questionNumber,
+  fieldIdOverride,
 }: {
   label: string
   placeholder?: string
   tooltip?: string
   questionNumber?: number
+  fieldIdOverride?: string
 }) {
   const { data, updateSection } = useProject()
   const value = asStringValue(data.eligibility?.formData?.[label])
-  const fieldId = getFieldId(label)
+  const fieldId = fieldIdOverride ?? getFieldId(label)
 
   return (
     <div id={fieldId}>
@@ -3746,48 +3878,51 @@ function Input({
   )
 }
 
-function AddressLinesField({
-  label,
+function PhoneNumberField({
   tooltip,
   questionNumber,
 }: {
-  label: string
   tooltip?: string
   questionNumber?: number
 }) {
   const { data, updateSection } = useProject()
-  const value = asStringValue(data.eligibility?.formData?.[label])
-  const [addressLine1 = "", addressLine2 = ""] = value.split(/\r?\n/, 2)
-  const fieldId = getFieldId(label)
+  const formData = data.eligibility?.formData || {}
+  const countryCode = asStringValue(formData["Country Code"])
+  const phoneNumber = asStringValue(formData["Phone Number"])
+  const fieldId = getFieldId("Phone Number")
 
-  const updateAddress = (line1: string, line2: string) => {
-    const nextValue = [line1.trim(), line2.trim()].filter(Boolean).join("\n")
-
+  const updatePhone = (nextCountryCode: string, nextPhoneNumber: string) => {
     updateSection("eligibility", {
-      formData: { ...(data.eligibility?.formData || {}), [label]: nextValue },
+      formData: {
+        ...formData,
+        "Country Code": nextCountryCode,
+        "Phone Number": nextPhoneNumber,
+      },
     })
   }
 
   return (
     <div id={fieldId}>
       <FieldLabel
-        label={label}
+        label="Phone Number"
         tooltip={tooltip}
         questionNumber={questionNumber}
         wrapperClassName="mb-0"
       />
-      <div className="mt-1 space-y-3">
+      <div className="mt-1 flex gap-3">
         <input
-          value={addressLine1}
-          placeholder="Address line 1"
-          onChange={(e) => updateAddress(e.target.value, addressLine2)}
-          className="w-full rounded-xl border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 transition-shadow"
+          type="tel"
+          value={countryCode}
+          placeholder="+44"
+          onChange={(e) => updatePhone(e.target.value, phoneNumber)}
+          className="w-24 rounded-xl border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 transition-shadow"
         />
         <input
-          value={addressLine2}
-          placeholder="Address line 2"
-          onChange={(e) => updateAddress(addressLine1, e.target.value)}
-          className="w-full rounded-xl border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 transition-shadow"
+          type="tel"
+          value={phoneNumber}
+          placeholder="Phone number"
+          onChange={(e) => updatePhone(countryCode, e.target.value)}
+          className="flex-1 rounded-xl border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 transition-shadow"
         />
       </div>
     </div>
