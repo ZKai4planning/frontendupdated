@@ -33,8 +33,6 @@ export type ProjectData = {
   eligibility?: {
     /* 🔹 Dynamic form storage (used by Eligibility page) */
     formData?: Record<string, string | string[]>
-    aiFilled?: Record<string, boolean>
-    aiDismissed?: Record<string, boolean>
     projectId?: string
     projectStageId?: string
     isDraft?: boolean

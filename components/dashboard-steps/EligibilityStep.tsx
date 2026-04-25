@@ -4,7 +4,6 @@ import { useProject } from "@/app/context/ProjectContext"
 
 import React, { Suspense, useEffect, useState, useRef } from "react"
 import { useRouter, usePathname, useSearchParams, useParams } from "next/navigation"
-import { Button } from "@/components/ui/button"
 import {
   Info,
   FileSearch,
@@ -17,7 +16,6 @@ import {
   X,
   PenLine,
   AlertCircle,
-  Zap,
 } from "lucide-react"
 import {
   PROJECT_FLOW,
@@ -29,10 +27,14 @@ import {
 } from "@/lib/project-flow"
 import { useUserIdentity } from "@/lib/use-user-identity"
 import axiosInstance from "@/lib/axiosinstance"
+import { ApplicantPropertyStepContent } from "@/components/dashboard-steps/eligibility/ApplicantPropertyStepContent"
+import { WorksMaterialsStepContent } from "@/components/dashboard-steps/eligibility/WorksMaterialsStepContent"
+import { SiteConstraintsStepContent } from "@/components/dashboard-steps/eligibility/SiteConstraintsStepContent"
+import { UtilitiesConsentsStepContent } from "@/components/dashboard-steps/eligibility/UtilitiesConsentsStepContent"
+import { DeclarationsStepContent } from "@/components/dashboard-steps/eligibility/DeclarationsStepContent"
+import { FloatingAgentWidget } from "@/components/dashboard-steps/eligibility/FloatingAgentWidget"
 
 type Step = 1 | 2 | 3 | 4 | 5
-type PlanType = "bronze" | "silver" | "gold" | "platinum"
-type ActivePlanType = PlanType | null
 type EligibilitySaveStatus = "in_progress" | "draft" | "submitted"
 type EligibilityFormValue = string | string[] | undefined
 type EligibilityFormValues = Record<string, EligibilityFormValue>
@@ -52,6 +54,18 @@ type EligibilityAssetsContextValue = {
   setSignatureFile: React.Dispatch<React.SetStateAction<File | null>>
 }
 
+type EligibilityAgentSidebarState = {
+  id: string
+  fieldLabel: string
+  message?: string
+} | null
+
+type EligibilityAgentContextValue = {
+  agentSidebar: EligibilityAgentSidebarState
+  showAgentSidebar: (payload: NonNullable<EligibilityAgentSidebarState>) => void
+  hideAgentSidebar: () => void
+}
+
 const DEFAULT_ELIGIBILITY_TOOLTIP = ""
 const ELIGIBILITY_SERVICE_ID = "grexnb"
 const ELIGIBILITY_CREATE_ENDPOINT =
@@ -62,20 +76,21 @@ const MAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024
 const MAX_UPLOAD_FILE_SIZE_LABEL = "10 MB"
 
 const EligibilityStepContext = React.createContext<Step>(1)
-const EligibilityAIContext = React.createContext({
-  planType: null as ActivePlanType,
-  usedChecks: 0,
-  totalChecks: 0,
-  consumeCheck: () => {},
-})
 const EligibilityAssetsContext = React.createContext<EligibilityAssetsContextValue | null>(null)
+const EligibilityAgentContext = React.createContext<EligibilityAgentContextValue | null>(null)
 
 const useEligibilityStep = () => React.useContext(EligibilityStepContext)
-const useEligibilityAI = () => React.useContext(EligibilityAIContext)
 const useEligibilityAssets = () => {
   const context = React.useContext(EligibilityAssetsContext)
   if (!context) {
     throw new Error("useEligibilityAssets must be used within EligibilityAssetsContext")
+  }
+  return context
+}
+const useEligibilityAgent = () => {
+  const context = React.useContext(EligibilityAgentContext)
+  if (!context) {
+    throw new Error("useEligibilityAgent must be used within EligibilityAgentContext")
   }
   return context
 }
@@ -86,11 +101,23 @@ const getFieldId = (label: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "")}`
 
-const isDontKnowValue = (value?: string) => {
-  if (!value) return false
-  const normalized = value.toLowerCase()
-  return normalized.includes("don't know") || normalized === "unsure"
+const isAgentSidebarTriggerValue = (value: string) => {
+  const normalized = value.trim().toLowerCase()
+  return (
+    normalized.includes("don't know") ||
+    normalized === "unsure" ||
+    normalized === "not required"
+  )
 }
+
+const createAgentSidebarPayload = (fieldLabel: string, message?: string) => ({
+  id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+  fieldLabel,
+  message,
+})
+
+const shouldShowAgentActionUi = (label: string) =>
+  label !== "Community consultation undertaken?"
 
 const asStringValue = (value: string | string[] | undefined) =>
   typeof value === "string" ? value : ""
@@ -1277,63 +1304,6 @@ const buildEligibilityMultipartFormData = ({
   return formData
 }
 
-const PLAN_CHECK_LIMITS: Record<PlanType, number> = {
-  bronze: 10,
-  silver: 25,
-  gold: 50,
-  platinum: 100,
-}
-
-const getStoredPlanType = (): ActivePlanType => {
-  if (typeof window === "undefined") return null
-  const storedPlan = window.sessionStorage.getItem("aiPlanType")
-  if (storedPlan && ["bronze", "silver", "gold", "platinum"].includes(storedPlan)) {
-    return storedPlan as PlanType
-  }
-  return null
-}
-
-const getStoredUsedChecks = (): number | null => {
-  if (typeof window === "undefined") return null
-  const storedUsed = window.sessionStorage.getItem("aiUsedChecks")
-  if (storedUsed && !Number.isNaN(Number(storedUsed))) {
-    return Number(storedUsed)
-  }
-  return null
-}
-
-const normalizeYesNo = (value: string) =>
-  value.trim().toLowerCase().startsWith("y") ? "Yes" : "No"
-
-const mapAICheckToFieldValue = (label: string, result: AICheckResult) => {
-  const resolvers: Record<string, (ai: AICheckResult) => "Yes" | "No"> = {
-    "Are you using a planning agent?": () => "No",
-    "Materials match existing?": () => "Yes",
-    "New or altered vehicle access?": () => "No",
-    "Cycle storage provided?": () => "Yes",
-    "Trees with TPO on or near site?": () => "No",
-    "Trees within falling distance of works?": () => "No",
-    "Any known contamination on site?": () => "No",
-    "Has pre-application advice been sought?": () => "Yes",
-    "Renewable energy installations proposed?": () => "No",
-    "Community consultation undertaken?": () => "No",
-    "Conservation Area?": ai => normalizeYesNo(ai.conservationArea),
-    "Is the property a Listed Building?": ai => normalizeYesNo(ai.listedBuildingNearby),
-    "Is the site in Flood Zone 2 or 3?": ai => {
-      const zone = ai.floodZone.toLowerCase()
-      return zone.includes("2") || zone.includes("3") ? "Yes" : "No"
-    },
-    "Conservation Area or Near Listed Building?": ai => {
-      const conservation = normalizeYesNo(ai.conservationArea) === "Yes"
-      const listed = normalizeYesNo(ai.listedBuildingNearby) === "Yes"
-      return conservation || listed ? "Yes" : "No"
-    },
-  }
-
-  const resolver = resolvers[label]
-  return resolver ? resolver(result) : null
-}
-
 const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
   "Applicant First Name": "Enter the applicant's first name.",
   "Applicant Middle Name": "Enter the applicant's middle name if applicable.",
@@ -1539,409 +1509,29 @@ function ConsultationTrigger({ message }: { message: string }) {
   )
 }
 
-interface AICheckResult {
-  floodZone: string
-  conservationArea: string
-  listedBuildingNearby: string
-  confidence: "high" | "medium" | "low"
-  requiresAssessment: boolean
-}
-
-interface AICheckProps {
-  isUnsure: boolean
-  fieldLabel: string
-  onApply: (result: AICheckResult) => void
-  onSkip: () => void
-  planType?: PlanType
-  usedChecks?: number
-  totalChecks?: number
-  onConsume?: () => void
-}
-
-function AICheck({
-  isUnsure,
-  fieldLabel,
-  onApply,
-  onSkip,
-  planType = "bronze",
-  usedChecks = 0,
-  totalChecks = 10,
-  onConsume,
-}: AICheckProps) {
-  const [stage, setStage] = useState<"prompt" | "confirmation" | "loading" | "result">("prompt")
-  const [result, setResult] = useState<AICheckResult | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [bounceCheckmark, setBounceCheckmark] = useState(false)
-
-  useEffect(() => {
-    if (isUnsure) {
-      setStage("prompt")
-      setResult(null)
-      setError(null)
-      setBounceCheckmark(false)
-    }
-  }, [isUnsure])
-
-  const handleCheckForMe = () => {
-    setStage("confirmation")
-  }
-
-  const handleConfirm = async () => {
-    if (usedChecks >= totalChecks) return
-    setStage("loading")
-    setError(null)
-    onConsume?.()
-
-    await new Promise(resolve => setTimeout(resolve, 2000))
-
-    const mockResult: AICheckResult = {
-      floodZone: "Zone 1",
-      conservationArea: "No",
-      listedBuildingNearby: "No",
-      confidence: "high",
-      requiresAssessment: false,
-    }
-
-    setResult(mockResult)
-    setStage("result")
-    setBounceCheckmark(true)
-  }
-
-  const handleApplyResults = () => {
-    if (result) {
-      onApply(result)
-    }
-  }
-
-  const handleCancel = () => {
-    setStage("prompt")
-    setResult(null)
-  }
-
-  if (!isUnsure) return null
-
-  const fieldCopy = (() => {
-    const sourcesByLabel: Record<string, string[]> = {
-      "Are you using a planning agent?": ["Project Details", "Planning"],
-      "Materials match existing?": ["Design Brief", "Property Photos"],
-      "New or altered vehicle access?": ["Site Access", "Planning"],
-      "Cycle storage provided?": ["Site Layout", "Planning"],
-      "Trees with TPO on or near site?": ["Heritage", "Planning", "Public Records"],
-      "Trees within falling distance of works?": ["Site Layout", "Environmental"],
-      "Any known contamination on site?": ["Environmental", "Public Records"],
-      "Has pre-application advice been sought?": ["Planning", "Public Records"],
-      "Renewable energy installations proposed?": ["Design Brief", "Planning"],
-      "Community consultation undertaken?": ["Planning", "Public Records"],
-      "Is the site in Flood Zone 2 or 3?": ["Flood", "Planning", "Public Records"],
-      "Conservation Area?": ["Heritage", "Planning", "Public Records"],
-      "Is the property a Listed Building?": ["Heritage", "Planning", "Public Records"],
-      "Conservation Area or Near Listed Building?": ["Heritage", "Planning", "Public Records"],
-    }
-
-    const descriptions: Record<string, string> = {
-      "Are you using a planning agent?":
-        "We can recommend whether a planning agent is typically needed for this type of project.",
-      "Materials match existing?":
-        "We can compare the proposed materials with the existing property details.",
-      "New or altered vehicle access?":
-        "We can review access changes based on your site layout.",
-      "Cycle storage provided?":
-        "We can infer whether cycle storage is required for this type of proposal.",
-      "Trees with TPO on or near site?":
-        "We can check Tree Preservation Orders near the site automatically.",
-      "Trees within falling distance of works?":
-        "We can review the site layout to identify nearby trees.",
-      "Any known contamination on site?":
-        "We can check public environmental records for contamination flags.",
-      "Has pre-application advice been sought?":
-        "We can check planning records for pre-application advice entries.",
-      "Renewable energy installations proposed?":
-        "We can check your project details for renewable energy measures.",
-      "Community consultation undertaken?":
-        "We can check if community consultation is typically required for this proposal.",
-      "Is the site in Flood Zone 2 or 3?":
-        "We can check flood risk automatically using your property address.",
-      "Conservation Area?":
-        "We can check conservation area status automatically using your property address.",
-      "Is the property a Listed Building?":
-        "We can check listed building status automatically using your property address.",
-      "Conservation Area or Near Listed Building?":
-        "We can check heritage constraints automatically using your property address.",
-    }
-
-    const loadingLines: Record<string, string> = {
-      "Are you using a planning agent?": "Reviewing project requirements...",
-      "Materials match existing?": "Comparing proposed and existing materials...",
-      "New or altered vehicle access?": "Reviewing access arrangements...",
-      "Cycle storage provided?": "Checking cycle storage requirements...",
-      "Trees with TPO on or near site?": "Accessing tree preservation data...",
-      "Trees within falling distance of works?": "Checking nearby tree constraints...",
-      "Any known contamination on site?": "Accessing environmental records...",
-      "Has pre-application advice been sought?": "Accessing planning records...",
-      "Renewable energy installations proposed?": "Reviewing energy measures...",
-      "Community consultation undertaken?": "Checking consultation requirements...",
-      "Is the site in Flood Zone 2 or 3?": "Accessing flood zone database...",
-      "Conservation Area?": "Accessing conservation area records...",
-      "Is the property a Listed Building?": "Accessing listed building register...",
-      "Conservation Area or Near Listed Building?": "Accessing heritage records...",
-    }
-
-    return {
-      title: "AI Property Check",
-      description:
-        descriptions[fieldLabel] ??
-        "We can check this automatically using your property address.",
-      sources:
-        sourcesByLabel[fieldLabel] ?? ["Planning", "Public Records"],
-      eta: "Takes ~2 minutes",
-      loadingLine:
-        loadingLines[fieldLabel] ?? "Accessing public records...",
-    }
-  })()
-
-  const resultItems = (() => {
-    if (!result) return []
-    const itemsByLabel: Record<string, { label: string; value: string }[]> = {
-      "Is the site in Flood Zone 2 or 3?": [
-        { label: "Flood Zone", value: result.floodZone },
-      ],
-      "Conservation Area?": [
-        { label: "Conservation Area", value: result.conservationArea },
-      ],
-      "Is the property a Listed Building?": [
-        { label: "Listed Building Nearby", value: result.listedBuildingNearby },
-      ],
-      "Conservation Area or Near Listed Building?": [
-        { label: "Conservation Area", value: result.conservationArea },
-        { label: "Listed Building Nearby", value: result.listedBuildingNearby },
-      ],
-    }
-
-    if (itemsByLabel[fieldLabel]) return itemsByLabel[fieldLabel]
-
-    const recommendation = mapAICheckToFieldValue(fieldLabel, result)
-    return recommendation
-      ? [{ label: "Zynapse Recommendation", value: recommendation }]
-      : []
-  })()
-
+function AgentActionButton({
+  label,
+  onClick,
+  disabled = false,
+  className = "mt-3",
+}: {
+  label: string
+  onClick: () => void
+  disabled?: boolean
+  className?: string
+}) {
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
-        <div className="flex items-center gap-1">
-          <Zap className="w-3 h-3" />
-          <span>
-            {usedChecks} of {totalChecks} Zynapse checks used
-          </span>
-        </div>
-        <span className="font-medium">{planType.charAt(0).toUpperCase() + planType.slice(1)} Plan</span>
-      </div>
-
-      {stage === "prompt" && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-5 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 rounded-full bg-blue-100 p-2 text-blue-700">
-              <Zap className="h-4 w-4" />
-            </div>
-
-            <div className="flex-1">
-              <h4 className="text-sm font-semibold text-blue-900">
-                {fieldCopy.title}
-              </h4>
-              <p className="text-sm text-blue-800 mt-1">
-                {fieldCopy.description}
-              </p>
-
-              <p className="text-xs text-blue-700 mt-2 opacity-80">
-                Data sources: {fieldCopy.sources.join(" | ")}
-              </p>
-              <p className="text-xs text-blue-700 opacity-80">
-                {fieldCopy.eta}
-              </p>
-
-              <div className="flex gap-2 mt-4">
-                <Button
-                  size="sm"
-                  onClick={handleCheckForMe}
-                  disabled={usedChecks >= totalChecks}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                >
-                  Check for me
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={onSkip}
-                  className="border-blue-300 text-blue-700 hover:bg-blue-100"
-                >
-                  Skip
-                </Button>
-              </div>
-
-              {usedChecks >= totalChecks && (
-                <p className="text-xs text-red-600 mt-2">
-                  You've used all your Zynapse checks. Upgrade your plan for more.
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {stage === "confirmation" && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4">
-          <h4 className="text-sm font-semibold text-amber-900 mb-3">
-            Confirm Zynapse Check
-          </h4>
-          <p className="text-sm text-amber-800 mb-4">
-            This will use 1 of your {totalChecks} Zynapse checks. We'll verify your property details using official
-            public records. Continue?
-          </p>
-
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              onClick={handleConfirm}
-              className="bg-amber-600 hover:bg-amber-700 text-white"
-            >
-              Yes, Check Now
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleCancel}
-              className="border-amber-300 text-amber-700 hover:bg-amber-100"
-            >
-              Cancel
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {stage === "loading" && (
-        <div className="bg-white border border-gray-200 rounded-xl p-5 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4">
-          <div className="flex items-center gap-3">
-            <div className="animate-spin h-5 w-5 border-2 border-blue-600 border-t-transparent rounded-full"></div>
-            <p className="text-sm text-gray-700">
-              Checking public planning records...
-            </p>
-          </div>
-
-          <div className="mt-4 space-y-2">
-            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-              <div className="h-full bg-blue-600 w-1/3 animate-pulse"></div>
-            </div>
-            <p className="text-xs text-gray-500">
-              {fieldCopy.loadingLine}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {stage === "result" && result && !result.requiresAssessment && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-5 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4">
-          <div className="flex items-start gap-3 mb-4">
-            <div
-              className={`${bounceCheckmark ? "animate-bounce" : ""} transition-all duration-300`}
-            >
-              <CheckCircle2 className="w-6 h-6 text-green-600" />
-            </div>
-            <h4 className="text-sm font-semibold text-green-800">
-              Zynapse Results
-            </h4>
-          </div>
-
-          <div className="space-y-3 text-sm text-green-900 mb-4">
-            {resultItems.map(item => (
-              <div key={item.label} className="bg-white/50 rounded p-2">
-                <p>
-                  <strong>{item.label}:</strong> {item.value}
-                </p>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex items-center justify-between flex-wrap gap-3">
-            <span className="text-xs px-3 py-1 bg-green-200 text-green-700 rounded-full font-medium">
-              {result.confidence === "high" && "High Confidence"}
-              {result.confidence === "medium" && "Medium Confidence"}
-              {result.confidence === "low" && "Low Confidence"}
-            </span>
-
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                onClick={handleApplyResults}
-                className="bg-green-600 hover:bg-green-700 text-white"
-              >
-                Apply Answers
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleCancel}
-                className="border-green-300 text-green-700 hover:bg-green-100"
-              >
-                Discard
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {stage === "result" && result && result.requiresAssessment && (
-        <div className="bg-orange-50 border border-orange-200 rounded-xl p-5 transition-all duration-300 animate-in fade-in slide-in-from-bottom-4">
-          <div className="flex items-start gap-3 mb-3">
-            <AlertCircle className="w-6 h-6 text-orange-600 flex-shrink-0 mt-0.5" />
-            <h4 className="text-sm font-semibold text-orange-800">
-              Additional Assessment May Be Required
-            </h4>
-          </div>
-
-          <p className="text-sm text-orange-900 mb-4">
-            Your property is in {result.floodZone} and within a conservation area. A professional review may be
-            required to avoid delays.
-          </p>
-
-          <div className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              Upgrade to Silver
-            </Button>
-
-            <Button
-              size="sm"
-              variant="outline"
-              className="border-blue-300 text-blue-700 hover:bg-blue-100"
-            >
-              Book Agent Consultation
-            </Button>
-
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={handleCancel}
-              className="text-gray-600 hover:text-gray-800 hover:bg-gray-100"
-            >
-              Continue Anyway
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {error && (
-        <p className="text-xs text-red-600">{error}</p>
-      )}
-    </div>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`inline-flex items-center justify-center rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 ${className}`}
+    >
+      {label}
+    </button>
   )
 }
 
-
-/* ─────────────────────────────────────────────
-   FILE UPLOAD COMPONENT
-───────────────────────────────────────────── */
 function FileUploadArea({
   label,
   accept = "*",
@@ -2535,6 +2125,7 @@ function CheckboxGroup({
   questionNumber?: number
 }) {
   const { data, updateSection } = useProject()
+  const { showAgentSidebar } = useEligibilityAgent()
   const selected: string[] = Array.isArray(data.eligibility?.formData?.[label])
   ? data.eligibility?.formData?.[label]
   : []
@@ -2553,8 +2144,7 @@ function CheckboxGroup({
     })
   }
 
-  const hasUnsure = selected.includes("Unsure")
-  const showZynopsis = selected.some(option => isDontKnowValue(option))
+  const hasAgentTrigger = selected.some(isAgentSidebarTriggerValue)
 
 
   return (
@@ -2592,8 +2182,21 @@ function CheckboxGroup({
           </button>
         ))}
       </div>
-      {!showZynopsis && hasUnsure && consultTrigger && (
+      {hasAgentTrigger && consultTrigger && shouldShowAgentActionUi(label) && (
         <ConsultationTrigger message={consultTrigger} />
+      )}
+      {hasAgentTrigger && shouldShowAgentActionUi(label) && (
+        <AgentActionButton
+          label="Get details"
+          onClick={() =>
+            showAgentSidebar(
+              createAgentSidebarPayload(
+                label,
+                consultTrigger ?? `Agent Z is gathering more details for ${label}.`
+              )
+            )
+          }
+        />
       )}
     </div>
   )
@@ -2663,15 +2266,14 @@ function EligibilityCheckPage() {
   const [loadEligibilityError, setLoadEligibilityError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [pendingScrollId, setPendingScrollId] = useState<string | null>(null)
-  const [planType, setPlanType] = useState<ActivePlanType>(null)
-  const [usedChecks, setUsedChecks] = useState(0)
+  const [agentSidebar, setAgentSidebar] = useState<EligibilityAgentSidebarState>(null)
   const [uploadedFiles, setUploadedFiles] = useState<EligibilityFileMap>({})
   const [signatureFile, setSignatureFile] = useState<File | null>(null)
-  const planHydratedRef = useRef(false)
   const fetchedEligibilityProjectRef = useRef<string | null>(null)
 
   const TOTAL_STEPS = 5
-  const totalChecks = planType ? PLAN_CHECK_LIMITS[planType] : 0
+  const showAgentSidebar = Boolean(agentSidebar)
+  const hasRightPanel = showVerification || showAgentSidebar
 
   const nextStep = () => setStep(prev => (prev < TOTAL_STEPS ? ((prev + 1) as Step) : prev))
   const prevStep = () => setStep(prev => (prev > 1 ? ((prev - 1) as Step) : prev))
@@ -2872,6 +2474,7 @@ function EligibilityCheckPage() {
     try {
       await upsertEligibilityProject("submitted")
 
+      setAgentSidebar(null)
       setShowVerification(true)
       updateSection("eligibility", {
         ...(data.eligibility || {}),
@@ -2894,22 +2497,6 @@ function EligibilityCheckPage() {
     "5. Declarations",
   ]
 
-  const syncPlanFromSession = () => {
-    if (typeof window === "undefined") return
-    const storedPlan = window.sessionStorage.getItem("aiPlanType")
-    const storedUsed = window.sessionStorage.getItem("aiUsedChecks")
-    if (storedPlan && ["bronze", "silver", "gold", "platinum"].includes(storedPlan)) {
-      setPlanType(storedPlan as PlanType)
-    } else {
-      setPlanType(null)
-      setUsedChecks(0)
-    }
-    if (storedUsed && !Number.isNaN(Number(storedUsed))) {
-      setUsedChecks(Number(storedUsed))
-    }
-    planHydratedRef.current = true
-  }
-
   useEffect(() => {
     const returnStep = searchParams.get("returnStep")
     const returnField = searchParams.get("returnField")
@@ -2924,43 +2511,7 @@ function EligibilityCheckPage() {
     if (returnField) {
       setPendingScrollId(returnField)
     }
-    syncPlanFromSession()
   }, [searchParams])
-
-  useEffect(() => {
-    syncPlanFromSession()
-  }, [])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    const handleFocus = () => syncPlanFromSession()
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        syncPlanFromSession()
-      }
-    }
-    window.addEventListener("focus", handleFocus)
-    document.addEventListener("visibilitychange", handleVisibility)
-    return () => {
-      window.removeEventListener("focus", handleFocus)
-      document.removeEventListener("visibilitychange", handleVisibility)
-    }
-  }, [])
-
-  useEffect(() => {
-    if (typeof window === "undefined") return
-    if (!planHydratedRef.current) return
-    if (planType) {
-      window.sessionStorage.setItem("aiPlanType", planType)
-      window.sessionStorage.setItem("aiUsedChecks", String(usedChecks))
-    } else {
-      const storedPlan = window.sessionStorage.getItem("aiPlanType")
-      if (!storedPlan) {
-        window.sessionStorage.removeItem("aiPlanType")
-        window.sessionStorage.removeItem("aiUsedChecks")
-      }
-    }
-  }, [planType, usedChecks])
 
   useEffect(() => {
     if (!pendingScrollId) return
@@ -3081,13 +2632,11 @@ function EligibilityCheckPage() {
 
       {/* FORM */}
       <EligibilityStepContext.Provider value={step}>
-        <EligibilityAIContext.Provider
+        <EligibilityAgentContext.Provider
           value={{
-            planType,
-            usedChecks,
-            totalChecks,
-            consumeCheck: () =>
-              setUsedChecks(prev => (prev < totalChecks ? prev + 1 : prev)),
+            agentSidebar,
+            showAgentSidebar: (payload) => setAgentSidebar(payload),
+            hideAgentSidebar: () => setAgentSidebar(null),
           }}
         >
         <EligibilityAssetsContext.Provider
@@ -3098,8 +2647,8 @@ function EligibilityCheckPage() {
             setSignatureFile,
           }}
         >
-          <div className={`grid gap-6 transition-all duration-500 ${showVerification ? "grid-cols-12" : "grid-cols-1"}`}>
-            <div className={showVerification ? "col-span-8" : "col-span-12"}>
+          <div className={`grid gap-6 transition-all duration-500 ${hasRightPanel ? "grid-cols-12" : "grid-cols-1"}`}>
+            <div className={hasRightPanel ? "col-span-8" : "col-span-12"}>
               <div className="rounded-2xl border bg-white p-6 shadow-sm">
 
               {/* Step tabs */}
@@ -3130,485 +2679,83 @@ function EligibilityCheckPage() {
                 className={isReviewOnly || isLoadingEligibility ? "opacity-85" : undefined}
               >
 
-            {/* ── STEP 1: Applicant & Property (rows 001–007) ── */}
             {step === 1 && (
-              <>
-                <SectionHeading>Applicant Details</SectionHeading>
-                <div className="mb-6 space-y-6">
-                  <div className="grid gap-6 md:grid-cols-3">
-                    <Input label="Applicant First Name" />
-                    <Input label="Applicant Middle Name" />
-                    <Input label="Applicant Last Name" />
-                  </div>
-                  <div className="grid gap-6 md:grid-cols-3">
-                    <Input label="Email Address" />
-                    <PhoneNumberField />
-                    <Input label="Site Address Line 1" />
-                  </div>
-                  <div className="grid gap-6 md:grid-cols-3">
-                    <Input label="Site Address Line 2" />
-                    <Input label="Which council have you applied for?" />
-                    <Input label="Postcode" />
-                  </div>
-                </div>
-
-                {false && (
-                  <>
-                {/* Agent Details */}
-                <SectionHeading>Agent Details</SectionHeading>
-
-                {/* Read selected value from context */}
-                {(() => {
-                  const agentUsage = savedFormData["Are you using a planning agent?"]
-
-                  return (
-                    <div className="grid grid-cols-2 gap-6 mb-2">
-
-                      {/* Radio selection */}
-                      <RadioGroupField
-                        label="Are you using a planning agent?"
-                        options={["Yes", "No"]}
-                        consultTrigger="We can act as your planning agent — book a consultation with Agent X."
-                        tooltip="A planning agent is a professional who prepares and submits planning applications on your behalf."
-                      />
-
-                      {/* CONDITIONAL AGENT FIELDS */}
-                      {agentUsage === "Yes" && (
-                        <div className="col-span-2 grid grid-cols-2 gap-6 animate-in fade-in duration-300">
-                          <Input label="Agent Name" />
-                          <Input label="Agent Address" />
-                          <Input label="Agent Contact" />
-                        </div>
-                      )}
-                    </div>
-                  )
-                })()}
-                  </>
-                )}
-
-                <SectionHeading>Pre-Application Check</SectionHeading>
-                {(() => {
-                  const previousCouncilApplication =
-                    savedFormData["Have you previously applied to the council?"]
-
-                  return (
-                    <div className="grid grid-cols-2 gap-6 mb-6">
-                      <div className="col-span-2">
-                        <RadioGroupField
-                          label="Have you previously applied to the council?"
-                          options={["Yes", "No"]}
-                          tooltip="If yes, we will collect details about the earlier council application before proceeding."
-                        />
-                      </div>
-
-                      {previousCouncilApplication === "Yes" && (
-                        <div className="col-span-2 grid grid-cols-2 gap-6 animate-in fade-in duration-300">
-                          <div className="col-span-2">
-                            <FieldLabel
-                              label="What was previously proposed, and was it approved, refused, or withdrawn?"
-                              wrapperClassName="mb-1"
-                            />
-                            <textarea
-                              rows={3}
-                              placeholder="Describe the earlier proposal, what was applied for, and whether it was approved, refused, or withdrawn..."
-                              className="w-full rounded-xl border px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
-                              value={asStringValue(
-                                savedFormData[
-                                  "What was previously proposed, and was it approved, refused, or withdrawn?"
-                                ]
-                              )}
-                              onChange={e =>
-                                updateSection("eligibility", {
-                                  formData: {
-                                    ...savedFormData,
-                                    "What was previously proposed, and was it approved, refused, or withdrawn?":
-                                      e.target.value,
-                                  },
-                                })
-                              }
-                            />
-                          </div>
-                          <Input label="Planning Reference Number *" />
-                          <Input
-                            label="Which council have you applied for?"
-                            questionNumber={0}
-                            fieldIdOverride="eligibility-field-which-council-have-you-applied-for-pre-application"
-                          />
-                          <Input label="Type of Application *" />
-                          <Input
-                            label="Type of Development Previously Proposed"
-                            placeholder="For example: boundary wall, bridge, rear extension, access road"
-                          />
-                          <div className="col-span-2">
-                            <RadioGroupField
-                              label="Is this project similar to the previous application or different this time?"
-                              options={["Yes", "No"]}
-                              tooltip="Let us know whether the new proposal is broadly the same as the earlier application or a different scheme."
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })()}
-
-                <SectionHeading>Property & Ownership</SectionHeading>
-                <div className="grid grid-cols-2 gap-6 mb-2">
-                  <SelectField label="Property Type" options={[
-                    "Detached house", "Semi-detached house", "Terraced house",
-                    "Flat / Maisonette", "Bungalow", "Other / Don't know",
-                  ]} consultTrigger="We can help identify your property type." />
-                  <SelectField label="Ownership Status" options={[
-                    "Freehold (Certificate A)",
-                    "Leasehold with known freeholder (Certificate B)",
-                    "Shared/agricultural tenancy (Certificate C)",
-                    "Unknown owner (Certificate D)",
-                    "Don't know",
-                  ]} consultTrigger="We can assist with land registry checks." />
-                  <RadioGroupField
-                    label="Conservation Area or Near Listed Building?"
-                    options={["Yes", "No", "Don't know"]}
-                    consultTrigger="We can provide a heritage impact assessment or pre-application advice."
-                  />
-                  <SelectField label="Purpose of Development" options={[
-                    "Rear extension", "Side extension", "Loft conversion",
-                    "New build", "Change of use", "Other / Don't know",
-                  ]} consultTrigger="Our consultant can help clarify the development type." />
-                </div>
-
-                {/* <InfoBox>Applicant, agent and property details are required for all planning application types.</InfoBox> */}
-              </>
+              <ApplicantPropertyStepContent
+                savedFormData={savedFormData}
+                updateSection={updateSection}
+                asStringValue={asStringValue}
+                components={{
+                  SectionHeading,
+                  Input,
+                  PhoneNumberField,
+                  RadioGroupField,
+                  SelectField,
+                  FieldLabel,
+                }}
+              />
             )}
 
-            {/* ── STEP 2: Works, Materials & Plans (rows 006, 008, 009) ── */}
             {step === 2 && (
-              <>
-                <SectionHeading>Description of Works</SectionHeading>
-                <div className="grid grid-cols-2 gap-6 mb-6">
-                  <div className="col-span-2">
-                    <FieldLabel label="Description of Proposed Works" wrapperClassName="mb-1" />
-                    <textarea
-                      rows={3}
-                      placeholder="Summarise the proposal, including size, number of storeys and position…"
-                      className="w-full rounded-xl border px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
-                      value={asStringValue(savedFormData["Description of Proposed Works"])}
-                      onChange={e =>
-                        updateSection("eligibility", {
-                          formData: { ...savedFormData, "Description of Proposed Works": e.target.value },
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <SectionHeading>Dimensions</SectionHeading>
-                <div className="grid grid-cols-2 gap-6 mb-6">
-                  <Input label="Existing Property Width (m)" />
-                  <Input label="Existing Property Depth (m)" />
-                  <Input label="Proposed Extension Width (m)" />
-                  <Input label="Proposed Extension Depth (m)" />
-                  <Input label="Ridge / Eaves Height (m)" />
-                  <Input label="Distance from Boundary (m)" />
-                </div>
-
-                <SectionHeading>Materials</SectionHeading>
-                <div className="grid grid-cols-2 gap-6 mb-6">
-                  <SelectField label="Wall Materials" options={[
-                    "Match existing", "Brick", "Render", "Timber cladding",
-                    "Stone", "Not decided / Don't know",
-                  ]} consultTrigger="We can provide a materials specification report." />
-                  <SelectField label="Roof Materials" options={[
-                    "Match existing", "Tiles", "Slates", "Flat roof (felt/GRP)",
-                    "Green roof", "Not decided / Don't know",
-                  ]} consultTrigger="We can provide a materials specification report." />
-                  <Input label="Colour / Finish Notes (optional)" />
-                  <RadioGroupField
-                    label="Materials match existing?"
-                    options={["Yes", "No", "Don't know"]}
-                  />
-                </div>
-
-                <SectionHeading>Plans, Drawings & Photographs</SectionHeading>
-                <div className="grid grid-cols-2 gap-4 mb-2">
-                  <FileUploadArea
-                    label="Location Plan (1:1250 or 1:2500)"
-                    accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf"
-                    multiple={false}
-                    hint="Ordnance Survey based plan showing site in context"
-                    onMissingTrigger="No location plan uploaded — we offer professional drawing services (CAD, surveys). Book a consultation."
-                  />
-                  <FileUploadArea
-                    label="Site Plan (1:200 or 1:500)"
-                    accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf"
-                    multiple={false}
-                    hint="Block plan of the site showing proposed development"
-                    onMissingTrigger="No site plan uploaded — our CAD team can prepare this for you."
-                  />
-                  <StructuredFileUploadArea
-                    label="Existing & Proposed Elevations"
-                    accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf"
-                    hint="All affected elevations at 1:50 or 1:100"
-                    slotLabels={["Existing elevation", "Proposed elevation"]}
-                    showDescriptionInput={false}
-                    onMissingTrigger="No elevations uploaded — our architects can prepare these drawings."
-                  />
-                  <StructuredFileUploadArea
-                    label="Photographs of Site"
-                    accept=".jpg,.jpeg,.png"
-                    hint="Current site photos showing all elevations"
-                    minSlots={5}
-                    singleRow
-                    allowAddMore
-                    descriptionPlaceholder="For example: front view, rear garden, side boundary"
-                    onMissingTrigger="No photographs uploaded — please add photos of the existing property."
-                  />
-                  <StructuredFileUploadArea
-                    label="Additional Drawings (floor plans, sections etc.)"
-                    accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf"
-                    hint="Any other supporting drawings"
-                    minSlots={5}
-                    singleRow
-                    allowAddMore
-                    descriptionPlaceholder="For example: ground floor plan, roof plan, section A-A"
-                    onMissingTrigger="Consider uploading floor plans or sections to support your application."
-                  />
-                </div>
-
-                {/* <InfoBox>Dimensions are checked against permitted development limits. Plans must be submitted to scale.</InfoBox> */}
-              </>
+              <WorksMaterialsStepContent
+                savedFormData={savedFormData}
+                updateSection={updateSection}
+                asStringValue={asStringValue}
+                components={{
+                  SectionHeading,
+                  Input,
+                  RadioGroupField,
+                  SelectField,
+                  FieldLabel,
+                  AgentActionButton,
+                  FileUploadArea,
+                  StructuredFileUploadArea,
+                }}
+              />
             )}
 
-            {/* ── STEP 3: Site Constraints (rows 005, 010, 011, 012, 014) ── */}
             {step === 3 && (
-              <>
-                <SectionHeading>Heritage & Listing</SectionHeading>
-                <div className="grid grid-cols-2 gap-6 mb-6">
-                  <RadioGroupField
-                    label="Is the property a Listed Building?"
-                    options={["Yes", "No", "Don't know"]}
-                    consultTrigger="Listed buildings require separate Listed Building Consent. Agent X can advise."
-                  />
-                  <RadioGroupField
-                    label="Conservation Area?"
-                    options={["Yes", "No", "Don't know"]}
-                    consultTrigger="We can provide a heritage impact assessment."
-                  />
-                </div>
-
-                <SectionHeading>Access & Parking</SectionHeading>
-                <div className="grid grid-cols-2 gap-6 mb-6">
-                  <RadioGroupField
-                    label="New or altered vehicle access?"
-                    options={["Yes", "No", "Don't know"]}
-                    consultTrigger="We can provide highways and transport advice."
-                  />
-                  <Input label="Details of Access / Parking Changes" />
-                  <Input label="Number of Proposed Parking Spaces" />
-                  <RadioGroupField
-                    label="Cycle storage provided?"
-                    options={["Yes", "No", "Don't know"]}
-                  />
-                </div>
-
-                <SectionHeading>Trees, Hedges & Landscaping</SectionHeading>
-                <div className="grid grid-cols-2 gap-6 mb-6">
-                  <RadioGroupField
-                    label="Trees with TPO on or near site?"
-                    options={["Yes", "No", "Don't know"]}
-                    consultTrigger="AArboriculture Report (BS5837) may be required. We can arrange this for you."
-                  />
-                  <RadioGroupField
-                    label="Trees within falling distance of works?"
-                    options={["Yes", "No", "Don't know"]}
-                    consultTrigger="AArboriculture Report (BS5837) may be required. We can arrange this for you."
-                  />
-                  <Input label="Tree Species (if known)" />
-                  <Input label="Approximate Tree Height (m)" />
-                  <FileUploadArea
-                    label="Arboriculture Report / BS5837 Report (if available)"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    multiple={false}
-                    hint="Plan showing tree positions, root protection areas and species"
-                    onMissingTrigger="No tree plan uploaded — we can commission a BS5837Arboriculture Report on your behalf."
-                  />
-                </div>
-
-                <SectionHeading>Flood & Environmental Risk</SectionHeading>
-                <div className="grid grid-cols-2 gap-6 mb-6">
-                  <RadioGroupField
-                    label="Is the site in Flood Zone 2 or 3?"
-                    options={["Yes", "No", "Don't know"]}
-                    consultTrigger="We can provide a Flood Risk Assessment and Surface Water Drainage Strategy."
-                  />
-                  <RadioGroupField
-                    label="Any known contamination on site?"
-                    options={["Yes", "No", "Don't know"]}
-                    consultTrigger="A Phase 1 Desk Study may be required — we can arrange this."
-                  />
-                  <FileUploadArea
-                    label="Flood Risk Assessment (if available)"
-                    accept=".pdf"
-                    multiple={false}
-                    hint="Required for sites in Flood Zone 2 or 3"
-                    onMissingTrigger="No FRA uploaded — we can commission a Flood Risk Assessment for your site."
-                  />
-                </div>
-
-                {/* <SectionHeading>Pre-Application Advice</SectionHeading>
-                <div className="grid grid-cols-2 gap-6 mb-2">
-                  <RadioGroupField
-                    label="Has pre-application advice been sought?"
-                    options={["Yes", "No", "Don't know"]}
-                    consultTrigger="We strongly recommend pre-application advice. Book a session with Agent X."
-                  />
-                  <Input label="Pre-Application Reference Number" />
-                  <Input label="Date of Pre-App Advice" />
-                  <Input label="Officer Name" />
-                  <div className="col-span-2">
-                    <FieldLabel label="Summary of Pre-App Advice Received" wrapperClassName="mb-1" />
-                    <textarea
-                      rows={2}
-                      placeholder="Briefly describe any advice received from the LPA…"
-                      className="w-full rounded-xl border px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
-                      value={asStringValue(savedFormData["Summary of Pre-App Advice Received"])}
-                      onChange={e =>
-                        updateSection("eligibility", {
-                          formData: { ...savedFormData, "Summary of Pre-App Advice Received": e.target.value },
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-
-                {/* <InfoBox>Constraints such as listed building status or flood zones may override permitted development rights.</InfoBox> */}
-              </>
+              <SiteConstraintsStepContent
+                savedFormData={savedFormData}
+                updateSection={updateSection}
+                asStringValue={asStringValue}
+                components={{
+                  SectionHeading,
+                  Input,
+                  RadioGroupField,
+                  FieldLabel,
+                  FileUploadArea,
+                }}
+              />
             )}
 
-            {/* ── STEP 4: Utilities, Ownership Certificates & Additional Consents (rows 013, 015, 016) ── */}
             {step === 4 && (
-              <>
-                <SectionHeading>Utilities & Waste</SectionHeading>
-                <div className="grid grid-cols-2 gap-6 mb-6">
-                  <SelectField label="Water Supply" options={[
-                    "Mains connected", "Borehole / private supply", "Not applicable", "Don't know",
-                  ]} consultTrigger="We can provide an infrastructure assessment." />
-                  <SelectField label="Sewage / Drainage" options={[
-                    "Mains sewer", "Septic tank", "Package treatment plant", "Not applicable", "Don't know",
-                  ]} consultTrigger="We can provide a drainage strategy." />
-                  <SelectField label="Surface Water Drainage" options={[
-                    "Connected to sewer", "Soakaway", "Watercourse", "SuDS proposed", "Don't know",
-                  ]} consultTrigger="We can provide a Surface Water Drainage Strategy." />
-                  <SelectField label="Existing Waste Arrangements" options={[
-                    "Kerbside collection", "Communal bins", "Other", "Don't know",
-                  ]} />
-                  <RadioGroupField
-                    label="Renewable energy installations proposed?"
-                    options={["Yes", "No", "Don't know"]}
-                  />
-                  <Input label="Details of Renewable / Energy Measures (if applicable)" />
-                </div>
-
-                <SectionHeading>Ownership Certificate</SectionHeading>
-                <div className="grid grid-cols-2 gap-6 mb-6">
-                  <SelectField
-                    label="Which Ownership Certificate applies?"
-                    options={[
-                      "Certificate A – sole owner",
-                      "Certificate B – known other owner(s), notices served",
-                      "Certificate C – agricultural tenants, notices served",
-                      "Certificate D – owner(s) unknown, notice published",
-                      "Don't know / need advice",
-                    ]}
-                    consultTrigger="We can handle certificate notices and land registry checks on your behalf."
-                  />
-                  <div className="col-span-2">
-                    <FieldLabel
-                      label="Names & Addresses of Other Owners (if Certificate B, C or D)"
-                      wrapperClassName="mb-1"
-                    />
-                    <textarea
-                      rows={2}
-                      placeholder="List any other known owners or agricultural tenants…"
-                      className="w-full rounded-xl border px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
-                      value={asStringValue(savedFormData["Other Owners Details"])}
-                      onChange={e =>
-                        updateSection("eligibility", {
-                          formData: { ...savedFormData, "Other Owners Details": e.target.value },
-                        })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <SectionHeading>Additional Consents Required</SectionHeading>
-                <div className="grid grid-cols-2 gap-6 mb-2">
-                  <CheckboxGroup
-                    label="Additional Consents"
-                    options={[
-                      "Advertisement Consent",
-                      "Tree Works (TPO)",
-                      "Demolition Consent",
-                      "Conservation Area Consent",
-                      "Variation of Conditions",
-                      "Listed Building Consent",
-                      "Non-Material Amendment",
-                      "Unsure",
-                    ]}
-                    consultTrigger="Additional consents may be required. Our team can advise on the right applications."
-                  />
-                  <div className="col-span-2">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                      Community Consultation / Neighbours Notified?
-                    </p>
-                    <RadioGroupField
-                      label="Community consultation undertaken?"
-                      options={["Yes", "No", "Not required", "Don't know"]}
-                      consultTrigger="Pre-application community consultation can strengthen your application."
-                    />
-                  </div>
-                </div>
-
-                {/* <InfoBox>
-                  Some development types require multiple simultaneous consent applications. Checking any option above may prompt additional professional services from Agent X.
-                </InfoBox> */}
-              </>
+              <UtilitiesConsentsStepContent
+                savedFormData={savedFormData}
+                updateSection={updateSection}
+                asStringValue={asStringValue}
+                components={{
+                  SectionHeading,
+                  Input,
+                  RadioGroupField,
+                  SelectField,
+                  FieldLabel,
+                  CheckboxGroup,
+                }}
+              />
             )}
 
-            {/* ── STEP 5: Declarations & Signature (row 017) ── */}
             {step === 5 && (
-              <>
-                <SectionHeading>Review & Declarations</SectionHeading>
-
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-5 mb-6 space-y-4">
-                  <p className="text-sm font-semibold text-slate-800">Please read and confirm each declaration:</p>
-
-                  {[
-                    "The information given in this application is correct and accurate to the best of my knowledge.",
-                    "I am the owner/occupier of the application site, or I have the authority of the owner/occupier to make this application.",
-                    "I understand that planning permission, if granted, does not authorise any infringement of private rights.",
-                    "I consent to the information in this application being used for planning purposes and being made publicly available.",
-                    "I understand that a fee may be payable and I agree to pay any fees required.",
-                  ].map((text, i) => (
-                    <DeclarationCheckbox key={i} label={text} fieldKey={`declaration_${i}`} />
-                  ))}
-                </div>
-
-                <SectionHeading>Digital Signature</SectionHeading>
-                <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
-                  Draw your signature exactly as you normally sign. Use a mouse on desktop or your finger/stylus on
-                  touch devices, and if the signature is not clear, press Clear and draw it again.
-                </div>
-                <div className="grid grid-cols-2 gap-6 mb-6">
-                  <Input label="Full Name of Signatory" />
-                  <Input label="Date (dd/mm/yyyy)" />
-                  <Input label="Capacity (Owner / Agent / Other)" />
-                  <SignaturePad label="Digital Signature" strokeWidth={1.5} />
-                </div>
-
-                {/* <InfoBox>
-                  By signing you confirm all information is accurate and that you have the authority to make this application. Providing false information may invalidate the application.
-                </InfoBox> */}
-              </>
+              <DeclarationsStepContent
+                savedFormData={savedFormData}
+                updateSection={updateSection}
+                asStringValue={asStringValue}
+                components={{
+                  SectionHeading,
+                  Input,
+                  DeclarationCheckbox,
+                  SignaturePad,
+                }}
+              />
             )}
 
               </fieldset>
@@ -3681,14 +2828,24 @@ function EligibilityCheckPage() {
           </div>
 
           {/* RIGHT: VERIFICATION CALENDAR */}
-            {showVerification && (
+            {hasRightPanel && (
               <div className="col-span-4 space-y-6">
-                <VerificationCalendar disabled={!hasSubmittedEligibility || isReadOnly} />
+                {showAgentSidebar && agentSidebar && (
+                  <FloatingAgentWidget
+                    requestId={agentSidebar.id}
+                    fieldLabel={agentSidebar.fieldLabel}
+                    message={agentSidebar.message}
+                    onClose={() => setAgentSidebar(null)}
+                  />
+                )}
+                {showVerification && (
+                  <VerificationCalendar disabled={!hasSubmittedEligibility || isReadOnly} />
+                )}
               </div>
             )}
           </div>
         </EligibilityAssetsContext.Provider>
-        </EligibilityAIContext.Provider>
+        </EligibilityAgentContext.Provider>
       </EligibilityStepContext.Provider>
 
       {isAnalyzing && <AnalysisModal />}
@@ -3845,14 +3002,23 @@ function Input({
   tooltip,
   questionNumber,
   fieldIdOverride,
+  actionLabel,
+  onAction,
+  actionDisabled,
+  actionMessage,
 }: {
   label: string
   placeholder?: string
   tooltip?: string
   questionNumber?: number
   fieldIdOverride?: string
+  actionLabel?: string
+  onAction?: () => void
+  actionDisabled?: boolean
+  actionMessage?: string
 }) {
   const { data, updateSection } = useProject()
+  const { showAgentSidebar } = useEligibilityAgent()
   const value = asStringValue(data.eligibility?.formData?.[label])
   const fieldId = fieldIdOverride ?? getFieldId(label)
 
@@ -3864,16 +3030,29 @@ function Input({
         questionNumber={questionNumber}
         wrapperClassName="mb-0"
       />
-      <input
-        value={value}
-        placeholder={placeholder}
-        onChange={e =>
-          updateSection("eligibility", {
-            formData: { ...(data.eligibility?.formData || {}), [label]: e.target.value },
-          })
-        }
-        className="mt-1 w-full rounded-xl border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 transition-shadow"
-      />
+      <div className="mt-1 flex flex-col gap-2 xl:flex-row">
+        <input
+          value={value}
+          placeholder={placeholder}
+          onChange={e =>
+            updateSection("eligibility", {
+              formData: { ...(data.eligibility?.formData || {}), [label]: e.target.value },
+            })
+          }
+          className="w-full rounded-xl border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 transition-shadow"
+        />
+        {actionLabel && onAction && (
+          <AgentActionButton
+            label={actionLabel}
+            disabled={actionDisabled}
+            className="w-full xl:mt-0 xl:w-auto xl:min-w-[110px]"
+            onClick={() => {
+              onAction()
+              showAgentSidebar(createAgentSidebarPayload(label, actionMessage ?? `${actionLabel} requested for ${label}.`))
+            }}
+          />
+        )}
+      </div>
     </div>
   )
 }
@@ -3939,36 +3118,10 @@ function SelectField({
   questionNumber?: number
 }) {
   const { data, updateSection } = useProject()
+  const { showAgentSidebar } = useEligibilityAgent()
   const value = asStringValue(data.eligibility?.formData?.[label])
-  const showTrigger = value.toLowerCase().includes("don't know") || value === "Unsure"
-  const showZynopsis = isDontKnowValue(value)
+  const showAgentButton = isAgentSidebarTriggerValue(value)
   const fieldId = getFieldId(label)
-  const { planType, usedChecks, totalChecks, consumeCheck } = useEligibilityAI()
-  const storedPlan = getStoredPlanType()
-  const storedUsedChecks = getStoredUsedChecks()
-  const effectivePlan = planType ?? storedPlan
-  const hasPlan = Boolean(effectivePlan)
-  const effectiveUsedChecks = storedUsedChecks ?? usedChecks
-  const effectiveTotalChecks = effectivePlan ? PLAN_CHECK_LIMITS[effectivePlan] : totalChecks
-  const remainingChecks = Math.max(effectiveTotalChecks - effectiveUsedChecks, 0)
-  const hasCredits = remainingChecks > 0
-  const isYesNoField = options.includes("Yes") && options.includes("No")
-  const aiDismissed = Boolean(data.eligibility?.aiDismissed?.[label])
-  const showAiTrigger = showZynopsis && isYesNoField
-  const showAICheck = showAiTrigger && !aiDismissed
-
-  const handleApplyResults = (result: AICheckResult) => {
-    const mappedValue = mapAICheckToFieldValue(label, result)
-    if (!mappedValue || !options.includes(mappedValue)) return
-    updateSection("eligibility", {
-      ...(data.eligibility || {}),
-      formData: {
-        ...(data.eligibility?.formData || {}),
-        [label]: mappedValue,
-      },
-      aiFilled: { ...(data.eligibility?.aiFilled || {}), [label]: true },
-    })
-  }
 
   return (
     <div id={fieldId}>
@@ -3980,37 +3133,31 @@ function SelectField({
       />
       <select
         value={value}
-        onChange={e =>
+        onChange={e => {
           updateSection("eligibility", {
             formData: { ...(data.eligibility?.formData || {}), [label]: e.target.value },
-            aiDismissed: { ...(data.eligibility?.aiDismissed || {}), [label]: false },
           })
-        }
+        }}
         className="mt-1 w-full rounded-xl border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 transition-shadow"
       >
-        <option value="">Select…</option>
+        <option value="">Select...</option>
         {options.map(o => <option key={o}>{o}</option>)}
       </select>
-      {!hasPlan && showAiTrigger && <ChoosePlanCta label={label} />}
-      {hasPlan && !hasCredits && showAiTrigger && <UpgradePlanCta label={label} />}
-      {hasPlan && hasCredits && showAICheck && (
-        <AICheck
-          isUnsure={showZynopsis}
-          fieldLabel={label}
-          onApply={handleApplyResults}
-          onSkip={() =>
-            updateSection("eligibility", {
-              aiDismissed: { ...(data.eligibility?.aiDismissed || {}), [label]: true },
-            })
-          }
-          planType={effectivePlan ?? "bronze"}
-          usedChecks={effectiveUsedChecks}
-          totalChecks={effectiveTotalChecks}
-          onConsume={consumeCheck}
-        />
-      )}
-      {!showAICheck && showTrigger && consultTrigger && (
+      {showAgentButton && consultTrigger && shouldShowAgentActionUi(label) && (
         <ConsultationTrigger message={consultTrigger} />
+      )}
+      {showAgentButton && shouldShowAgentActionUi(label) && (
+        <AgentActionButton
+          label="Get details"
+          onClick={() =>
+            showAgentSidebar(
+              createAgentSidebarPayload(
+                label,
+                consultTrigger ?? `Agent Z is gathering more details for ${label}.`
+              )
+            )
+          }
+        />
       )}
     </div>
   )
@@ -4030,184 +3177,57 @@ function RadioGroupField({
   questionNumber?: number
 }) {
   const { data, updateSection } = useProject()
+  const { showAgentSidebar } = useEligibilityAgent()
 
   const selectedRaw = data.eligibility?.formData?.[label]
   const selected = asStringValue(selectedRaw)
-  const showZynopsis = isDontKnowValue(selected)
   const fieldId = getFieldId(label)
-  const { planType, usedChecks, totalChecks, consumeCheck } = useEligibilityAI()
-  const storedPlan = getStoredPlanType()
-  const storedUsedChecks = getStoredUsedChecks()
-  const effectivePlan = planType ?? storedPlan
-  const hasPlan = Boolean(effectivePlan)
-  const effectiveUsedChecks = storedUsedChecks ?? usedChecks
-  const effectiveTotalChecks = effectivePlan ? PLAN_CHECK_LIMITS[effectivePlan] : totalChecks
-  const remainingChecks = Math.max(effectiveTotalChecks - effectiveUsedChecks, 0)
-  const hasCredits = remainingChecks > 0
-  const aiFilled = Boolean(data.eligibility?.aiFilled?.[label])
-  const aiDismissed = Boolean(data.eligibility?.aiDismissed?.[label])
-  const showAICheck = showZynopsis && !aiDismissed
-
-  const handleApplyResults = (result: AICheckResult) => {
-    const mappedValue = mapAICheckToFieldValue(label, result)
-    if (!mappedValue || !options.includes(mappedValue)) return
-
-    const extraFields =
-      label === "Has pre-application advice been sought?" && mappedValue === "Yes"
-        ? {
-            "Pre-Application Reference Number": "PRE-APP-2026-001",
-            "Date of Pre-App Advice": formatDate(new Date()),
-            "Officer Name": "James Harrison",
-            "Summary of Pre-App Advice Received":
-              "Pre-application advice received; preliminary guidance provided.",
-          }
-        : {}
-
-    updateSection("eligibility", {
-      ...(data.eligibility || {}),
-      formData: {
-        ...(data.eligibility?.formData || {}),
-        [label]: mappedValue,
-        ...extraFields,
-      },
-      aiFilled: { ...(data.eligibility?.aiFilled || {}), [label]: true },
-    })
-  }
-
-  const showTrigger =
-    consultTrigger &&
-    (selected === "Don't know" ||
-      selected === "Unsure" ||
-      selected === "Not required")
-
-  const formatDate = (date: Date) => {
-    const dd = String(date.getDate()).padStart(2, "0")
-    const mm = String(date.getMonth() + 1).padStart(2, "0")
-    const yyyy = date.getFullYear()
-    return `${dd}/${mm}/${yyyy}`
-  }
+  const showAgentButton = isAgentSidebarTriggerValue(selected)
 
   return (
     <div id={fieldId}>
       <FieldLabel label={label} tooltip={tooltip} questionNumber={questionNumber} />
 
-      {/* ✅ Options */}
       <div className="flex flex-wrap gap-2">
         {options.map(o => (
           <button
             key={o}
             type="button"
-            disabled={aiFilled && isDontKnowValue(o)}
-            onClick={() =>
+            onClick={() => {
               updateSection("eligibility", {
                 ...(data.eligibility || {}),
                 formData: { ...(data.eligibility?.formData || {}), [label]: o },
-                aiDismissed: { ...(data.eligibility?.aiDismissed || {}), [label]: false },
               })
-            }
+            }}
             className={`flex-1 min-w-fit rounded-xl border px-4 py-2 text-sm transition-all ${
               selected === o
                 ? "bg-blue-600 text-white border-blue-600"
                 : "hover:bg-blue-50 border-slate-200"
-            } ${aiFilled && isDontKnowValue(o) ? "cursor-not-allowed opacity-40 hover:bg-transparent" : ""}`}
+            }`}
           >
             {o}
           </button>
         ))}
       </div>
-
-      {!hasPlan && showZynopsis && <ChoosePlanCta label={label} />}
-      {hasPlan && !hasCredits && showZynopsis && <UpgradePlanCta label={label} />}
-      {hasPlan && hasCredits && showAICheck && (
-        <AICheck
-          isUnsure={showZynopsis}
-          fieldLabel={label}
-          onApply={handleApplyResults}
-          onSkip={() =>
-            updateSection("eligibility", {
-              aiDismissed: { ...(data.eligibility?.aiDismissed || {}), [label]: true },
-            })
-          }
-          planType={effectivePlan ?? "bronze"}
-          usedChecks={effectiveUsedChecks}
-          totalChecks={effectiveTotalChecks}
-          onConsume={consumeCheck}
-        />
-      )}
-      {!showZynopsis && showTrigger && consultTrigger && (
+      {showAgentButton && consultTrigger && shouldShowAgentActionUi(label) && (
         <ConsultationTrigger message={consultTrigger} />
       )}
+      {showAgentButton && shouldShowAgentActionUi(label) && (
+        <AgentActionButton
+          label="Get details"
+          onClick={() =>
+            showAgentSidebar(
+              createAgentSidebarPayload(
+                label,
+                consultTrigger ?? `Agent Z is gathering more details for ${label}.`
+              )
+            )
+          }
+        />
+      )}
     </div>
   )
 }
-
-function InfoBox({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="mt-6 rounded-xl bg-blue-50 border border-blue-100 p-4 flex gap-3">
-      <Info className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
-      <p className="text-sm text-blue-900">
-        <strong>Why we need this?</strong>
-        <br />
-        {children}
-      </p>
-    </div>
-  )
-}
-
-function ChoosePlanCta({ label }: { label: string }) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const step = useEligibilityStep()
-  const fieldId = getFieldId(label)
-
-  const handleClick = () => {
-    const params = new URLSearchParams()
-    params.set("returnTo", pathname === "/dashboard-eligibility" ? pathname : "/dashboard?stage=eligibility")
-    params.set("returnStep", String(step))
-    params.set("returnField", fieldId)
-    router.push(`/subscription?${params.toString()}`)
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={handleClick}
-      className="mt-2 inline-flex items-center rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100 transition-colors"
-    >
-      Choose a plan to use AI
-    </button>
-  )
-}
-
-function UpgradePlanCta({ label }: { label: string }) {
-  const router = useRouter()
-  const pathname = usePathname()
-  const step = useEligibilityStep()
-  const fieldId = getFieldId(label)
-
-  const handleClick = () => {
-    const params = new URLSearchParams()
-    params.set("returnTo", pathname === "/dashboard-eligibility" ? pathname : "/dashboard?stage=eligibility")
-    params.set("returnStep", String(step))
-    params.set("returnField", fieldId)
-    router.push(`/subscription?${params.toString()}`)
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={handleClick}
-      className="mt-2 inline-flex items-center rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100 transition-colors"
-    >
-      Upgrade plan to use AI
-    </button>
-  )
-}
-
-
-/* ─────────────────────────────────────────────
-   VERIFICATION CALENDAR
-───────────────────────────────────────────── */
 function VerificationCalendar({ disabled = false }: { disabled?: boolean }) {
   const router = useRouter()
   const TIME_SLOTS = ["09:30 AM", "11:00 AM", "01:45 PM", "04:30 PM"]
@@ -4352,4 +3372,5 @@ function RoadmapStep({ label, status, icon: Icon, onClick }: {
 function RoadmapLine() {
   return <div className="flex-1 h-[2px] bg-slate-200 mx-2 min-w-[120px]" />
 }
+
 

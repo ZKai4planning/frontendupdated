@@ -381,8 +381,6 @@ export default function DashboardHeader({
   const handleStartNewProject = () => {
     updateSection("eligibility", {
       formData: undefined,
-      aiFilled: undefined,
-      aiDismissed: undefined,
       projectId: undefined,
       isDraft: undefined,
       draftSavedAt: undefined,
