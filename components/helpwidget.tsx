@@ -1,5 +1,5 @@
 "use client"
- 
+
 import { useState } from "react"
 import {
   FiHeart,
@@ -8,10 +8,13 @@ import {
   FiStar,
   FiX,
 } from "react-icons/fi"
- 
+import { useUserIdentity } from "@/lib/use-user-identity"
+
 export default function HelpWidget() {
   const [open, setOpen] = useState(false)
- 
+  const { fullName } = useUserIdentity()
+  const displayName = fullName || "User"
+
   return (
     <>
       {/* Help Card */}
@@ -21,12 +24,12 @@ export default function HelpWidget() {
             {/* Header */}
             <div className="flex items-start justify-between mb-4">
               <div>
-                <p className="text-sm text-gray-400">Afternoon Zafer Khan.</p>
+                <p className="text-sm text-gray-400">Afternoon {displayName}.</p>
                 <h3 className="text-base font-semibold">
                   How can we help?
                 </h3>
               </div>
- 
+
               <button
                 onClick={() => setOpen(false)}
                 className="text-gray-400 hover:text-white"
@@ -34,7 +37,7 @@ export default function HelpWidget() {
                 <FiX size={16} />
               </button>
             </div>
- 
+
             {/* Items */}
             <ul className="space-y-1">
               <HelpItem icon={<FiHeart />} label="Get Started" />
@@ -45,7 +48,7 @@ export default function HelpWidget() {
           </div>
         </div>
       )}
- 
+
       {/* HELP BUTTON */}
       <button
         onClick={() => setOpen((prev) => !prev)}
@@ -58,9 +61,9 @@ export default function HelpWidget() {
     </>
   )
 }
- 
+
 /* ===== ITEM ===== */
- 
+
 function HelpItem({
   icon,
   label,

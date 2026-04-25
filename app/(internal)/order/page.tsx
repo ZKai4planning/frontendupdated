@@ -1,22 +1,25 @@
 "use client"
 
 import { useRouter } from "next/navigation"
+import { useUserIdentity } from "@/lib/use-user-identity"
 
 export default function OrdersPage() {
   const router = useRouter()
+  const { fullName } = useUserIdentity()
+  const displayName = fullName || "User"
 
   const orders = [
     {
       id: "ORD-1001",
       date: "12 Feb 2026",
-      customer: "Zafer Khan",
+      customer: displayName,
       serviceName: "House Holder Planning Consent",
       serviceId: "MS-01-HPC",
     },
     {
       id: "ORD-1002",
       date: "10 Feb 2026",
-      customer: "Zafer Khan",
+      customer: displayName,
       serviceName: "Construction & Build Services",
       serviceId: "MS-02-CBS",
     },

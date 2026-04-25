@@ -26,7 +26,7 @@
 //               exit={{ opacity: 0 }}
 //             >
 //               <div className="max-w-7xl mx-auto min-h-screen px-6 py-12 grid grid-rows-[auto_1fr] gap-8">
- 
+
 //                 {/* ========== TOP CONVERGING TEXT STRIP ========== */}
 //                <motion.div
 //   initial={{ opacity: 0, y: 24 }}
@@ -53,10 +53,10 @@
 // </motion.div>
 
 
- 
+
 //                 {/* ========== IMAGE + CONTENT (SAME HEIGHT) ========== */}
 //                 <div className="grid grid-cols-1 lg:grid-cols-2  h-full">
- 
+
 //                   {/* LEFT IMAGE */}
 //                   <div className="h-full flex">
 //                     <motion.img
@@ -76,7 +76,7 @@
 //                       "
 //                     />
 //                   </div>
- 
+
 //                   {/* RIGHT CONTENT */}
 //                   <motion.div
 //                     initial={{
@@ -113,11 +113,11 @@
 //                     >
 //                       <X />
 //                     </button>
- 
+
 //                     <p className="text-neutral-600 max-w-md mb-10 font-bold">
 //                       {team[active].description}
 //                     </p>
- 
+
 //                     <div className="flex gap-16">
 //                       <div>
 //                         <p className="text-3xl font-serif">
@@ -127,7 +127,7 @@
 //                           Years in practice
 //                         </p>
 //                       </div>
- 
+
 //                       <div>
 //                         <p className="text-3xl font-serif">
 //                           {team[active].rating}
@@ -211,7 +211,7 @@
 //           >
 //             {member.name}
 //           </p>
-          
+
 //         </div>
 //       </motion.div>
 //     )

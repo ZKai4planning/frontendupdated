@@ -1,5 +1,5 @@
 "use client"
- 
+
 const users = [
   { id: 1, name: "sai", email: "sai@gmail.com", role: "Admin", dept: "IT", location: "India", status: "Active" },
   { id: 2, name: "Mayan", email: "mayan@gmail.com", role: "User", dept: "HR", location: "USA", status: "Inactive" },
@@ -12,17 +12,17 @@ const users = [
   { id: 9, name: "Arjun", email: "arjun@gmail.com", role: "Admin", dept: "IT", location: "USA", status: "Active" },
   { id: 10, name: "Sneha", email: "sneha@gmail.com", role: "User", dept: "Marketing", location: "India", status: "Active" },
 ]
- 
+
 export default function TablePage() {
   return (
     <div className=" bg-gray-100 flex justify-center p-10">
       {/* CARD */}
       <div className="bg-white rounded-xl shadow-lg w-full max-w-7xl p-6">
- 
- 
+
+
         {/* TABLE WRAPPER */}
         <div className="overflow-x-auto border rounded-lg">
-          <table className="min-w-[1100px] w-full border-collapse">
+          <table className="min-w-275 w-full border-collapse">
             <thead className="bg-gray-100 text-left text-sm">
               <tr>
                 <th className="sticky left-0 z-20 bg-gray-100 px-4 py-3 w-20">
@@ -38,7 +38,7 @@ export default function TablePage() {
                 <th className="px-4 py-3">Status</th>
               </tr>
             </thead>
- 
+
             <tbody className="text-sm">
               {users.map((user, index) => (
                 <tr
@@ -49,23 +49,22 @@ export default function TablePage() {
                   <td className="sticky left-0 bg-white z-10 px-4 py-3 font-medium">
                     {index + 1}
                   </td>
- 
+
                   {/* Name (Sticky) */}
                   <td className="sticky left-20 bg-white z-10 px-4 py-3 font-semibold">
                     {user.name}
                   </td>
- 
+
                   <td className="px-4 py-3">{user.email}</td>
                   <td className="px-4 py-3">{user.role}</td>
                   <td className="px-4 py-3">{user.dept}</td>
                   <td className="px-4 py-3">{user.location}</td>
                   <td className="px-4 py-3">
                     <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        user.status === "Active"
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${user.status === "Active"
                           ? "bg-green-100 text-green-700"
                           : "bg-red-100 text-red-700"
-                      }`}
+                        }`}
                     >
                       {user.status}
                     </span>
@@ -75,7 +74,7 @@ export default function TablePage() {
             </tbody>
           </table>
         </div>
- 
+
       </div>
     </div>
   )

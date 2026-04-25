@@ -39,7 +39,7 @@ export function VerifyEmailForm() {
           </div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">Check your connection</h1>
           <p className="text-slate-500 dark:text-slate-400 text-sm leading-relaxed max-w-xs mx-auto">
-            We've sent a structural handshake link to{" "}
+            We&apos;ve sent a structural handshake link to{" "}
             <span className="text-primary font-semibold">architect@ai4planning.com</span>. Please verify to finalize your
             profile.
           </p>

@@ -66,7 +66,7 @@ export default function Table({
 
               <td className="border-b px-4 py-3">
                 <button onClick={onView} className="rounded-lg border px-4 py-1.5 text-sm hover:bg-blue-600 bg-blue-500 text-white font-medium transition" >
-                   pay 
+                  pay
                 </button>
               </td>
             </tr>

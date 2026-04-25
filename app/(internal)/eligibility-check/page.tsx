@@ -23,12 +23,17 @@ import {
   CreditCard,
   Camera,
 } from "lucide-react"
+import { useUserIdentity } from "@/lib/use-user-identity"
 
 
 type Step = 1 | 2 | 3
 
 export default function EligibilityCheckPage() {
   const router = useRouter()
+  const { fullName, firstName, email } = useUserIdentity()
+  const displayName = fullName || "User"
+  const displayFirstName = firstName || "User"
+  const displayEmail = email || "No email available"
   const [step, setStep] = useState<Step>(1)
   const [showVerification, setShowVerification] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
@@ -37,9 +42,9 @@ export default function EligibilityCheckPage() {
 
     propertyDetails: {
 
-      applicantFullName: "Zafer Khan",
+      applicantFullName: displayName,
 
-      contactEmailOrPhone: "zafer.khan@ai4planning.com / 07768262279",
+      contactEmailOrPhone: displayEmail,
 
       siteAddress: "42 Brick Lane, London",
 
@@ -122,7 +127,7 @@ export default function EligibilityCheckPage() {
         <div className="flex items-start justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
-            Welcome back, Zafer Khan
+            Welcome back, {displayName}
           </h1>
 
           <p className="text-xl text-slate-600 mt-2">
@@ -208,7 +213,7 @@ export default function EligibilityCheckPage() {
                   </h3>
       
                   <p className="text-sm opacity-90 mb-6">
-                    Hi Zafer Khan, before we prepare your planning application, we conduct an Eligibility Check to confirm whether your project requires planning permission or qualifies under permitted development rights.
+                    Hi {displayFirstName}, before we prepare your planning application, we conduct an Eligibility Check to confirm whether your project requires planning permission or qualifies under permitted development rights.
                   </p>
 
                   <p>1. We review your property details, location constraints and project scope.</p>
@@ -257,7 +262,7 @@ export default function EligibilityCheckPage() {
                   <Input label="Existing Property Width (m)" defaultValue={formData.dimensions.existingPropertyWidthM} />
                   <Input label="Existing Property Depth (m)" defaultValue={formData.dimensions.existingPropertyDepthM} />
                   <Input label="Proposed Extension Depth (m)" defaultValue={formData.dimensions.proposedExtensionDepthM} />
-                  <Input label="Proposed Extension Height (m)" defaultValue={formData.dimensions.proposedExtensionHeightM} />
+                  <Input label="Proposed Extension width (m)" defaultValue={formData.dimensions.proposedExtensionHeightM} />
                   <Select label="External Materials" defaultValue={formData.dimensions.externalMaterials} options={["Match existing","Different materials","Not decided / Don’t know"]} />
                   <Input label="Brief Description of Proposed Works" defaultValue={formData.dimensions.briefDescription} />
                 </div>

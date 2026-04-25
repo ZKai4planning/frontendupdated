@@ -46,22 +46,22 @@ export default function RootLayout({
 
       <body className="font-sans antialiased">
         <ProjectProvider>
-        {children}
+          {children}
         </ProjectProvider>
         {/* ✅ Toast container (required for toast messages) */}
-       <Toaster
-  position="bottom-right"
-  containerStyle={{
-    bottom: 250, // 👈 moves toast upward from bottom
-    right: 170,
-  }}
-  toastOptions={{
-    duration: 5000,
-    style: {
-      animation: "slideUpRight 0.4s ease-out",
-    },
-  }}
-/>
+        <Toaster
+          position="bottom-right"
+          containerStyle={{
+            bottom: 250, // 👈 moves toast upward from bottom
+            right: 170,
+          }}
+          toastOptions={{
+            duration: 1000,
+            style: {
+              animation: "slideUpRight 0.4s ease-out",
+            },
+          }}
+        />
       </body>
     </html>
   )

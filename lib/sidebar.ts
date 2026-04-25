@@ -1,7 +1,6 @@
 import {
   FiHome,
   FiSettings,
-  FiLogOut,
   FiGrid,
   FiFileText,
   FiCheckSquare,
@@ -10,7 +9,6 @@ import {
   FiBarChart2,
   FiCpu,
   FiBriefcase,
-  FiUser,
 } from "react-icons/fi"
 import type { IconType } from "react-icons"
 
@@ -49,11 +47,7 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     id: "Menu",
     label: "Menu",
     icon: FiGrid,
-    children: [
-      { id: "all-projects", label: "Profile", href: "/profile-section" },
-      { id: "active-projects", label: "Orders & Invoices", href: "/order" },
-      { id: "completed-projects", label: "Help Center", href: "/projects/completed" },
-    ],
+
   },
 
   /* ================= AI ================= */
@@ -148,10 +142,4 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
   // },
 
   /* ================= LOGOUT ================= */
-  {
-    id: "logout",
-    label: "Logout",
-    icon: FiLogOut,
-    href: "/"
-  },
 ]

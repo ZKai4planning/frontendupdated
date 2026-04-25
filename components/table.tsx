@@ -1,9 +1,6 @@
 "use client";
 
-import { Plus } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Roadmap from "@/components/project-stages"
 
 export default function Table({
   onView,
@@ -68,7 +65,7 @@ export default function Table({
                 >
                   Homeowners, landlords 
                 </span> */}
-                Homeowners, landlords 
+                Homeowners, landlords
               </td>
               <td className="border-b px-4 py-3 text-blue-600">House Holder planning consent</td>
               <td className="border-b px-4 py-3">HSPC000-07</td>

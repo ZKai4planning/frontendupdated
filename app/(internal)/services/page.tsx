@@ -748,12 +748,12 @@
 
 
 import React from 'react'
-import ServicesSection from '@/components/services-section'
+import LandingServicesSection from '@/components/Services-section1'
 
 const page = () => {
   return (
     <div className="min-h-screen bg-gray-100">
-      <ServicesSection />
+      <LandingServicesSection applyAction="next-step" />
     </div>
   )
 }

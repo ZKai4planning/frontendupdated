@@ -26,7 +26,7 @@ export interface Service {
 /* ================= SERVICES DATA ================= */
 
 const services: Service[] = [
-   {
+  {
     id: "Service-01",
     title: "Residential: Homeowners & Personal Life Projects",
     shortTitle: "Residential: Homeowners & Personal Life Projects",
@@ -77,7 +77,7 @@ const services: Service[] = [
         description:
           "As a homeowner, I want to build a modest extension (e.g., a rear kitchen/dining room) so that my family has more living space."
       },
-    
+
       {
         title: "Prior Approval",
         header: "Prior Approval",
@@ -102,14 +102,14 @@ const services: Service[] = [
         description:
           "As a homeowner with land to develop, I want to test whether building multiple houses might be acceptable before producing detailed plans"
       },
-       {
+      {
         title: "Reserved Matters Application  ",
         header: "Reserved Matters Application  ",
         description:
           "As a homeowner who has outline approval, I want to submit detailed designs for appearance, layout and landscaping so that construction can proceed."
       },
     ],
-    
+
     cta: "Select & Apply",
     label: "Homeowners, landlords, self-builders",
   },
@@ -295,7 +295,7 @@ export default function ServicesSection() {
     mediaQuery.addListener(handleChange)
     return () => mediaQuery.removeListener(handleChange)
   }, [])
-  
+
   useEffect(() => {
     if (isMobile) {
       setExpandedServiceId(null)

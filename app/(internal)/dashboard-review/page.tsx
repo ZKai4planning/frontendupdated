@@ -12,6 +12,7 @@ import {
   Headset,
   Camera,
 } from "lucide-react"
+import { useUserIdentity } from "@/lib/use-user-identity"
 
 /* ================= TYPES ================= */
 
@@ -55,6 +56,8 @@ const UPLOADED_DOCUMENTS: DocumentItem[] = [
 
 export default function ReviewPage() {
   const router = useRouter()
+  const { fullName } = useUserIdentity()
+  const displayName = fullName || "User"
   const [showPaymentCard, setShowPaymentCard] = useState(false)
 
   // 🔁 Switch after 5 seconds
@@ -88,7 +91,7 @@ export default function ReviewPage() {
       <div className="flex items-start justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
-            Welcome back, Zafer Khan
+            Welcome back, {displayName}
           </h1>
 
           <p className="text-xl text-slate-600 mt-2">

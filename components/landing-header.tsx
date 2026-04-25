@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ClientLogin } from "@/components//clientloginform" 
+import { ClientLogin } from "@/components//clientloginform"
 import { motion } from "framer-motion"
 import { Logo } from "./landing-log"
 
@@ -54,7 +54,6 @@ export function LoginHeader() {
       {showLogin && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm"
-          onClick={() => setShowLogin(false)}
         >
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
@@ -65,7 +64,11 @@ export function LoginHeader() {
           >
             {/* Close Button */}
             <button
-              onClick={() => setShowLogin(false)}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowLogin(false)
+              }}
               className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white"
             >
               <span className="material-symbols-outlined">close</span>

@@ -208,7 +208,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import {motion } from "framer-motion"
+import { motion } from "framer-motion"
 import { ClientLogin } from "@/components/clientloginform"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -415,25 +415,25 @@ export default function ServiceExpandPanel({
               </div> */}
 
               <div className="flex flex-col gap-3 mb-6">
-  {service.features.map((feature, i) => (
-    <div
-      key={i}
-      className="relative group flex gap-3 items-start"
-    >
-      {/* Icon */}
-      <span className="material-symbols-outlined text-blue-400 text-lg">
-        check_circle
-      </span>
+                {service.features.map((feature, i) => (
+                  <div
+                    key={i}
+                    className="relative group flex gap-3 items-start"
+                  >
+                    {/* Icon */}
+                    <span className="material-symbols-outlined text-blue-400 text-lg">
+                      check_circle
+                    </span>
 
-      {/* Feature title */}
-      <span className="text-sm text-white/80 cursor-pointer">
-        {feature.title}
-      </span>
+                    {/* Feature title */}
+                    <span className="text-sm text-white/80 cursor-pointer">
+                      {feature.title}
+                    </span>
 
-      {/* Tooltip — ONLY for Service-01 AND only if description exists */}
-      {service.id === "Service-01" && feature.description && (
-        <div
-          className="
+                    {/* Tooltip — ONLY for Service-01 AND only if description exists */}
+                    {service.id === "Service-01" && feature.description && (
+                      <div
+                        className="
             absolute left-7 top-full mt-2 w-64
             rounded-lg bg-black/90 border border-white/10
             px-3 py-2 text-xs text-white/80
@@ -442,20 +442,20 @@ export default function ServiceExpandPanel({
             transition-all duration-200
             pointer-events-none z-50
           "
-        >
-          {feature.header && (
-            <h4 className="font-semibold mb-1 text-white">
-              {feature.header}
-            </h4>
-          )}
-          <p className="leading-relaxed">
-            {feature.description}
-          </p>
-        </div>
-      )}
-    </div>
-  ))}
-</div>
+                      >
+                        {feature.header && (
+                          <h4 className="font-semibold mb-1 text-white">
+                            {feature.header}
+                          </h4>
+                        )}
+                        <p className="leading-relaxed">
+                          {feature.description}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
 
 
 
@@ -474,9 +474,9 @@ export default function ServiceExpandPanel({
               </div> */}
 
               <div className="mt-auto">
-  <button
-  onClick={() => router.push("/pay")}
-  className={`
+                <button
+                  onClick={() => router.push("/dashboard?stage=payment")}
+                  className={`
     ${service.id === "Service-01" ? "fixed bottom-6 z-50" : ""}
     bg-blue-500 hover:bg-blue-400
     text-white font-bold
@@ -485,14 +485,14 @@ export default function ServiceExpandPanel({
     transition shadow-lg shadow-blue-500/30
     active:scale-95
   `}
->
-  {service.cta}
-  <span className="material-symbols-outlined">
-    rocket_launch
-  </span>
-</button>
+                >
+                  {service.cta}
+                  <span className="material-symbols-outlined">
+                    rocket_launch
+                  </span>
+                </button>
 
-</div>
+              </div>
             </div>
           </motion.div>
         )}

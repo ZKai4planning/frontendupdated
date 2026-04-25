@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 
 import Link from "next/link"
 import { Mail, Phone, MapPin } from "lucide-react"
@@ -10,7 +10,7 @@ export default function Footer() {
       <div className="max-w-8xl mx-auto px-16 py-16">
         {/* Top Section */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
-          
+
           {/* Brand */}
           <div className="space-y-4">
             <div className="flex items-center gap-3">
@@ -85,7 +85,7 @@ export default function Footer() {
                   How It Works
                 </Link>
               </li>
-             
+
               <li>
                 <Link href="/contact" className="hover:text-white">
                   Contact
@@ -99,17 +99,21 @@ export default function Footer() {
             <h4 className="font-medium mb-4">Contact</h4>
             <ul className="space-y-4 text-sm text-white/70">
               <li className="flex items-center gap-3">
-                <Mail className="h-4 w-4 text-indigo-400" />
-                <span>zafer.khan@ai4planning.com</span>
+                <Mail className="h-4 w-4 text-indigo-400 mt-0.5 shrink-0" />
+                <a href="mailto:info@ai4planning.com" className="hover:text-white transition-colors duration-150">
+                  info@ai4planning.com
+                </a>
               </li>
               <li className="flex items-center gap-3">
-                <Phone className="h-4 w-4 text-indigo-400" />
-                <span>+44 7768262279</span>
+                <Phone className="h-4 w-4 text-indigo-400 mt-0.5 shrink-0" />
+                <a href="tel:+447777788885" className="hover:text-white transition-colors duration-150">
+                  +44 7777788885
+                </a>
               </li>
               <li className="flex items-start gap-3">
-                <MapPin className="h-4 w-4 text-indigo-400 mt-0.5" />
+                <MapPin className="h-4 w-4 text-indigo-400 mt-0.5 shrink-0" />
                 <span>
-                  UK 
+                  United Kingdom
                 </span>
               </li>
             </ul>
@@ -122,7 +126,7 @@ export default function Footer() {
         {/* Bottom Section */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-6 text-sm text-white/60">
           <p>
-            © {new Date().getFullYear()} AI4Planning. All rights reserved.
+            &copy; {new Date().getFullYear()} AI4Planning. All rights reserved.
           </p>
 
           <div className="flex items-center gap-6">
