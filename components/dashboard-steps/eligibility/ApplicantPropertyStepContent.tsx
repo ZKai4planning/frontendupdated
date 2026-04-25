@@ -211,7 +211,7 @@ export function ApplicantPropertyStepContent({
             "Terraced house",
             "Flat / Maisonette",
             "Bungalow",
-            "Other / Don't know",
+            "Other / Ask Agent Z",
           ]}
           consultTrigger="We can help identify your property type."
         />
@@ -222,13 +222,13 @@ export function ApplicantPropertyStepContent({
             "Leasehold with known freeholder (Certificate B)",
             "Shared/agricultural tenancy (Certificate C)",
             "Unknown owner (Certificate D)",
-            "Don't know",
+            "Ask Agent Z",
           ]}
           consultTrigger="We can assist with land registry checks."
         />
         <RadioGroupField
           label="Conservation Area or Near Listed Building?"
-          options={["Yes", "No", "Don't know"]}
+          options={["Yes", "No", "Ask Agent Z"]}
           consultTrigger="We can provide a heritage impact assessment or pre-application advice."
         />
         <SelectField
@@ -239,7 +239,7 @@ export function ApplicantPropertyStepContent({
             "Loft conversion",
             "New build",
             "Change of use",
-            "Other / Don't know",
+            "Other / Ask Agent Z",
           ]}
           consultTrigger="Our consultant can help clarify the development type."
         />

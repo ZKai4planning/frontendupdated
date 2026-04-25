@@ -86,7 +86,7 @@ export function WorksMaterialsStepContent({
           </div>
           <textarea
             rows={3}
-            placeholder="Summarise the proposal, including size, number of storeys and position... You can also click Summarize after entering the details."
+            placeholder="Summarise the proposal, including size, number of storeys and position... Ask Agent Z to help to concise"
             className="w-full rounded-xl border px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
             value={asStringValue(savedFormData["Description of Proposed Works"])}
             onChange={e =>
@@ -118,7 +118,7 @@ export function WorksMaterialsStepContent({
             "Render",
             "Timber cladding",
             "Stone",
-            "Not decided / Don't know",
+            "Not decided / Ask Agent Z",
           ]}
           consultTrigger="We can provide a materials specification report."
         />
@@ -130,14 +130,14 @@ export function WorksMaterialsStepContent({
             "Slates",
             "Flat roof (felt/GRP)",
             "Green roof",
-            "Not decided / Don't know",
+            "Not decided / Ask Agent Z",
           ]}
           consultTrigger="We can provide a materials specification report."
         />
         <Input label="Colour / Finish Notes (optional)" />
         <RadioGroupField
           label="Materials match existing?"
-          options={["Yes", "No", "Don't know"]}
+          options={["Yes", "No", "Ask Agent Z"]}
         />
       </div>
 

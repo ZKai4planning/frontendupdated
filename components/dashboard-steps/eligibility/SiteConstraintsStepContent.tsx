@@ -19,12 +19,12 @@ export function SiteConstraintsStepContent({
       <div className="grid grid-cols-2 gap-6 mb-6">
         <RadioGroupField
           label="Is the property a Listed Building?"
-          options={["Yes", "No", "Don't know"]}
+          options={["Yes", "No", "Ask Agent Z"]}
           consultTrigger="Listed buildings require separate Listed Building Consent. Agent X can advise."
         />
         <RadioGroupField
           label="Conservation Area?"
-          options={["Yes", "No", "Don't know"]}
+          options={["Yes", "No", "Ask Agent Z"]}
           consultTrigger="We can provide a heritage impact assessment."
         />
       </div>
@@ -33,14 +33,14 @@ export function SiteConstraintsStepContent({
       <div className="grid grid-cols-2 gap-6 mb-6">
         <RadioGroupField
           label="New or altered vehicle access?"
-          options={["Yes", "No", "Don't know"]}
+          options={["Yes", "No", "Ask Agent Z"]}
           consultTrigger="We can provide highways and transport advice."
         />
         <Input label="Details of Access / Parking Changes" />
         <Input label="Number of Proposed Parking Spaces" />
         <RadioGroupField
           label="Cycle storage provided?"
-          options={["Yes", "No", "Don't know"]}
+          options={["Yes", "No", "Ask Agent Z"]}
         />
       </div>
 
@@ -48,12 +48,12 @@ export function SiteConstraintsStepContent({
       <div className="grid grid-cols-2 gap-6 mb-6">
         <RadioGroupField
           label="Trees with TPO on or near site?"
-          options={["Yes", "No", "Don't know"]}
+          options={["Yes", "No", "Ask Agent Z"]}
           consultTrigger="AArboriculture Report (BS5837) may be required. We can arrange this for you."
         />
         <RadioGroupField
           label="Trees within falling distance of works?"
-          options={["Yes", "No", "Don't know"]}
+          options={["Yes", "No", "Ask Agent Z"]}
           consultTrigger="AArboriculture Report (BS5837) may be required. We can arrange this for you."
         />
         <Input label="Tree Species (if known)" />
@@ -71,12 +71,12 @@ export function SiteConstraintsStepContent({
       <div className="grid grid-cols-2 gap-6 mb-6">
         <RadioGroupField
           label="Is the site in Flood Zone 2 or 3?"
-          options={["Yes", "No", "Don't know"]}
+          options={["Yes", "No", "Ask Agent Z"]}
           consultTrigger="We can provide a Flood Risk Assessment and Surface Water Drainage Strategy."
         />
         <RadioGroupField
           label="Any known contamination on site?"
-          options={["Yes", "No", "Don't know"]}
+          options={["Yes", "No", "Ask Agent Z"]}
           consultTrigger="A Phase 1 Desk Study may be required — we can arrange this."
         />
         <FileUploadArea
@@ -92,7 +92,7 @@ export function SiteConstraintsStepContent({
       <div className="grid grid-cols-2 gap-6 mb-2">
         <RadioGroupField
           label="Has pre-application advice been sought?"
-          options={["Yes", "No", "Don't know"]}
+          options={["Yes", "No", "Ask Agent Z"]}
           consultTrigger="We strongly recommend pre-application advice. Book a session with Agent X."
         />
         <Input label="Pre-Application Reference Number" />

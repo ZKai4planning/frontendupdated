@@ -19,26 +19,26 @@ export function UtilitiesConsentsStepContent({
       <div className="grid grid-cols-2 gap-6 mb-6">
         <SelectField
           label="Water Supply"
-          options={["Mains connected", "Borehole / private supply", "Not applicable", "Don't know"]}
+          options={["Mains connected", "Borehole / private supply", "Not applicable", "Ask Agent Z"]}
           consultTrigger="We can provide an infrastructure assessment."
         />
         <SelectField
           label="Sewage / Drainage"
-          options={["Mains sewer", "Septic tank", "Package treatment plant", "Not applicable", "Don't know"]}
+          options={["Mains sewer", "Septic tank", "Package treatment plant", "Not applicable", "Ask Agent Z"]}
           consultTrigger="We can provide a drainage strategy."
         />
         <SelectField
           label="Surface Water Drainage"
-          options={["Connected to sewer", "Soakaway", "Watercourse", "SuDS proposed", "Don't know"]}
+          options={["Connected to sewer", "Soakaway", "Watercourse", "SuDS proposed", "Ask Agent Z"]}
           consultTrigger="We can provide a Surface Water Drainage Strategy."
         />
         <SelectField
           label="Existing Waste Arrangements"
-          options={["Kerbside collection", "Communal bins", "Other", "Don't know"]}
+          options={["Kerbside collection", "Communal bins", "Other", "Ask Agent Z"]}
         />
         <RadioGroupField
           label="Renewable energy installations proposed?"
-          options={["Yes", "No", "Don't know"]}
+          options={["Yes", "No", "Ask Agent Z"]}
         />
         <Input label="Details of Renewable / Energy Measures (if applicable)" />
       </div>
@@ -52,7 +52,7 @@ export function UtilitiesConsentsStepContent({
             "Certificate B - known other owner(s), notices served",
             "Certificate C - agricultural tenants, notices served",
             "Certificate D - owner(s) unknown, notice published",
-            "Don't know / need advice",
+            "Ask Agent Z / need advice",
           ]}
           consultTrigger="We can handle certificate notices and land registry checks on your behalf."
         />
@@ -97,7 +97,7 @@ export function UtilitiesConsentsStepContent({
           </p>
           <RadioGroupField
             label="Community consultation undertaken?"
-            options={["Yes", "No", "Not required", "Don't know"]}
+            options={["Yes", "No", "Not required", "Ask Agent Z"]}
             consultTrigger="Pre-application community consultation can strengthen your application."
           />
         </div>

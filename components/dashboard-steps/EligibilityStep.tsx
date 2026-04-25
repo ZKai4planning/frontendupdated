@@ -101,10 +101,35 @@ const getFieldId = (label: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "")}`
 
+const isAgentOptionLabel = (value: string) => {
+  const normalized = value.trim().toLowerCase()
+  return normalized.includes("ask agent z") || normalized === "unsure"
+}
+
+const renderAgentOptionLabel = (value: string) => {
+  const marker = "Agent Z"
+  const index = value.indexOf(marker)
+
+  if (index === -1) {
+    return value
+  }
+
+  const before = value.slice(0, index)
+  const after = value.slice(index + marker.length)
+
+  return (
+    <>
+      {before}
+      Agent <span className="font-extrabold">Z</span>
+      {after}
+    </>
+  )
+}
+
 const isAgentSidebarTriggerValue = (value: string) => {
   const normalized = value.trim().toLowerCase()
   return (
-    normalized.includes("don't know") ||
+    normalized.includes("ask agent z") ||
     normalized === "unsure" ||
     normalized === "not required"
   )
@@ -1525,7 +1550,7 @@ function AgentActionButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center justify-center rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 ${className}`}
+      className={`inline-flex items-center justify-center rounded-xl border border-blue-700 bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 ${className}`}
     >
       {label}
     </button>
@@ -2142,6 +2167,14 @@ function CheckboxGroup({
         [label]: next,
       },
     })
+    if (next.some(isAgentSidebarTriggerValue) && shouldShowAgentActionUi(label)) {
+      showAgentSidebar(
+        createAgentSidebarPayload(
+          label,
+          consultTrigger ?? `Agent Z is gathering more details for ${label}.`
+        )
+      )
+    }
   }
 
   const hasAgentTrigger = selected.some(isAgentSidebarTriggerValue)
@@ -2156,47 +2189,53 @@ function CheckboxGroup({
         wrapperClassName="mb-3"
       />
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        {options.map(o => (
-          <button
-            key={o}
-            type="button"
-            onClick={() => toggle(o)}
-            className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm text-left transition-all ${
-              selected.includes(o)
-                ? "bg-blue-600 text-white border-blue-600"
-                : "hover:bg-blue-50 border-slate-200 text-slate-700"
-            }`}
-          >
-            <span
-              className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                selected.includes(o) ? "bg-white border-white" : "border-slate-300"
+        {options.map(o => {
+          const isAgentOption = isAgentOptionLabel(o)
+          const isSelected = selected.includes(o)
+
+          return (
+            <button
+              key={o}
+              type="button"
+              onClick={() => toggle(o)}
+              className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm text-left transition-all ${
+                isSelected
+                  ? isAgentOption
+                    ? "border-blue-700 bg-blue-600 text-white"
+                    : "bg-blue-600 text-white border-blue-600"
+                  : isAgentOption
+                    ? "border-blue-500 bg-blue-100 text-blue-900 hover:bg-blue-200"
+                    : "hover:bg-blue-50 border-slate-200 text-slate-700"
               }`}
             >
-              {selected.includes(o) && (
-                <svg className="w-3 h-3 text-blue-600" viewBox="0 0 12 12" fill="none">
-                  <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              )}
-            </span>
-            {o}
-          </button>
-        ))}
+              <span
+                className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                  isSelected
+                    ? isAgentOption
+                      ? "bg-white border-white"
+                      : "bg-white border-white"
+                    : isAgentOption
+                      ? "border-blue-500"
+                      : "border-slate-300"
+                }`}
+              >
+                {isSelected && (
+                  <svg
+                    className="w-3 h-3 text-blue-600"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                  >
+                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </span>
+              {renderAgentOptionLabel(o)}
+            </button>
+          )
+        })}
       </div>
       {hasAgentTrigger && consultTrigger && shouldShowAgentActionUi(label) && (
         <ConsultationTrigger message={consultTrigger} />
-      )}
-      {hasAgentTrigger && shouldShowAgentActionUi(label) && (
-        <AgentActionButton
-          label="Get details"
-          onClick={() =>
-            showAgentSidebar(
-              createAgentSidebarPayload(
-                label,
-                consultTrigger ?? `Agent Z is gathering more details for ${label}.`
-              )
-            )
-          }
-        />
       )}
     </div>
   )
@@ -3121,6 +3160,7 @@ function SelectField({
   const { showAgentSidebar } = useEligibilityAgent()
   const value = asStringValue(data.eligibility?.formData?.[label])
   const showAgentButton = isAgentSidebarTriggerValue(value)
+  const isAgentValue = isAgentOptionLabel(value)
   const fieldId = getFieldId(label)
 
   return (
@@ -3134,22 +3174,11 @@ function SelectField({
       <select
         value={value}
         onChange={e => {
+          const nextValue = e.target.value
           updateSection("eligibility", {
-            formData: { ...(data.eligibility?.formData || {}), [label]: e.target.value },
+            formData: { ...(data.eligibility?.formData || {}), [label]: nextValue },
           })
-        }}
-        className="mt-1 w-full rounded-xl border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 transition-shadow"
-      >
-        <option value="">Select...</option>
-        {options.map(o => <option key={o}>{o}</option>)}
-      </select>
-      {showAgentButton && consultTrigger && shouldShowAgentActionUi(label) && (
-        <ConsultationTrigger message={consultTrigger} />
-      )}
-      {showAgentButton && shouldShowAgentActionUi(label) && (
-        <AgentActionButton
-          label="Get details"
-          onClick={() =>
+          if (isAgentSidebarTriggerValue(nextValue) && shouldShowAgentActionUi(label)) {
             showAgentSidebar(
               createAgentSidebarPayload(
                 label,
@@ -3157,7 +3186,18 @@ function SelectField({
               )
             )
           }
-        />
+        }}
+        className={`mt-1 w-full rounded-xl border px-4 py-2 text-sm transition-shadow focus:outline-none focus:ring-2 ${
+          isAgentValue
+            ? "border-blue-600 bg-blue-100 text-blue-900 focus:ring-blue-300"
+            : "focus:ring-blue-200"
+        }`}
+      >
+        <option value="">Select...</option>
+        {options.map(o => <option key={o}>{o}</option>)}
+      </select>
+      {showAgentButton && consultTrigger && shouldShowAgentActionUi(label) && (
+        <ConsultationTrigger message={consultTrigger} />
       )}
     </div>
   )
@@ -3189,41 +3229,44 @@ function RadioGroupField({
       <FieldLabel label={label} tooltip={tooltip} questionNumber={questionNumber} />
 
       <div className="flex flex-wrap gap-2">
-        {options.map(o => (
-          <button
-            key={o}
-            type="button"
-            onClick={() => {
-              updateSection("eligibility", {
-                ...(data.eligibility || {}),
-                formData: { ...(data.eligibility?.formData || {}), [label]: o },
-              })
-            }}
-            className={`flex-1 min-w-fit rounded-xl border px-4 py-2 text-sm transition-all ${
-              selected === o
-                ? "bg-blue-600 text-white border-blue-600"
-                : "hover:bg-blue-50 border-slate-200"
-            }`}
-          >
-            {o}
-          </button>
-        ))}
+        {options.map(o => {
+          const isAgentOption = isAgentOptionLabel(o)
+
+          return (
+            <button
+              key={o}
+              type="button"
+              onClick={() => {
+                updateSection("eligibility", {
+                  ...(data.eligibility || {}),
+                  formData: { ...(data.eligibility?.formData || {}), [label]: o },
+                })
+                if (isAgentSidebarTriggerValue(o) && shouldShowAgentActionUi(label)) {
+                  showAgentSidebar(
+                    createAgentSidebarPayload(
+                      label,
+                      consultTrigger ?? `Agent Z is gathering more details for ${label}.`
+                    )
+                  )
+                }
+              }}
+              className={`flex-1 min-w-fit rounded-xl border px-4 py-2 text-sm transition-all ${
+                selected === o
+                  ? isAgentOption
+                    ? "border-blue-700 bg-blue-600 text-white"
+                    : "bg-blue-600 text-white border-blue-600"
+                  : isAgentOption
+                    ? "border-blue-500 bg-blue-100 text-blue-900 hover:bg-blue-200"
+                    : "hover:bg-blue-50 border-slate-200"
+              }`}
+            >
+              {renderAgentOptionLabel(o)}
+            </button>
+          )
+        })}
       </div>
       {showAgentButton && consultTrigger && shouldShowAgentActionUi(label) && (
         <ConsultationTrigger message={consultTrigger} />
-      )}
-      {showAgentButton && shouldShowAgentActionUi(label) && (
-        <AgentActionButton
-          label="Get details"
-          onClick={() =>
-            showAgentSidebar(
-              createAgentSidebarPayload(
-                label,
-                consultTrigger ?? `Agent Z is gathering more details for ${label}.`
-              )
-            )
-          }
-        />
       )}
     </div>
   )
