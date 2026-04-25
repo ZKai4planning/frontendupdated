@@ -97,7 +97,7 @@ export function UtilitiesConsentsStepContent({
           </p>
           <RadioGroupField
             label="Community consultation undertaken?"
-            options={["Yes", "No", "Not required", "Ask Agent Z"]}
+            options={["Yes", "No", "Not required", "Don't know"]}
             consultTrigger="Pre-application community consultation can strengthen your application."
           />
         </div>
