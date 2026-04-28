@@ -5,6 +5,7 @@ import React, {
   useContext,
   useEffect,
   useState,
+  useCallback,
 } from "react"
 
 /* ================= TYPES ================= */
@@ -37,6 +38,19 @@ export type ProjectData = {
     projectStageId?: string
     isDraft?: boolean
     draftSavedAt?: string
+    location?: {
+      postcode?: string
+      lat?: number
+      lng?: number
+      lpaCode?: string
+      lpaName?: string
+      region?: string
+      country?: string
+      ward?: string
+      constituency?: string
+      source?: string
+      ds?: string
+    }
 
     /* 🔹 Structured fields (future use / admin / backend) */
     propertyDetails?: {
@@ -110,7 +124,7 @@ export function ProjectProvider({
     sessionStorage.setItem(PROJECT_STORAGE_KEY, JSON.stringify(getPersistedProjectData(data)))
   }, [data])
 
-  const updateSection = (
+  const updateSection = useCallback((
     section: keyof ProjectData,
     value: any
   ) => {
@@ -121,7 +135,7 @@ export function ProjectProvider({
         ...value,
       },
     }))
-  }
+  }, [])
 
   const resetProject = () => {
     setData({})

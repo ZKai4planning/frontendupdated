@@ -15,6 +15,7 @@ export type EligibilitySharedComponents = {
   Input?: React.ComponentType<
     BaseFieldProps & {
       placeholder?: string
+      autocompleteKind?: "postcode"
       fieldIdOverride?: string
       actionLabel?: string
       onAction?: () => void

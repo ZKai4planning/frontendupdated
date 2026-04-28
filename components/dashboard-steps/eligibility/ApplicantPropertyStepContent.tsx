@@ -1,4 +1,5 @@
-import React from "react"
+import React, { useEffect } from "react"
+import { useProject } from "@/app/context/ProjectContext"
 import { EligibilityStepContentProps } from "./types"
 
 export function ApplicantPropertyStepContent({
@@ -7,6 +8,7 @@ export function ApplicantPropertyStepContent({
   asStringValue,
   components,
 }: EligibilityStepContentProps) {
+  const { data } = useProject()
   const { SectionHeading, Input, PhoneNumberField, RadioGroupField, SelectField, FieldLabel } = components
 
   if (!SectionHeading || !Input || !PhoneNumberField || !RadioGroupField || !SelectField || !FieldLabel) {
@@ -65,6 +67,35 @@ export function ApplicantPropertyStepContent({
     return `Auto-filled locality for ${outwardCode}`
   }
 
+  const resolveCouncilFromPostcode = (value: string) => {
+    const normalizedPostcode = value.replace(/\s+/g, " ").trim().toUpperCase()
+    const lookupPostcode = data.eligibility?.location?.postcode?.replace(/\s+/g, " ").trim().toUpperCase()
+    const lookupCouncil = data.eligibility?.location?.lpaName?.trim()
+
+    if (lookupCouncil && lookupPostcode === normalizedPostcode) {
+      return lookupCouncil
+    }
+
+    return buildCouncilFromPostcode(value)
+  }
+
+  useEffect(() => {
+    if (!postcode) return
+
+    const currentCouncil = asStringValue(savedFormData["Council"]).trim()
+    if (currentCouncil) return
+
+    const resolvedCouncil = resolveCouncilFromPostcode(postcode).trim()
+    if (!resolvedCouncil) return
+
+    updateSection("eligibility", {
+      formData: {
+        ...savedFormData,
+        Council: resolvedCouncil,
+      },
+    })
+  }, [asStringValue, data.eligibility?.location?.lpaName, data.eligibility?.location?.postcode, postcode, savedFormData, updateSection])
+
   const handleGetAddress = () => {
     if (!siteAddressLine1 || !postcode) return
 
@@ -72,9 +103,9 @@ export function ApplicantPropertyStepContent({
       "Site Address Line 2":
         asStringValue(savedFormData["Site Address Line 2"]).trim() ||
         buildAddressLine2(siteAddressLine1, postcode),
-      "Which council have you applied for?":
-        asStringValue(savedFormData["Which council have you applied for?"]).trim() ||
-        buildCouncilFromPostcode(postcode),
+      Council:
+        asStringValue(savedFormData["Council"]).trim() ||
+        resolveCouncilFromPostcode(postcode),
     })
   }
 
@@ -82,9 +113,9 @@ export function ApplicantPropertyStepContent({
     if (!planningReferenceNumber) return
 
     updateFormData({
-      "Which council have you applied for?":
-        asStringValue(savedFormData["Which council have you applied for?"]).trim() ||
-        buildCouncilFromPostcode(postcode || "LOCAL"),
+      Council:
+        asStringValue(savedFormData["Council"]).trim() ||
+        resolveCouncilFromPostcode(postcode || "LOCAL"),
       "Type of Application *":
         asStringValue(savedFormData["Type of Application *"]).trim() ||
         "Householder Planning Application",
@@ -124,6 +155,7 @@ export function ApplicantPropertyStepContent({
           </div>
           <Input
             label="Postcode"
+            autocompleteKind="postcode"
             actionLabel="Get address"
             onAction={handleGetAddress}
             actionDisabled={!siteAddressLine1 || !postcode}
@@ -132,7 +164,7 @@ export function ApplicantPropertyStepContent({
         </div>
         <div className="grid gap-6 md:grid-cols-2">
           <Input label="Site Address Line 2" />
-          <Input label="Which council have you applied for?" />
+          <Input label="Council" />
         </div>
       </div>
 
@@ -181,9 +213,9 @@ export function ApplicantPropertyStepContent({
               actionMessage="Agent Z is using the planning reference number to bring in the remaining pre-application details."
             />
             <Input
-              label="Which council have you applied for?"
+              label="Council"
               questionNumber={0}
-              fieldIdOverride="eligibility-field-which-council-have-you-applied-for-pre-application"
+              fieldIdOverride="eligibility-field-council-pre-application"
             />
             <Input label="Type of Application *" />
             <Input

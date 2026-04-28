@@ -58,6 +58,8 @@ type EligibilityAgentSidebarState = {
   id: string
   fieldLabel: string
   message?: string
+  requestType: "ask-agent" | "action"
+  responseMode: "info" | "yes-no"
 } | null
 
 type EligibilityAgentContextValue = {
@@ -74,6 +76,17 @@ const SELECTED_PROJECT_STORAGE_KEY = "selectedProjectId"
 const SELECTED_PROJECT_STAGE_STORAGE_KEY = "selectedProjectStageId"
 const MAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024
 const MAX_UPLOAD_FILE_SIZE_LABEL = "10 MB"
+const POSTCODE_AUTOCOMPLETE_ENDPOINT =
+  process.env.NEXT_PUBLIC_POSTCODE_AUTOCOMPLETE_ENDPOINT ??
+  "http://localhost:8000/api/v1/ds02/address/autocomplete"
+const POSTCODE_AUTOCOMPLETE_QUERY_PARAM =
+  process.env.NEXT_PUBLIC_POSTCODE_AUTOCOMPLETE_QUERY_PARAM ?? "q"
+const POSTCODE_LOOKUP_ENDPOINT =
+  process.env.NEXT_PUBLIC_POSTCODE_LOOKUP_ENDPOINT ??
+  "http://localhost:8000/api/v1/ds02/address"
+const POSTCODE_LOOKUP_QUERY_PARAM =
+  process.env.NEXT_PUBLIC_POSTCODE_LOOKUP_QUERY_PARAM ?? "q"
+const FULL_UK_POSTCODE_PATTERN = /^([A-Z]{1,2}\d[A-Z\d]?|GIR)\s*\d[A-Z]{2}$/i
 
 const EligibilityStepContext = React.createContext<Step>(1)
 const EligibilityAssetsContext = React.createContext<EligibilityAssetsContextValue | null>(null)
@@ -135,10 +148,24 @@ const isAgentSidebarTriggerValue = (value: string) => {
   )
 }
 
-const createAgentSidebarPayload = (fieldLabel: string, message?: string) => ({
+const shouldAutoApplyYesNoResponse = (options: string[]) => {
+  const normalizedOptions = options.map((option) => option.trim().toLowerCase())
+  return normalizedOptions.includes("yes") && normalizedOptions.includes("no")
+}
+
+const createAgentSidebarPayload = (
+  fieldLabel: string,
+  message?: string,
+  config?: {
+    requestType?: "ask-agent" | "action"
+    responseMode?: "info" | "yes-no"
+  }
+) => ({
   id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
   fieldLabel,
   message,
+  requestType: config?.requestType ?? "ask-agent",
+  responseMode: config?.responseMode ?? "info",
 })
 
 const shouldShowAgentActionUi = (label: string) =>
@@ -202,6 +229,111 @@ const getEligibilityActionErrorMessage = (error: unknown, fallback: string) => {
 
   return error instanceof Error ? error.message : fallback
 }
+
+type AutocompleteSuggestion = {
+  id: string
+  label: string
+  value: string
+}
+
+type PostcodeLookupResponse = {
+  postcode?: string
+  lat?: number
+  lng?: number
+  lpa_code?: string
+  lpa_name?: string
+  region?: string
+  country?: string
+  ward?: string
+  constituency?: string
+  source?: string
+  ds?: string
+}
+
+const toSuggestionText = (value: unknown): string => {
+  if (typeof value !== "string") return ""
+  return value.replace(/\s+/g, " ").trim()
+}
+
+const normalizePostcode = (value: string) =>
+  value.replace(/\s+/g, " ").trim().toUpperCase()
+
+const buildAutocompleteSuggestion = (value: unknown, index: number): AutocompleteSuggestion | null => {
+  if (typeof value === "string") {
+    const normalized = toSuggestionText(value)
+    if (!normalized) return null
+    return {
+      id: `${normalized}-${index}`,
+      label: normalized,
+      value: normalized,
+    }
+  }
+
+  if (!isRecord(value)) return null
+
+  const candidateValue =
+    toSuggestionText(value.postcode) ||
+    toSuggestionText(value.formatted_postcode) ||
+    toSuggestionText(value.value) ||
+    toSuggestionText(value.code) ||
+    toSuggestionText(value.id)
+
+  const candidateLabel =
+    toSuggestionText(value.label) ||
+    toSuggestionText(value.display) ||
+    toSuggestionText(value.description) ||
+    toSuggestionText(value.address) ||
+    toSuggestionText(value.text) ||
+    candidateValue
+
+  if (!candidateValue && !candidateLabel) return null
+
+  const resolvedValue = candidateValue || candidateLabel
+  const resolvedLabel = candidateLabel || candidateValue
+
+  return {
+    id: `${resolvedValue}-${index}`,
+    label: resolvedLabel,
+    value: resolvedValue,
+  }
+}
+
+const extractAutocompleteSuggestions = (payload: unknown): AutocompleteSuggestion[] => {
+  const candidateCollections: unknown[] = []
+
+  if (Array.isArray(payload)) {
+    candidateCollections.push(payload)
+  } else if (isRecord(payload)) {
+    candidateCollections.push(
+      payload.suggestions,
+      payload.results,
+      payload.data,
+      payload.items,
+      payload.postcodes,
+      payload.addresses
+    )
+  }
+
+  const firstCollection = candidateCollections.find(Array.isArray)
+  if (!Array.isArray(firstCollection)) return []
+
+  const seenValues = new Set<string>()
+
+  return firstCollection.reduce<AutocompleteSuggestion[]>((accumulator, item, index) => {
+    const suggestion = buildAutocompleteSuggestion(item, index)
+    if (!suggestion) return accumulator
+
+    const dedupeKey = suggestion.value.toUpperCase()
+    if (seenValues.has(dedupeKey)) return accumulator
+
+    seenValues.add(dedupeKey)
+    accumulator.push(suggestion)
+    return accumulator
+  }, [])
+}
+
+const isValidCoordinate = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value)
 
 const hasUploadedAsset = (entry: UploadedFileEntry) => Boolean(entry.file || entry.remoteFileUrl)
 
@@ -530,10 +662,10 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
       label: "Planning Reference Number *",
       paths: [["applicantAndProperty", "councilApplicationHistory", "planningReferenceNumber"]],
     },
-    {
-      label: "Which council have you applied for?",
-      paths: [["applicantAndProperty", "councilApplicationHistory", "councilName"]],
-    },
+      {
+        label: "Council",
+        paths: [["applicantAndProperty", "councilApplicationHistory", "councilName"]],
+      },
     {
       label: "Type of Application *",
       paths: [["applicantAndProperty", "councilApplicationHistory", "previousApplicationType"]],
@@ -911,7 +1043,8 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
   setMissingValue("Site Address Line 1", legacyAddressLines.line1)
   setMissingValue("Site Address Line 2", legacyAddressLines.line2)
   setMissingValue("Postcode", legacyPostcode)
-  setMissingValue("Which council have you applied for?", legacyCouncil)
+  setMissingValue("Council", legacyCouncil)
+  setMissingValue("Council", formData["Which council have you applied for?"])
 
   return formData
 }
@@ -1107,7 +1240,7 @@ const buildEligibilityStepPayload = (
               "What was previously proposed, and was it approved, refused, or withdrawn?"
             ),
             planningReferenceNumber: getValue("Planning Reference Number *"),
-            councilName: getValue("Which council have you applied for?"),
+            councilName: getValue("Council"),
             previousApplicationType: getValue("Type of Application *"),
             previousDevelopmentType: getValue("Type of Development Previously Proposed"),
             projectComparison: getValue(
@@ -1339,7 +1472,7 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
   "Site Address Line 1": "Primary address line for the property where the works are proposed.",
   "Site Address Line 2": "Optional second address line for the property.",
   "Postcode": "Postcode helps us identify planning constraints in your area.",
-  "Which council have you applied for?":
+  Council:
     "Name of the council that handled the earlier application.",
   "Are you using a planning agent?": "Tell us if a professional is acting on your behalf for the application.",
   "Agent Name": "Name of the planning agent or firm.",
@@ -1443,7 +1576,7 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Phone Number",
   "Site Address Line 1",
   "Site Address Line 2",
-  "Which council have you applied for?",
+  "Council",
   "Postcode",
   "Are you using a planning agent?",
   "Agent Name",
@@ -2171,7 +2304,11 @@ function CheckboxGroup({
       showAgentSidebar(
         createAgentSidebarPayload(
           label,
-          consultTrigger ?? `Agent Z is gathering more details for ${label}.`
+          consultTrigger ?? `Agent Z is gathering more details for ${label}.`,
+          {
+            requestType: "ask-agent",
+            responseMode: shouldAutoApplyYesNoResponse(options) ? "yes-no" : "info",
+          }
         )
       )
     }
@@ -2874,6 +3011,8 @@ function EligibilityCheckPage() {
                     requestId={agentSidebar.id}
                     fieldLabel={agentSidebar.fieldLabel}
                     message={agentSidebar.message}
+                    requestType={agentSidebar.requestType}
+                    responseMode={agentSidebar.responseMode}
                     onClose={() => setAgentSidebar(null)}
                   />
                 )}
@@ -3040,6 +3179,7 @@ function Input({
   placeholder,
   tooltip,
   questionNumber,
+  autocompleteKind,
   fieldIdOverride,
   actionLabel,
   onAction,
@@ -3050,6 +3190,7 @@ function Input({
   placeholder?: string
   tooltip?: string
   questionNumber?: number
+  autocompleteKind?: "postcode"
   fieldIdOverride?: string
   actionLabel?: string
   onAction?: () => void
@@ -3060,6 +3201,211 @@ function Input({
   const { showAgentSidebar } = useEligibilityAgent()
   const value = asStringValue(data.eligibility?.formData?.[label])
   const fieldId = fieldIdOverride ?? getFieldId(label)
+  const isPostcodeAutocomplete = autocompleteKind === "postcode"
+  const [suggestions, setSuggestions] = useState<AutocompleteSuggestion[]>([])
+  const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false)
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
+  const [autocompleteError, setAutocompleteError] = useState<string | null>(null)
+  const [postcodeLookupError, setPostcodeLookupError] = useState<string | null>(null)
+  const inputWrapperRef = useRef<HTMLDivElement>(null)
+  const skipNextAutocompleteLookupRef = useRef(false)
+  const lastResolvedPostcodeRef = useRef(
+    normalizePostcode(asStringValue(data.eligibility?.location?.postcode))
+  )
+
+  useEffect(() => {
+    if (!isPostcodeAutocomplete) return
+
+    const trimmedValue = value.trim()
+
+    if (skipNextAutocompleteLookupRef.current) {
+      skipNextAutocompleteLookupRef.current = false
+      setIsLoadingSuggestions(false)
+      setAutocompleteError(null)
+      return
+    }
+
+    if (trimmedValue.length < 2) {
+      setSuggestions([])
+      setIsAutocompleteOpen(false)
+      setIsLoadingSuggestions(false)
+      setAutocompleteError(null)
+      return
+    }
+
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(async () => {
+      setIsLoadingSuggestions(true)
+      setAutocompleteError(null)
+
+      try {
+        const params = new URLSearchParams({
+          [POSTCODE_AUTOCOMPLETE_QUERY_PARAM]: trimmedValue,
+        })
+        const response = await fetch(`${POSTCODE_AUTOCOMPLETE_ENDPOINT}?${params.toString()}`, {
+          method: "GET",
+          signal: controller.signal,
+        })
+
+        if (!response.ok) {
+          throw new Error(`Postcode lookup failed with status ${response.status}.`)
+        }
+
+        const payload = await response.json()
+        const nextSuggestions = extractAutocompleteSuggestions(payload)
+
+        setSuggestions(nextSuggestions)
+        setIsAutocompleteOpen(nextSuggestions.length > 0)
+      } catch (error) {
+        if (controller.signal.aborted) return
+
+        setSuggestions([])
+        setIsAutocompleteOpen(false)
+        setAutocompleteError(
+          error instanceof Error ? error.message : "Unable to load postcode suggestions."
+        )
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoadingSuggestions(false)
+        }
+      }
+    }, 250)
+
+    return () => {
+      controller.abort()
+      window.clearTimeout(timeoutId)
+    }
+  }, [isPostcodeAutocomplete, value])
+
+  useEffect(() => {
+    if (!isPostcodeAutocomplete) return
+
+    const normalizedValue = normalizePostcode(value)
+
+    if (!normalizedValue) {
+      lastResolvedPostcodeRef.current = ""
+      setPostcodeLookupError(null)
+      return
+    }
+
+    if (!FULL_UK_POSTCODE_PATTERN.test(normalizedValue)) {
+      setPostcodeLookupError(null)
+      return
+    }
+
+    const storedLocation = data.eligibility?.location
+    const storedPostcode = normalizePostcode(asStringValue(storedLocation?.postcode))
+    const hasStoredCoordinates =
+      isValidCoordinate(storedLocation?.lat) && isValidCoordinate(storedLocation?.lng)
+
+    if (
+      storedPostcode === normalizedValue &&
+      hasStoredCoordinates &&
+      lastResolvedPostcodeRef.current === normalizedValue
+    ) {
+      setPostcodeLookupError(null)
+      return
+    }
+
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(async () => {
+      setPostcodeLookupError(null)
+
+      try {
+        const params = new URLSearchParams({
+          [POSTCODE_LOOKUP_QUERY_PARAM]: normalizedValue,
+        })
+        const response = await fetch(`${POSTCODE_LOOKUP_ENDPOINT}?${params.toString()}`, {
+          method: "GET",
+          signal: controller.signal,
+        })
+
+        if (!response.ok) {
+          throw new Error(`Postcode coordinate lookup failed with status ${response.status}.`)
+        }
+
+        const payload = (await response.json()) as PostcodeLookupResponse
+
+        if (!isValidCoordinate(payload.lat) || !isValidCoordinate(payload.lng)) {
+          throw new Error("Postcode coordinate lookup did not return valid latitude and longitude.")
+        }
+
+        const resolvedPostcode = normalizePostcode(payload.postcode || normalizedValue)
+        lastResolvedPostcodeRef.current = resolvedPostcode
+
+        updateSection("eligibility", {
+          location: {
+            postcode: resolvedPostcode,
+            lat: payload.lat,
+            lng: payload.lng,
+            lpaCode: typeof payload.lpa_code === "string" ? payload.lpa_code : undefined,
+            lpaName: typeof payload.lpa_name === "string" ? payload.lpa_name : undefined,
+            region: typeof payload.region === "string" ? payload.region : undefined,
+            country: typeof payload.country === "string" ? payload.country : undefined,
+            ward: typeof payload.ward === "string" ? payload.ward : undefined,
+            constituency:
+              typeof payload.constituency === "string" ? payload.constituency : undefined,
+            source: typeof payload.source === "string" ? payload.source : undefined,
+            ds: typeof payload.ds === "string" ? payload.ds : undefined,
+          },
+        })
+      } catch (error) {
+        if (controller.signal.aborted) return
+
+        setPostcodeLookupError(
+          error instanceof Error
+            ? error.message
+            : "Unable to resolve postcode coordinates."
+        )
+      }
+    }, 250)
+
+    return () => {
+      controller.abort()
+      window.clearTimeout(timeoutId)
+    }
+  }, [data.eligibility?.location, isPostcodeAutocomplete, updateSection, value])
+
+  useEffect(() => {
+    if (!isPostcodeAutocomplete) return
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!inputWrapperRef.current?.contains(event.target as Node)) {
+        setIsAutocompleteOpen(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown)
+    return () => document.removeEventListener("mousedown", handlePointerDown)
+  }, [isPostcodeAutocomplete])
+
+  const updateInputValue = (
+    nextValue: string,
+    options?: { suppressAutocompleteLookup?: boolean }
+  ) => {
+    const normalizedNextValue = normalizePostcode(nextValue)
+    const normalizedStoredPostcode = normalizePostcode(
+      asStringValue(data.eligibility?.location?.postcode)
+    )
+    const shouldClearStoredLocation =
+      isPostcodeAutocomplete &&
+      Boolean(normalizedStoredPostcode) &&
+      normalizedNextValue !== normalizedStoredPostcode
+
+    if (options?.suppressAutocompleteLookup) {
+      skipNextAutocompleteLookupRef.current = true
+    }
+
+    if (shouldClearStoredLocation) {
+      lastResolvedPostcodeRef.current = ""
+      setPostcodeLookupError(null)
+    }
+
+    updateSection("eligibility", {
+      formData: { ...(data.eligibility?.formData || {}), [label]: nextValue },
+      ...(shouldClearStoredLocation ? { location: undefined } : {}),
+    })
+  }
 
   return (
     <div id={fieldId}>
@@ -3070,16 +3416,54 @@ function Input({
         wrapperClassName="mb-0"
       />
       <div className="mt-1 flex flex-col gap-2 xl:flex-row">
-        <input
-          value={value}
-          placeholder={placeholder}
-          onChange={e =>
-            updateSection("eligibility", {
-              formData: { ...(data.eligibility?.formData || {}), [label]: e.target.value },
-            })
-          }
-          className="w-full rounded-xl border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 transition-shadow"
-        />
+        <div className="relative w-full" ref={inputWrapperRef}>
+          <input
+            value={value}
+            placeholder={placeholder}
+            autoComplete={isPostcodeAutocomplete ? "postal-code" : undefined}
+            onFocus={() => {
+              if (isPostcodeAutocomplete && suggestions.length > 0) {
+                setIsAutocompleteOpen(true)
+              }
+            }}
+            onChange={e => {
+              updateInputValue(e.target.value)
+              if (isPostcodeAutocomplete) {
+                setIsAutocompleteOpen(Boolean(e.target.value.trim()))
+              }
+            }}
+            className="w-full rounded-xl border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 transition-shadow"
+          />
+          {isPostcodeAutocomplete && isLoadingSuggestions && (
+            <p className="mt-1 text-xs text-slate-400">Loading postcode suggestions...</p>
+          )}
+          {isPostcodeAutocomplete && autocompleteError && (
+            <p className="mt-1 text-xs text-red-600">{autocompleteError}</p>
+          )}
+          {isPostcodeAutocomplete && postcodeLookupError && (
+            <p className="mt-1 text-xs text-red-600">{postcodeLookupError}</p>
+          )}
+          {isPostcodeAutocomplete && isAutocompleteOpen && suggestions.length > 0 && (
+            <div className="absolute z-30 mt-2 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
+              {suggestions.map((suggestion) => (
+                <button
+                  key={suggestion.id}
+                  type="button"
+                  onMouseDown={(event) => {
+                    event.preventDefault()
+                    updateInputValue(suggestion.value, {
+                      suppressAutocompleteLookup: true,
+                    })
+                    setIsAutocompleteOpen(false)
+                  }}
+                  className="block w-full px-4 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-blue-50"
+                >
+                  {suggestion.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         {actionLabel && onAction && (
           <AgentActionButton
             label={actionLabel}
@@ -3087,7 +3471,16 @@ function Input({
             className="w-full xl:mt-0 xl:w-auto xl:min-w-[110px]"
             onClick={() => {
               onAction()
-              showAgentSidebar(createAgentSidebarPayload(label, actionMessage ?? `${actionLabel} requested for ${label}.`))
+              showAgentSidebar(
+                createAgentSidebarPayload(
+                  label,
+                  actionMessage ?? `${actionLabel} requested for ${label}.`,
+                  {
+                    requestType: "action",
+                    responseMode: "info",
+                  }
+                )
+              )
             }}
           />
         )}
@@ -3182,7 +3575,11 @@ function SelectField({
             showAgentSidebar(
               createAgentSidebarPayload(
                 label,
-                consultTrigger ?? `Agent Z is gathering more details for ${label}.`
+                consultTrigger ?? `Agent Z is gathering more details for ${label}.`,
+                {
+                  requestType: "ask-agent",
+                  responseMode: shouldAutoApplyYesNoResponse(options) ? "yes-no" : "info",
+                }
               )
             )
           }
@@ -3245,7 +3642,11 @@ function RadioGroupField({
                   showAgentSidebar(
                     createAgentSidebarPayload(
                       label,
-                      consultTrigger ?? `Agent Z is gathering more details for ${label}.`
+                      consultTrigger ?? `Agent Z is gathering more details for ${label}.`,
+                      {
+                        requestType: "ask-agent",
+                        responseMode: shouldAutoApplyYesNoResponse(options) ? "yes-no" : "info",
+                      }
                     )
                   )
                 }
