@@ -2420,17 +2420,47 @@ function AgentActionButton({
       className={`eligibility-agent-button inline-flex items-center justify-center rounded-xl border border-blue-900/60 bg-gradient-to-r from-slate-800/92 via-[#1f3d9a]/86 to-blue-800/84 px-3 py-2 text-xs font-semibold text-white transition-all hover:from-slate-800 hover:via-[#1d388f]/92 hover:to-blue-800/90 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-none disabled:bg-slate-100 disabled:text-slate-400 ${className}`}
     >
       <span className="relative z-10">{label}</span>
-      {!disabled && (
-        <BorderBeam
-          size={38}
-          duration={2.8}
-          initialOffset={18}
-          borderWidth={2.5}
-          colorFrom="#f59e0b"
-          colorTo="#60a5fa"
-        />
-      )}
+      {!disabled && <EligibilityAgentMovingBorder size={54} />}
     </button>
+  )
+}
+
+function EligibilityAgentMovingBorder({
+  size = 58,
+}: {
+  size?: number
+}) {
+  return (
+    <>
+      <BorderBeam
+        size={size}
+        duration={2.8}
+        initialOffset={18}
+        borderWidth={3}
+        className="from-transparent via-sky-300 to-transparent"
+        colorFrom="#f59e0b"
+        colorTo="#60a5fa"
+      />
+      <BorderBeam
+        size={Math.max(size - 6, 36)}
+        duration={3.25}
+        initialOffset={44}
+        borderWidth={2.5}
+        reverse
+        className="from-transparent via-fuchsia-300 to-transparent"
+        colorFrom="#ec4899"
+        colorTo="#a78bfa"
+      />
+      <BorderBeam
+        size={Math.max(size - 10, 32)}
+        duration={3.7}
+        initialOffset={72}
+        borderWidth={2}
+        className="from-transparent via-emerald-300 to-transparent"
+        colorFrom="#22c55e"
+        colorTo="#06b6d4"
+      />
+    </>
   )
 }
 
@@ -3145,16 +3175,7 @@ function CheckboxGroup({
                 </span>
                 {renderAgentOptionLabel(o)}
               </span>
-              {isAgentOption && (
-                <BorderBeam
-                  size={42}
-                  duration={3.1}
-                  initialOffset={24}
-                  borderWidth={2.5}
-                  colorFrom="#f59e0b"
-                  colorTo="#60a5fa"
-                />
-              )}
+              {isAgentOption && <EligibilityAgentMovingBorder size={58} />}
             </button>
           )
         })}
@@ -4803,35 +4824,38 @@ function SelectField({
         questionNumber={questionNumber}
         wrapperClassName="mb-0"
       />
-      <select
-        value={value}
-        onChange={e => {
-          const nextValue = e.target.value
-          updateSection("eligibility", {
-            formData: { ...(data.eligibility?.formData || {}), [label]: nextValue },
-          })
-          if (isAgentSidebarTriggerValue(nextValue) && shouldShowAgentActionUi(label)) {
-            showAgentSidebar(
-              createAgentSidebarPayload(
-                label,
-                consultTrigger ?? `Agent Z is gathering more details for ${label}.`,
-                {
-                  requestType: "ask-agent",
-                  responseMode: shouldAutoApplyYesNoResponse(options) ? "yes-no" : "info",
-                }
+      <div className={`mt-1 ${isAgentValue ? "eligibility-agent-button relative rounded-xl" : ""}`}>
+        <select
+          value={value}
+          onChange={e => {
+            const nextValue = e.target.value
+            updateSection("eligibility", {
+              formData: { ...(data.eligibility?.formData || {}), [label]: nextValue },
+            })
+            if (isAgentSidebarTriggerValue(nextValue) && shouldShowAgentActionUi(label)) {
+              showAgentSidebar(
+                createAgentSidebarPayload(
+                  label,
+                  consultTrigger ?? `Agent Z is gathering more details for ${label}.`,
+                  {
+                    requestType: "ask-agent",
+                    responseMode: shouldAutoApplyYesNoResponse(options) ? "yes-no" : "info",
+                  }
+                )
               )
-            )
-          }
-        }}
-        className={`mt-1 w-full rounded-xl border px-4 py-2 text-sm transition-shadow focus:outline-none focus:ring-2 ${
-          isAgentValue
-            ? "border-blue-600 bg-blue-100 text-blue-900 focus:ring-blue-300"
-            : "focus:ring-blue-200"
-        }`}
-      >
-        <option value="">Select...</option>
-        {options.map(o => <option key={o}>{o}</option>)}
-      </select>
+            }
+          }}
+          className={`w-full rounded-xl border px-4 py-2 text-sm transition-shadow focus:outline-none focus:ring-2 ${
+            isAgentValue
+              ? "relative z-10 border-blue-900/60 bg-gradient-to-r from-slate-800/92 via-[#1f3d9a]/86 to-blue-800/84 text-white focus:ring-blue-300"
+              : "focus:ring-blue-200"
+          }`}
+        >
+          <option value="">Select...</option>
+          {options.map(o => <option key={o}>{o}</option>)}
+        </select>
+        {isAgentValue && <EligibilityAgentMovingBorder size={58} />}
+      </div>
       {showAgentButton && consultTrigger && shouldShowAgentActionUi(label) && (
         <ConsultationTrigger message={consultTrigger} />
       )}
@@ -4903,16 +4927,7 @@ function RadioGroupField({
               }`}
             >
               <span className="relative z-10">{renderAgentOptionLabel(o)}</span>
-              {isAgentOption && (
-                <BorderBeam
-                  size={42}
-                  duration={3.1}
-                  initialOffset={24}
-                  borderWidth={2.5}
-                  colorFrom="#f59e0b"
-                  colorTo="#60a5fa"
-                />
-              )}
+              {isAgentOption && <EligibilityAgentMovingBorder size={58} />}
             </button>
           )
         })}

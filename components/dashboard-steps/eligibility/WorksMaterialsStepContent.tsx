@@ -109,7 +109,7 @@ export function WorksMaterialsStepContent({
         />
         <RadioGroupField
           label="Is there a communal kitchen?"
-          options={["Yes", "No", "Planning to create one", "Ask Agent Z"]}
+          options={["Yes", "No", "Planning to create one / Ask Agent Z Can help you"]}
         />
         <RadioGroupField
           label="Is any lounge/dining room proposed as a bedroom?"
@@ -242,7 +242,7 @@ export function WorksMaterialsStepContent({
           <div className="space-y-4">
             <RadioGroupField
               label="Approx smallest bedroom size?"
-              options={["Under 6.5 m²", "6.5–10 m²", "10+ m²", "Ask Agent Z"]}
+              options={["Under 6.5 m²", "6.5–10 m²", "10+ m²"]}
             />
           </div>
         </div>

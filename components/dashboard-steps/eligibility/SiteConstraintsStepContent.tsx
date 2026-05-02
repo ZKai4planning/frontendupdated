@@ -30,14 +30,15 @@ export function SiteConstraintsStepContent({
       <div className="mb-6 grid grid-cols-2 gap-6">
         <RadioGroupField
           label="New or altered vehicle access?"
-          options={["Yes", "No", "Ask Agent Z"]}
+          options={["Yes", "No"]}
           consultTrigger="We can provide highways and transport advice."
         />
         <Input label="Details of Access / Parking Changes" />
+      
         <Input label="Number of Proposed Parking Spaces" />
         <RadioGroupField
           label="Cycle storage provided?"
-          options={["Yes", "No", "Ask Agent Z"]}
+          options={["Yes", "No"]}
         />
       </div>
 
@@ -45,7 +46,7 @@ export function SiteConstraintsStepContent({
       <div className="mb-6 grid grid-cols-2 gap-6">
         <RadioGroupField
           label="Trees with TPO on or near site?"
-          options={["Yes", "No", "Ask Agent Z"]}
+          options={["Yes", "No"]}
           consultTrigger="An Arboriculture Report (BS5837) may be required. We can arrange this for you."
         />
         <RadioGroupField

@@ -628,14 +628,14 @@ export function ApplicantPropertyStepContent({
             "Internal wall changes",
             "Additional bathroom",
             "New build",
-            "Ask Agent Z",
+            "Unsure / Ask Agent Z",
           ]}
           consultTrigger="Our consultant can help clarify the development type."
         />
         <div className="col-span-2">
           <RadioGroupField
             label="Has the property already been extended before?"
-            options={["Yes", "No", "Unsure"]}
+            options={["Yes", "No", "Unsure / Ask Agent Z"]}
           />
         </div>
         <div className="col-span-2">
