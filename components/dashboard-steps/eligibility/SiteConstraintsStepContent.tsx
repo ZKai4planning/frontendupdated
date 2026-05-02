@@ -17,7 +17,7 @@ export function SiteConstraintsStepContent({
     <>
       <SectionHeading>Heritage & Listing</SectionHeading>
       <div className="mb-6 grid grid-cols-2 gap-6">
-        <RadioGroupField
+        {/* <RadioGroupField
           label="Is the property a Listed Building?"
           options={["Yes", "No", "Ask Agent Z"]}
           consultTrigger="Listed buildings require separate Listed Building Consent. Agent X can advise."
@@ -26,6 +26,11 @@ export function SiteConstraintsStepContent({
           label="Conservation Area?"
           options={["Yes", "No", "Ask Agent Z"]}
           consultTrigger="We can provide a heritage impact assessment."
+        /> */}
+        <RadioGroupField
+          label="Conservation Area or Near Listed Building?"
+          options={["Yes", "No", "Ask Agent Z"]}
+          consultTrigger="We can provide a heritage impact assessment or pre-application advice."
         />
       </div>
 

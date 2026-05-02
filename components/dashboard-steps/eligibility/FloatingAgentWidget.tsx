@@ -820,9 +820,29 @@ export function FloatingAgentWidget({
       <div className="h-[calc(100vh-3rem)] min-h-[560px] bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col">
         <div className="flex items-center justify-between px-4 pt-4 pb-2 flex-shrink-0">
           <div className="flex items-center gap-1.5">
-            <span className="w-[7px] h-[7px] rounded-full bg-slate-800" />
-            <span className="w-[7px] h-[7px] rounded-full bg-slate-800" />
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-400/10 ring-1 ring-white/10 overflow-hidden">
+                    <video
+                      className="h-8 w-8 object-cover rounded-xl"
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                    >
+                      <source src="/video-logo-animation.mp4" type="video/mp4" />
+                      Your browser does not support the video tag.
+                    </video>
+                  </div>
+            {/* <span className="w-[7px] h-[7px] rounded-full bg-slate-800" />
+            <span className="w-[7px] h-[7px] rounded-full bg-slate-800" /> */}
+
+            <div className="px-4 pb-3 flex-shrink-0 mt-5">
+          <p className="text-[15px] font-semibold text-slate-900">Agent Z</p>
+          <p className="mt-1 text-[11px] text-slate-500">
+            AI4Planning intelligence for eligibility requests
+          </p>
+        </div>
           </div>
+          
 
           <button
             type="button"
@@ -834,12 +854,7 @@ export function FloatingAgentWidget({
           </button>
         </div>
 
-        <div className="px-4 pb-3 flex-shrink-0">
-          <p className="text-[15px] font-semibold text-slate-900">Agent Z Workspace</p>
-          <p className="mt-1 text-[11px] text-slate-500">
-            Planning intelligence for eligibility requests
-          </p>
-        </div>
+        
 
         <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4 min-h-0">
           {!isRunning && orderedHistoryEntries.length === 0 && tasks.length === 0 && insights.length === 0 && (

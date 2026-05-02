@@ -713,6 +713,31 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
       ],
     },
     {
+      label: "Alternate address for correspondence?",
+      paths: [
+        ["applicantAndProperty", "applicantDetails", "useAlternateCorrespondenceAddress"],
+        ["applicantAndProperty", "applicantDetails", "correspondenceAddress", "enabled"],
+      ],
+    },
+    {
+      label: "Correspondence Address Line 1",
+      paths: [
+        ["applicantAndProperty", "applicantDetails", "correspondenceAddress", "line1"],
+      ],
+    },
+    {
+      label: "Correspondence Address Line 2",
+      paths: [
+        ["applicantAndProperty", "applicantDetails", "correspondenceAddress", "line2"],
+      ],
+    },
+    {
+      label: "Correspondence Postcode",
+      paths: [
+        ["applicantAndProperty", "applicantDetails", "correspondenceAddress", "postcode"],
+      ],
+    },
+    {
       label: "Are you using a planning agent?",
       paths: [["applicantAndProperty", "agentDetails", "usesPlanningAgent"]],
     },
@@ -763,10 +788,6 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
     {
       label: "Ownership Status",
       paths: [["applicantAndProperty", "propertyAndOwnership", "ownershipStatus"]],
-    },
-    {
-      label: "Conservation Area or Near Listed Building?",
-      paths: [["applicantAndProperty", "propertyAndOwnership", "nearConservationAreaOrListedBuilding"]],
     },
     {
       label: "Are you planning any building works?",
@@ -875,19 +896,23 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
       paths: [["worksAndMaterials", "materials", "materialsMatchExisting"]],
     },
     {
-      label: "Is the property a Listed Building?",
-      paths: [
-        ["siteConstratints", "heritageAndListing", "isListedBuilding"],
-        ["siteConstraints", "heritageAndListing", "isListedBuilding"],
-      ],
+      label: "Conservation Area or Near Listed Building?",
+      paths: [["applicantAndProperty", "propertyAndOwnership", "nearConservationAreaOrListedBuilding"]],
     },
-    {
-      label: "Conservation Area?",
-      paths: [
-        ["siteConstratints", "heritageAndListing", "isInConservationArea"],
-        ["siteConstraints", "heritageAndListing", "isInConservationArea"],
-      ],
-    },
+    // {
+    //   label: "Is the property a Listed Building?",
+    //   paths: [
+    //     ["siteConstratints", "heritageAndListing", "isListedBuilding"],
+    //     ["siteConstraints", "heritageAndListing", "isListedBuilding"],
+    //   ],
+    // },
+    // {
+    //   label: "Conservation Area?",
+    //   paths: [
+    //     ["siteConstratints", "heritageAndListing", "isInConservationArea"],
+    //     ["siteConstraints", "heritageAndListing", "isInConservationArea"],
+    //   ],
+    // },
     {
       label: "New or altered vehicle access?",
       paths: [
@@ -1444,6 +1469,17 @@ const buildEligibilityStepPayload = (
       uploadedFiles?.[SAFETY_COMPLIANCE_UPLOAD_LABEL]?.[index] &&
         hasUploadedAsset(uploadedFiles[SAFETY_COMPLIANCE_UPLOAD_LABEL][index])
     )
+  const buildCorrespondenceAddress = () => {
+    const line1 = getValue("Correspondence Address Line 1")
+    const line2 = getValue("Correspondence Address Line 2")
+    const postcode = getValue("Correspondence Postcode")
+
+    if (![line1, line2, postcode].some(Boolean)) {
+      return undefined
+    }
+
+    return { line1, line2, postcode }
+  }
   const buildApplicantSiteAddress = () => {
     const line1 = getValue("Site Address Line 1")
     const line2 = getValue("Site Address Line 2")
@@ -1468,6 +1504,11 @@ const buildEligibilityStepPayload = (
             countryCode: getValue("Country Code"),
             phoneNumber: getValue("Phone Number"),
             siteAddress: buildApplicantSiteAddress(),
+            useAlternateCorrespondenceAddress: getBooleanFieldValue(
+              formValues,
+              "Alternate address for correspondence?"
+            ),
+            correspondenceAddress: buildCorrespondenceAddress(),
           },
           agentDetails: {
             usesPlanningAgent: getBooleanFieldValue(formValues, "Are you using a planning agent?"),
@@ -1769,6 +1810,11 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
   "Site Address Line 1": "Primary address line for the property where the works are proposed.",
   "Site Address Line 2": "Optional second address line for the property.",
   "Postcode": "Postcode helps us identify planning constraints in your area.",
+  "Alternate address for correspondence?":
+    "Choose Yes if planning correspondence should be sent to a different address.",
+  "Correspondence Address Line 1": "Primary address line for correspondence.",
+  "Correspondence Address Line 2": "Optional second address line for correspondence.",
+  "Correspondence Postcode": "Postcode for the correspondence address.",
   Council:
     "Name of the council that handled the earlier application.",
   "Are you using a planning agent?": "Tell us if a professional is acting on your behalf for the application.",
@@ -1905,6 +1951,10 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Site Address Line 2",
   "Council",
   "Postcode",
+  "Alternate address for correspondence?",
+  "Correspondence Address Line 1",
+  "Correspondence Address Line 2",
+  "Correspondence Postcode",
   "Are you using a planning agent?",
   "Agent Name",
   "Agent Address",
@@ -1917,7 +1967,6 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Is this project similar to the previous application or different this time?",
   "Property Type",
   "Ownership Status",
-  "Conservation Area or Near Listed Building?",
   "Are you planning any building works?",
   "Has the property already been extended before?",
   "How is the property currently used?",
@@ -1947,8 +1996,9 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Existing & Proposed Elevations",
   "Photographs of Site",
   "Additional Drawings (floor plans, sections etc.)",
-  "Is the property a Listed Building?",
-  "Conservation Area?",
+  // "Is the property a Listed Building?",
+  // "Conservation Area?",
+  "Conservation Area or Near Listed Building?",
   "New or altered vehicle access?",
   "Details of Access / Parking Changes",
   "Number of Proposed Parking Spaces",

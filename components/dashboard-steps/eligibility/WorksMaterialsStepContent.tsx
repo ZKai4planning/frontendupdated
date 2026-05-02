@@ -108,27 +108,12 @@ export function WorksMaterialsStepContent({
         />
         <RadioGroupField
           label="Is there a communal kitchen?"
-          options={["Yes", "No", "Planning to create one"]}
+          options={["Yes", "No", "Planning to create one", "Ask Agent Z"]}
         />
         <RadioGroupField
           label="Is any lounge/dining room proposed as a bedroom?"
           options={["Yes", "No"]}
         />
-        <div className="col-span-2">
-          <div className="space-y-4 rounded-2xl border p-4">
-            <RadioGroupField
-              label="Approx smallest bedroom size?"
-              options={["Under 6.5 m²", "6.5–10 m²", "10+ m²", "Ask Agent Z"]}
-            />
-            {/* <Input
-              label="Approx smallest bedroom size details"
-              placeholder="Enter the room size, dimensions, or any notes"
-              actionLabel="Ask Agent Z"
-              onAction={() => {}}
-              actionMessage="Agent Z is helping estimate the smallest bedroom size based on the room details provided."
-            /> */}
-          </div>
-        </div>
       </div>
 
       <SectionHeading>Description of Works</SectionHeading>
@@ -159,6 +144,14 @@ export function WorksMaterialsStepContent({
 
       <SectionHeading>Dimensions</SectionHeading>
       <div className="mb-6 grid grid-cols-2 gap-6">
+        <div className="col-span-2">
+          <div className="space-y-4">
+            <RadioGroupField
+              label="Approx smallest bedroom size?"
+              options={["Under 6.5 m²", "6.5–10 m²", "10+ m²", "Ask Agent Z"]}
+            />
+          </div>
+        </div>
         <Input label="Existing Property Width (m)" />
         <Input label="Existing Property Depth (m)" />
         <Input label="Proposed Extension Width (m)" />

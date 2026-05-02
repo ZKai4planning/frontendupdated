@@ -228,6 +228,8 @@ export function ApplicantPropertyStepContent({
   const [isGettingAddress, setIsGettingAddress] = useState(false)
 
   const previousCouncilApplication = savedFormData["Have you previously applied to the council?"]
+  const useAlternateCorrespondenceAddress =
+    asStringValue(savedFormData["Alternate address for correspondence?"]).trim() === "Yes"
   const siteAddressLine1 = asStringValue(savedFormData["Site Address Line 1"]).trim()
   const postcode = asStringValue(savedFormData["Postcode"]).trim()
   const planningReferenceNumber = asStringValue(savedFormData["Planning Reference Number *"]).trim()
@@ -481,6 +483,32 @@ export function ApplicantPropertyStepContent({
           <Input label="Site Address Line 2" />
           <Input label="Council" />
         </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <RadioGroupField
+              label="Alternate address for correspondence?"
+              options={["Yes", "No"]}
+              tooltip="Choose Yes if correspondence should be sent to a different address."
+            />
+          </div>
+
+          {useAlternateCorrespondenceAddress && (
+            <div className="md:col-span-2 grid gap-6 animate-in fade-in duration-300">
+              <div className="grid gap-6 md:grid-cols-3">
+                <div className="md:col-span-2">
+                  <Input label="Correspondence Address Line 1" />
+                </div>
+                <Input
+                  label="Correspondence Postcode"
+                  autocompleteKind="postcode"
+                />
+              </div>
+              <div className="grid gap-6 md:grid-cols-2">
+                <Input label="Correspondence Address Line 2" />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <SectionHeading>Pre-Application Check</SectionHeading>
@@ -575,11 +603,6 @@ export function ApplicantPropertyStepContent({
           ]}
           consultTrigger="We can assist with land registry checks."
         />
-        <RadioGroupField
-          label="Conservation Area or Near Listed Building?"
-          options={["Yes", "No", "Ask Agent Z"]}
-          consultTrigger="We can provide a heritage impact assessment or pre-application advice."
-        />
         <CheckboxGroup
           label="Are you planning any building works?"
           options={[
@@ -637,11 +660,11 @@ export function ApplicantPropertyStepContent({
         </div>
         <RadioGroupField
           label="Will occupants share kitchen/bathroom?"
-          options={["Yes", "No"]}
+          options={["Yes", "No", "Don't know / Ask Agent Z"]}
         />
         <RadioGroupField
-          label="Will rooms be rented individually?"
-          options={["Yes", "No"]}
+          label="b. Will rooms be rented individually?"
+          options={["Yes", "No", "Don't know / Ask Agent Z"]}
         />
       </div>
     </>

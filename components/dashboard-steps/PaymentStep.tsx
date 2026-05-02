@@ -1,7 +1,7 @@
 "use client"
 
 import axios from "axios"
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { Check, Info, UploadCloud } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
@@ -263,7 +263,6 @@ export default function PaymentUI() {
   )
   const [isSavingProfile, setIsSavingProfile] = useState(false)
   const [isFetchingAddress, setIsFetchingAddress] = useState(false)
-  const hasAttemptedAutoAddressRef = useRef(false)
 
   const serviceCategory =
     serviceSelection?.category || "Residential: Homeowners & landlords"
@@ -405,36 +404,6 @@ export default function PaymentUI() {
     },
     []
   )
-
-  useEffect(() => {
-    if (hasAttemptedAutoAddressRef.current) return
-    if (isReadOnly) return
-    if (customerDetails.fullAddress.trim()) return
-
-    hasAttemptedAutoAddressRef.current = true
-
-    if (typeof window === "undefined" || !("permissions" in navigator)) return
-
-    const maybeAutoFetchAddress = async () => {
-      try {
-        const permissionStatus = await navigator.permissions.query({
-          name: "geolocation",
-        })
-
-        if (permissionStatus.state === "granted") {
-          await fetchAddressFromCurrentLocation(false)
-        }
-      } catch {
-        // Ignore permission API issues and allow manual location fetch instead.
-      }
-    }
-
-    void maybeAutoFetchAddress()
-  }, [
-    customerDetails.fullAddress,
-    fetchAddressFromCurrentLocation,
-    isReadOnly,
-  ])
 
   const effectiveFullName = customerDetails.fullName
   const effectivePhoneCountryCode = customerDetails.phoneCountryCode || "+44"
