@@ -615,14 +615,18 @@ import toast from "react-hot-toast";
 import axiosInstance from "@/lib/axiosinstance";
 import { COUNTRY_CODES, MOBILE_NUMBER_LENGTH } from "@/lib/profile-validation";
 import { PROFILE_COMPLETION_UPDATED_EVENT } from "@/lib/use-profile-completion-status";
-import { USER_IDENTITY_UPDATED_EVENT } from "@/lib/use-user-identity";
+import {
+  USER_IDENTITY_UPDATED_EVENT,
+  useUserIdentity,
+} from "@/lib/use-user-identity";
 import { useAuthStore } from "@/lib/zustand";
 import { Card, CardContent } from "@/components/ui/card";
-import { User, Phone, Loader2 } from "lucide-react";
+import { User, Phone, Loader2, Mail } from "lucide-react";
 
 export default function ProfileSetupPage() {
   const router = useRouter();
   const storeUserId = useAuthStore((state) => state.userId);
+  const { email } = useUserIdentity();
 
   const [fullName, setFullName] = useState("");
   const [phoneCountryCode, setPhoneCountryCode] = useState("+44");
@@ -726,11 +730,10 @@ export default function ProfileSetupPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-
-            {/* Name */}
+            {/* Full Name */}
             <div className="space-y-1">
               <label className="text-sm font-medium text-gray-700">
-                 Name
+                Full Name <span className="text-red-500">*</span>
               </label>
 
               <div className="relative">
@@ -741,6 +744,7 @@ export default function ProfileSetupPage() {
                   onChange={(e: ChangeEvent<HTMLInputElement>) =>
                     setFullName(e.target.value)
                   }
+                  required
                   placeholder="John Doe"
                   className="w-full pl-10 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ring-blue-100 focus:border-blue-500 transition"
                 />
@@ -789,6 +793,25 @@ export default function ProfileSetupPage() {
               <p className="text-xs text-gray-500">
                 Enter exactly {MOBILE_NUMBER_LENGTH} digits.
               </p>
+            </div>
+
+            {/* Email */}
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">
+                Email
+              </label>
+
+              <div className="relative">
+                <Mail className="absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
+
+                <input
+                  value={email}
+                  readOnly
+                  disabled
+                  placeholder="Email"
+                  className="w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 pl-10 text-sm text-slate-500"
+                />
+              </div>
             </div>
 
             {/* Save Button */}

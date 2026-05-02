@@ -7,6 +7,7 @@ import Image from "next/image";
 import { BorderBeam } from "@/components/ui/border-beam";
 import { Service } from "@/types"; // Import Service type
 import { useProject } from "@/app/context/ProjectContext";
+import { useServiceSelectionStore } from "@/lib/zustand";
 import { useRouter } from "next/navigation";
 
 interface ServiceExpandPanelProps {
@@ -93,13 +94,19 @@ export default function ServiceExpandPanel({
   isLaptop = false,
   applyAction = "login",
 }: ServiceExpandPanelProps) {
+  const firstActiveFeatureIndex = service.features.findIndex(
+    (feature) => feature.status !== false
+  );
+
   const [showLogin, setShowLogin] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const { updateSection } = useProject();
+  const setServiceSelection = useServiceSelectionStore((state) => state.setSelection);
   const router = useRouter();
-  const [selectedFeatureIndex, setSelectedFeatureIndex] = useState(0);
+  const [selectedFeatureIndex, setSelectedFeatureIndex] = useState(
+    firstActiveFeatureIndex >= 0 ? firstActiveFeatureIndex : 0
+  );
   const [showDetail, setShowDetail] = useState(false);
-  const [beamVisible, setBeamVisible] = useState(false);
   const beamDurationSeconds = 12;
 
   const [showChat, setShowChat] = useState(false);
@@ -107,26 +114,16 @@ export default function ServiceExpandPanel({
 
   // Chat State
   const [messages, setMessages] = useState<{ sender: "user" | "bot"; text: string }[]>([
-    { sender: "bot", text: "Thank you for your enquiry. Our planning specialist will connect with you shortly." }
+    { sender: "bot", text: "Thank you for your enquiry. How can we help?" }
   ]);
   const [input, setInput] = useState("");
   const [showDecisionButtons, setShowDecisionButtons] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ name: "", email: "", phone: "" });
 
+  const isServiceActive = service.status !== false;
   const selectedFeature = service.features[selectedFeatureIndex] ?? service.features[0];
-
-  useEffect(() => {
-    if (isExpanded) {
-      setSelectedFeatureIndex(0);
-      setShowDetail(false);
-      setBeamVisible(false);
-      // Reset chat state on expand
-      setMessages([{ sender: "bot", text: "Thank you for your enquiry. How can we help?" }]);
-      setShowDecisionButtons(true);
-      setShowForm(false);
-    }
-  }, [isExpanded, service.id]);
+  const isSelectedFeatureActive = selectedFeature?.status !== false;
 
   useEffect(() => {
     if (!isExpanded) return;
@@ -138,16 +135,6 @@ export default function ServiceExpandPanel({
       panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
   }, [isExpanded]);
-
-  useEffect(() => {
-    if (!showDetail) {
-      setBeamVisible(false);
-      return;
-    }
-    setBeamVisible(true);
-    const timeout = setTimeout(() => setBeamVisible(false), beamDurationSeconds * 1000);
-    return () => clearTimeout(timeout);
-  }, [selectedFeatureIndex, showDetail]);
 
   const handleClose = () => {
     if (showDetail) {
@@ -188,20 +175,35 @@ export default function ServiceExpandPanel({
     setMessages((prev) => [...prev, { sender: "bot", text: "Thank you! Our specialist will contact you shortly." }]);
   };
 
-  const handleApplyForService = () => {
+  const persistSelectedService = () => {
     const activeFeature = selectedFeature ?? service.features[0];
-
-    updateSection("service", {
-      serviceId: activeFeature?.subServiceId ?? service.id,
+    const nextSelection = {
+      serviceId: service.id,
       parentServiceId: service.id,
+      subServiceId: activeFeature?.subServiceId,
+      serviceTitle: service.title,
       plan: activeFeature?.title ?? service.title,
       category: service.label,
       description: activeFeature?.description ?? service.description,
       image: service.image,
-    });
+      pricingPlan: undefined,
+      pricingPlanDescription: undefined,
+      price: undefined,
+      initialCharge: undefined,
+      subsequentCharge: undefined,
+    };
+
+    updateSection("service", nextSelection);
+    setServiceSelection(nextSelection);
+  };
+
+  const handleApplyForService = () => {
+    if (!isServiceActive || !isSelectedFeatureActive) return;
+
+    persistSelectedService();
 
     if (applyAction === "next-step") {
-      router.push("/dashboard?stage=payment");
+      router.push("/dashboard?stage=plans");
       return;
     }
 
@@ -233,11 +235,23 @@ export default function ServiceExpandPanel({
 
         {/* Collapsed State */}
         {!isExpanded && !mobile && (
-          <button onClick={onExpand} className="absolute inset-0 flex items-center justify-center cursor-pointer">
+          <button
+            onClick={() => {
+              if (isServiceActive) {
+                onExpand();
+              }
+            }}
+            disabled={!isServiceActive}
+            className={`absolute inset-0 flex items-center justify-center ${
+              isServiceActive ? "cursor-pointer" : "cursor-not-allowed"
+            }`}
+          >
             <motion.span
               animate={{ y: index % 2 === 0 ? [-8, 12, -7] : [10, -7, 10] }}
               transition={{ duration: 2.2, ease: "easeInOut", repeat: Infinity, delay: index * 0.10 }}
-              className="font-bold text-white/50 uppercase tracking-[0.4em] text-xs lg:[writing-mode:vertical-rl] lg:rotate-180"
+              className={`font-bold uppercase tracking-[0.4em] text-xs lg:[writing-mode:vertical-rl] lg:rotate-180 ${
+                isServiceActive ? "text-white/50" : "text-white/25"
+              }`}
             >
               {service.shortTitle}
             </motion.span>
@@ -259,6 +273,11 @@ export default function ServiceExpandPanel({
                 <div className="absolute inset-0 bg-blue-900/30" />
                 <div className="absolute inset-x-0 bottom-0 h-44 bg-linear-to-t from-[#050b18]/95 via-[#050b18]/65 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 p-4 lg:p-6">
+                  {!isServiceActive ? (
+                    <span className="mb-3 inline-flex rounded-full border border-amber-400/30 bg-amber-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-200">
+                      Inactive Service
+                    </span>
+                  ) : null}
                   <h3 className={`mt-2 font-bold text-white ${isLaptop ? "text-base lg:text-xl" : "text-lg lg:text-2xl"}`}>{service.title}</h3>
                   <p className={`mt-1 text-white/70 ${isLaptop ? "text-[11px] lg:text-xs" : "text-xs lg:text-sm"}`}>{service.description}</p>
                 </div>
@@ -284,13 +303,29 @@ export default function ServiceExpandPanel({
                       <div className="flex flex-col gap-3">
                         {service.features.map((feature, i) => {
                           const isActive = i === selectedFeatureIndex;
+                          const isFeatureActive = feature.status !== false;
                           return (
                             <button
                               key={i}
                               type="button"
-                              onClick={() => setSelectedFeatureIndex(i)}
+                              onClick={() => {
+                                if (isFeatureActive) {
+                                  setSelectedFeatureIndex(i);
+                                }
+                              }}
+                              disabled={!isFeatureActive}
                               className={`group relative flex items-center gap-3 rounded-2xl border overflow-hidden text-left transition-all duration-200 
-                                ${isActive ? (isLaptop ? "px-3 py-1.5 border-blue-400/50 bg-blue-500/10" : "px-4 py-2 border-blue-400/50 bg-blue-500/10") : (isLaptop ? "px-3 py-1 border-white/10 bg-white/5 hover:border-blue-400/50 hover:bg-white/10" : "px-4 py-1.5 border-white/10 bg-white/5 hover:border-blue-400/50 hover:bg-white/10")}`}
+                                ${!isFeatureActive
+                                  ? isLaptop
+                                    ? "cursor-not-allowed px-3 py-1 border-white/10 bg-white/5 opacity-45"
+                                    : "cursor-not-allowed px-4 py-1.5 border-white/10 bg-white/5 opacity-45"
+                                  : isActive
+                                    ? isLaptop
+                                      ? "px-3 py-1.5 border-blue-400/50 bg-blue-500/10"
+                                      : "px-4 py-2 border-blue-400/50 bg-blue-500/10"
+                                    : isLaptop
+                                      ? "px-3 py-1 border-white/10 bg-white/5 hover:border-blue-400/50 hover:bg-white/10"
+                                      : "px-4 py-1.5 border-white/10 bg-white/5 hover:border-blue-400/50 hover:bg-white/10"}`}
                             >
                               <span className={`material-symbols-outlined relative z-10 ${isLaptop ? "text-lg" : "text-xl"} ${isActive ? "text-blue-300" : "text-white/60"}`}>
                                 {getFeatureIcon(feature.title)}
@@ -299,9 +334,24 @@ export default function ServiceExpandPanel({
                                 {isActive && <span className="text-[10px] uppercase tracking-[0.18em] text-blue-300">Active Selection</span>}
                                 <span className={`${isLaptop ? "text-xs" : "text-sm"} text-white/90 font-semibold`}>{feature.title}</span>
                               </div>
-                              {isActive && beamVisible && (
-                                <BorderBeam size={40} initialOffset={20} className="from-transparent via-yellow-500 to-transparent" transition={{ duration: beamDurationSeconds, ease: "linear", repeat: 0 }} />
-                              )}
+                              {!isFeatureActive ? (
+                                <span className="ml-auto rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-200">
+                                  Inactive
+                                </span>
+                              ) : null}
+                              {isActive && showDetail ? (
+                                <BorderBeam
+                                  key={`${service.id}-${selectedFeatureIndex}`}
+                                  size={40}
+                                  initialOffset={20}
+                                  className="from-transparent via-yellow-500 to-transparent"
+                                  transition={{
+                                    duration: beamDurationSeconds,
+                                    ease: "linear",
+                                    repeat: 0,
+                                  }}
+                                />
+                              ) : null}
                             </button>
                           );
                         })}
@@ -322,9 +372,25 @@ export default function ServiceExpandPanel({
                           <p className="text-[11px] uppercase tracking-[0.2em] text-white/40">Service Overview</p>
                           <p className={`mt-3 leading-relaxed text-white/70 ${isLaptop ? "text-xs" : "text-sm"}`}>{selectedFeature?.description ?? service.description}</p>
                         </div>
+                        {!isSelectedFeatureActive ? (
+                          <p className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-amber-200">
+                            This subservice is currently inactive and cannot be selected.
+                          </p>
+                        ) : null}
                         <div className="mt-6 flex items-center justify-center gap-4 rounded-2xl px-4 py-3 mb-8">
-                          <button type="button" onClick={handleApplyForService} className={`rounded-full bg-blue-500 px-5 py-2 font-semibold text-white transition hover:bg-blue-400 ${isLaptop ? "text-xs" : "text-sm"}`}>
-                            Apply for this Service
+                          <button
+                            type="button"
+                            onClick={handleApplyForService}
+                            disabled={!isServiceActive || !isSelectedFeatureActive}
+                            className={`rounded-full px-5 py-2 font-semibold text-white transition ${isLaptop ? "text-xs" : "text-sm"} ${
+                              !isServiceActive || !isSelectedFeatureActive
+                                ? "cursor-not-allowed bg-slate-500/60"
+                                : "bg-blue-500 hover:bg-blue-400"
+                            }`}
+                          >
+                            {!isServiceActive || !isSelectedFeatureActive
+                              ? "Service Unavailable"
+                              : "Apply for this Service"}
                           </button>
                         </div>
 
@@ -353,17 +419,44 @@ export default function ServiceExpandPanel({
                     <p className={`text-white/70 mb-6 leading-relaxed italic ${isLaptop ? "text-sm" : "text-base"}`}>&quot;{service.description}&quot;</p>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                      {service.features.map((feature, i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          onClick={() => { setSelectedFeatureIndex(i); setShowDetail(true); }}
-                          className="group relative flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-left transition-all duration-200 hover:border-blue-400/60 hover:bg-white/10"
-                        >
-                          <span className={`material-symbols-outlined text-blue-300 ${isLaptop ? "text-lg" : "text-xl"}`}>{getFeatureIcon(feature.title)}</span>
-                          <span className={`${isLaptop ? "text-xs" : "text-sm"} text-white/90 font-semibold`}>{feature.title}</span>
-                        </button>
-                      ))}
+                      {service.features.map((feature, i) => {
+                        const isFeatureActive = feature.status !== false;
+
+                        return (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => {
+                              if (isFeatureActive) {
+                                setSelectedFeatureIndex(i);
+                                setShowDetail(true);
+                              }
+                            }}
+                            disabled={!isFeatureActive}
+                            className={`group relative flex items-center gap-3 rounded-2xl border px-4 py-4 text-left transition-all duration-200 ${
+                              isFeatureActive
+                                ? "border-white/10 bg-white/5 hover:border-blue-400/60 hover:bg-white/10"
+                                : "cursor-not-allowed border-white/10 bg-white/5 opacity-45"
+                            }`}
+                          >
+                            <span className={`material-symbols-outlined ${isLaptop ? "text-lg" : "text-xl"} ${
+                              isFeatureActive ? "text-blue-300" : "text-white/50"
+                            }`}>
+                              {getFeatureIcon(feature.title)}
+                            </span>
+                            <span className={`${isLaptop ? "text-xs" : "text-sm"} font-semibold ${
+                              isFeatureActive ? "text-white/90" : "text-white/60"
+                            }`}>
+                              {feature.title}
+                            </span>
+                            {!isFeatureActive ? (
+                              <span className="ml-auto rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-200">
+                                Inactive
+                              </span>
+                            ) : null}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 

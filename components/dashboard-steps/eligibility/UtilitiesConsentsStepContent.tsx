@@ -7,14 +7,133 @@ export function UtilitiesConsentsStepContent({
   asStringValue,
   components,
 }: EligibilityStepContentProps) {
-  const { SectionHeading, Input, RadioGroupField, SelectField, FieldLabel, CheckboxGroup } = components
+  const {
+    SectionHeading,
+    Input,
+    RadioGroupField,
+    SelectField,
+    FieldLabel,
+    CheckboxGroup,
+    FileUploadArea,
+  } = components
 
-  if (!SectionHeading || !Input || !RadioGroupField || !SelectField || !FieldLabel || !CheckboxGroup) {
+  if (
+    !SectionHeading ||
+    !Input ||
+    !RadioGroupField ||
+    !SelectField ||
+    !FieldLabel ||
+    !CheckboxGroup ||
+    !FileUploadArea
+  ) {
     return null
   }
 
+  const safetyComplianceFields = [
+    {
+      label: "Do you currently have smoke alarms installed?",
+      uploadLabel: "Smoke Alarm Certificate Upload",
+      hint: "Upload a smoke alarm certificate, installation record, or compliance evidence if available.",
+      consultTrigger:
+        "Agent Z can help confirm smoke alarm compliance requirements and the best supporting evidence to upload.",
+      missingUploadTrigger: {
+        message:
+          "No smoke alarm certificate uploaded - we can help confirm the compliance evidence needed for this property.",
+        decision: {
+          fieldLabel: "Need help with smoke alarm certificate?",
+          prompt: "Do you want help with the smoke alarm certificate?",
+          yesMessage:
+            "Agent Z is preparing support for smoke alarm compliance and certificate requirements.",
+          noMessage:
+            "Agent Z has noted that you do not need help with the smoke alarm certificate right now.",
+        },
+      },
+    },
+    {
+      label: "Do you have a valid Gas Safety Certificate?",
+      uploadLabel: "Gas Safety Certificate Upload",
+      hint: "Upload the latest gas safety certificate for the property.",
+      consultTrigger:
+        "Agent Z can help if you need guidance on gas safety certification or what to provide.",
+      missingUploadTrigger: {
+        message:
+          "No gas safety certificate uploaded - we can help you confirm what certificate is needed for this property.",
+        decision: {
+          fieldLabel: "Need help with gas safety certificate?",
+          prompt: "Do you want help with the Gas Safety Certificate?",
+          yesMessage:
+            "Agent Z is preparing support for gas safety certification requirements.",
+          noMessage:
+            "Agent Z has noted that you do not need help with the Gas Safety Certificate right now.",
+        },
+      },
+    },
+    {
+      label: "Do you have a valid Electrical Report (EICR)?",
+      uploadLabel: "EICR Certificate Upload",
+      hint: "Upload the current Electrical Installation Condition Report (EICR).",
+      consultTrigger:
+        "Agent Z can help with EICR requirements and what counts as acceptable supporting documentation.",
+      missingUploadTrigger: {
+        message:
+          "No EICR uploaded - we can help you confirm the electrical report requirements for this property.",
+        decision: {
+          fieldLabel: "Need help with EICR certificate?",
+          prompt: "Do you want help with the EICR certificate?",
+          yesMessage:
+            "Agent Z is preparing support for EICR requirements and next steps.",
+          noMessage:
+            "Agent Z has noted that you do not need help with the EICR certificate right now.",
+        },
+      },
+    },
+    {
+      label: "EPC available?",
+      uploadLabel: "EPC Certificate Upload",
+      hint: "Upload the Energy Performance Certificate if it is available.",
+      consultTrigger:
+        "Agent Z can help if you need support locating or obtaining the EPC for this property.",
+      missingUploadTrigger: {
+        message:
+          "No EPC uploaded - we can help you locate or obtain the Energy Performance Certificate for this property.",
+        decision: {
+          fieldLabel: "Need help with EPC certificate?",
+          prompt: "Do you want help with the EPC certificate?",
+          yesMessage:
+            "Agent Z is preparing support for locating or obtaining the EPC certificate.",
+          noMessage:
+            "Agent Z has noted that you do not need help with the EPC certificate right now.",
+        },
+      },
+    },
+  ] as const
+
   return (
     <>
+      <SectionHeading>Safety & Compliance</SectionHeading>
+      <div className="mb-6 grid grid-cols-2 gap-6">
+        {safetyComplianceFields.map(field => (
+          <RadioGroupField
+            key={field.label}
+            label={field.label}
+            options={["Yes", "No", "Ask Agent Z"]}
+            consultTrigger={field.consultTrigger}
+          />
+        ))}
+      </div>
+      <div className="mb-6 space-y-6">
+        {safetyComplianceFields.map(field => (
+          <FileUploadArea
+            key={field.uploadLabel}
+            label={field.uploadLabel}
+            accept=".pdf,.jpg,.jpeg,.png"
+            multiple={false}
+            hint={field.hint}
+            onMissingTrigger={field.missingUploadTrigger}
+          />
+        ))}
+      </div>
+
       <SectionHeading>Utilities & Waste</SectionHeading>
       <div className="grid grid-cols-2 gap-6 mb-6">
         <SelectField
@@ -87,7 +206,7 @@ export function UtilitiesConsentsStepContent({
             "Variation of Conditions",
             "Listed Building Consent",
             "Non-Material Amendment",
-            "Unsure",
+            "Ask Agent Z / need advice",
           ]}
           consultTrigger="Additional consents may be required. Our team can advise on the right applications."
         />

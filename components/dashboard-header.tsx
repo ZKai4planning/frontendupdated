@@ -98,6 +98,8 @@ import { useUserIdentity } from "@/lib/use-user-identity"
 import { useProject } from "@/app/context/ProjectContext"
 import axiosInstance from "@/lib/axiosinstance"
 import { extractProjectFromResponse, extractProjectsFromResponse } from "@/lib/project-api"
+import { useServiceSelectionStore } from "@/lib/zustand"
+import { useResolvedServiceSelection } from "@/lib/use-service-selection"
 import { resolveProjectServiceName, useServiceCatalog } from "@/lib/use-service-catalog"
 
 type Breadcrumb = {
@@ -141,6 +143,29 @@ const SELECTED_PROJECT_STAGE_STORAGE_KEY = "selectedProjectStageId"
 const getPrimaryProjectService = (project?: UserProject | null) =>
   project?.subServices?.[0] ?? project?.services?.[0]
 
+const buildProjectServiceSelection = (
+  service: ProjectService | null | undefined,
+  resolvedServiceName: string | null
+) => {
+  if (!service) return null
+
+  return {
+    serviceId: service.serviceId || service.subServiceId,
+    parentServiceId: service.serviceId,
+    subServiceId: service.subServiceId,
+    serviceTitle: service.serviceName || resolvedServiceName || service.title,
+    plan: resolvedServiceName || service.title || service.serviceName,
+    pricingPlan: undefined,
+    pricingPlanDescription: undefined,
+    price: undefined,
+    initialCharge: undefined,
+    subsequentCharge: undefined,
+    category: service.serviceName || resolvedServiceName,
+    description: service.description,
+    image: service.image,
+  }
+}
+
 const resolveStageFromStatus = (status?: string | null) => {
   const normalized = status?.toLowerCase() ?? ""
 
@@ -179,6 +204,9 @@ export default function DashboardHeader({
   const projectRef = useRef<HTMLDivElement | null>(null)
   const { fullName, email, profilePictureUrl, userId } = useUserIdentity()
   const { data, updateSection } = useProject()
+  const serviceSelection = useResolvedServiceSelection(data.service)
+  const setServiceSelection = useServiceSelectionStore((state) => state.setSelection)
+  const clearServiceSelection = useServiceSelectionStore((state) => state.clearSelection)
   const serviceLabelMap = useServiceCatalog()
   const displayName = fullName || userName || "User"
   const displayEmail = email || "No email available"
@@ -189,7 +217,8 @@ export default function DashboardHeader({
   const selectedProjectService = getPrimaryProjectService(selectedProject)
   const selectedProjectLabel =
     resolveProjectServiceName(selectedProjectService, serviceLabelMap) ||
-    data.service?.plan ||
+    serviceSelection?.plan ||
+    serviceSelection?.serviceTitle ||
     selectedProjectId ||
     null
   const hasProjects = projects.length > 0
@@ -209,16 +238,14 @@ export default function DashboardHeader({
       projectStageId: project.currentStage?.stageId,
     })
 
-    if (service?.serviceId || service?.title || service?.serviceName) {
+    if (service?.serviceId || service?.subServiceId || service?.title || service?.serviceName) {
       const resolvedServiceName = resolveProjectServiceName(service, serviceLabelMap)
+      const nextSelection = buildProjectServiceSelection(service, resolvedServiceName)
 
-      updateSection("service", {
-        serviceId: service.subServiceId || service.serviceId,
-        plan: resolvedServiceName || service.title || service.serviceName,
-        category: service.serviceName || resolvedServiceName,
-        description: service.description,
-        image: service.image,
-      })
+      if (nextSelection) {
+        updateSection("service", nextSelection)
+        setServiceSelection(nextSelection)
+      }
     }
 
     if (typeof window !== "undefined") {
@@ -336,15 +363,13 @@ export default function DashboardHeader({
     const service = getPrimaryProjectService(matchingProject)
     if (!service) return
     const resolvedServiceName = resolveProjectServiceName(service, serviceLabelMap)
+    const nextSelection = buildProjectServiceSelection(service, resolvedServiceName)
 
-    updateSection("service", {
-      serviceId: service.subServiceId || service.serviceId,
-      plan: resolvedServiceName || service.title || service.serviceName,
-      category: service.serviceName || resolvedServiceName,
-      description: service.description,
-      image: service.image,
-    })
-  }, [projects, selectedProjectId, serviceLabelMap])
+    if (!nextSelection) return
+
+    updateSection("service", nextSelection)
+    setServiceSelection(nextSelection)
+  }, [projects, selectedProjectId, serviceLabelMap, setServiceSelection, updateSection])
 
   const handleProjectSelect = async (project: UserProject) => {
     persistSelectedProject(project)
@@ -391,9 +416,28 @@ export default function DashboardHeader({
       completedAt: undefined,
     })
 
+    updateSection("service", {
+      serviceId: undefined,
+      parentServiceId: undefined,
+      subServiceId: undefined,
+      serviceTitle: undefined,
+      plan: undefined,
+      pricingPlan: undefined,
+      pricingPlanDescription: undefined,
+      price: undefined,
+      initialCharge: undefined,
+      subsequentCharge: undefined,
+      category: undefined,
+      description: undefined,
+      image: undefined,
+    })
+    clearServiceSelection()
+
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(SELECTED_PROJECT_STORAGE_KEY)
       window.sessionStorage.removeItem(SELECTED_PROJECT_STORAGE_KEY)
+      window.localStorage.removeItem(SELECTED_PROJECT_STAGE_STORAGE_KEY)
+      window.sessionStorage.removeItem(SELECTED_PROJECT_STAGE_STORAGE_KEY)
     }
 
     router.push("/services")

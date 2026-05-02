@@ -18,6 +18,7 @@ const mapApiServiceToService = (apiService: ApiServiceData): Service => {
       header: sub.title,
       description: sub.description,
       subServiceId: sub.subServiceId,
+      status: sub.status,
     })),
     cta: "Select & Apply",
     label: apiService.serviceName || "Service Category",
@@ -43,7 +44,9 @@ export default function LandingServicesSection({
     const fetchServices = async () => {
       try {
         setLoading(true);
-        const response = await axiosInstance.get<ApiResponse>("/services");
+        const response = await axiosInstance.get<ApiResponse>("/services", {
+          params: { includeDeleted: true },
+        });
 
         if (response.data.success && response.data.data) {
           const mappedServices = response.data.data.map(mapApiServiceToService);
@@ -156,19 +159,40 @@ export default function LandingServicesSection({
             {services.map((service) => (
               <div
                 key={service.id}
-                className="group bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-2xl transition-all flex flex-col"
+                className={`group border p-6 rounded-2xl transition-all flex flex-col ${
+                  service.status !== false
+                    ? "bg-white/5 backdrop-blur-xl border-white/10"
+                    : "bg-white/5 border-white/10 opacity-60"
+                }`}
               >
                 <div>
-                  <p className={`${isLaptop ? "text-[11px]" : "text-xs"} font-bold text-blue-400 mb-2`}>{service.label}</p>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className={`${isLaptop ? "text-[11px]" : "text-xs"} font-bold text-blue-400`}>
+                      {service.label}
+                    </p>
+                    {service.status === false ? (
+                      <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-200">
+                        Inactive
+                      </span>
+                    ) : null}
+                  </div>
                   <h3 className={`${isLaptop ? "text-base" : "text-lg"} font-bold mb-3 leading-snug`}>{service.subtitle}</h3>
                   <p className={`${isLaptop ? "text-xs" : "text-sm"} text-white/60 leading-relaxed italic`}>
                     &quot;{service.description.substring(0, 80)}...&quot;
                   </p>
                 </div>
-                <span className="mt-auto pt-6 text-sm text-blue-400 font-semibold inline-flex items-center gap-1 relative self-start">
-                  Get Started
-                  <span className="transition-transform duration-300 group-hover:translate-x-2">-&gt;</span>
-                  <span className="absolute left-0 -bottom-1 h-0.5 w-0 bg-blue-400 transition-all duration-300 group-hover:w-full" />
+                <span
+                  className={`mt-auto pt-6 text-sm font-semibold inline-flex items-center gap-1 relative self-start ${
+                    service.status !== false ? "text-blue-400" : "text-white/40"
+                  }`}
+                >
+                  {service.status !== false ? "Get Started" : "Currently Unavailable"}
+                  {service.status !== false ? (
+                    <>
+                      <span className="transition-transform duration-300 group-hover:translate-x-2">-&gt;</span>
+                      <span className="absolute left-0 -bottom-1 h-0.5 w-0 bg-blue-400 transition-all duration-300 group-hover:w-full" />
+                    </>
+                  ) : null}
                 </span>
               </div>
             ))}
@@ -180,7 +204,7 @@ export default function LandingServicesSection({
           >
             {services.map((service, index) => (
               <ServiceExpandPanel
-                key={service.id}
+                key={`${service.id}-${expandedServiceId === service.id ? "open" : "closed"}`}
                 index={index}
                 service={service}
                 applyAction={applyAction}
@@ -196,20 +220,45 @@ export default function LandingServicesSection({
             {services.map((service) => (
               <div
                 key={service.id}
-                onClick={() => setExpandedServiceId(service.id)}
-                className="group bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-2xl cursor-pointer transition-all hover:border-blue-400/60 hover:shadow-xl hover:shadow-blue-500/20 flex flex-col"
+                onClick={() => {
+                  if (service.status !== false) {
+                    setExpandedServiceId(service.id);
+                  }
+                }}
+                className={`group border border-white/10 p-6 rounded-2xl transition-all flex flex-col ${
+                  service.status !== false
+                    ? "cursor-pointer bg-white/5 backdrop-blur-xl hover:border-blue-400/60 hover:shadow-xl hover:shadow-blue-500/20"
+                    : "cursor-not-allowed bg-white/5 opacity-60"
+                }`}
               >
                 <div>
-                  <p className={`${isLaptop ? "text-[11px]" : "text-xs"} font-bold text-blue-400 mb-2`}>{service.label}</p>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className={`${isLaptop ? "text-[11px]" : "text-xs"} font-bold text-blue-400`}>
+                      {service.label}
+                    </p>
+                    {service.status === false ? (
+                      <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-200">
+                        Inactive
+                      </span>
+                    ) : null}
+                  </div>
                   <h3 className={`${isLaptop ? "text-[13px]" : "text-lg"} font-bold mb-3 leading-snug`}>{service.subtitle}</h3>
                   <p className={`${isLaptop ? "text-xs" : "text-sm"} text-white/60 leading-relaxed italic`}>
                     &quot;{service.description.substring(0, 80)}...&quot;
                   </p>
                 </div>
-                <span className="mt-auto pt-6 text-sm text-blue-400 font-semibold inline-flex items-center gap-1 relative self-start">
-                  Get Started
-                  <span className="transition-transform duration-300 group-hover:translate-x-2">-&gt;</span>
-                  <span className="absolute left-0 -bottom-1 h-0.5 w-0 bg-blue-400 transition-all duration-300 group-hover:w-full" />
+                <span
+                  className={`mt-auto pt-6 text-sm font-semibold inline-flex items-center gap-1 relative self-start ${
+                    service.status !== false ? "text-blue-400" : "text-white/40"
+                  }`}
+                >
+                  {service.status !== false ? "Get Started" : "Currently Unavailable"}
+                  {service.status !== false ? (
+                    <>
+                      <span className="transition-transform duration-300 group-hover:translate-x-2">-&gt;</span>
+                      <span className="absolute left-0 -bottom-1 h-0.5 w-0 bg-blue-400 transition-all duration-300 group-hover:w-full" />
+                    </>
+                  ) : null}
                 </span>
               </div>
             ))}

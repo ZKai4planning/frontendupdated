@@ -6,17 +6,20 @@ import toast from "react-hot-toast"
 import { useRouter } from "next/navigation"
 import axios from "axios"
 import axiosInstance from "@/lib/axiosinstance"
+import { COUNTRY_CODES, MOBILE_NUMBER_LENGTH } from "@/lib/profile-validation"
 import { useAuthStore } from "@/lib/zustand"
 
 export function ClientLogin() {
   const router = useRouter()
 
+  const [authMode, setAuthMode] = useState<"SIGN_IN" | "SIGN_UP">("SIGN_IN")
   const [step, setStep] = useState<"REQUEST_OTP" | "VERIFY_OTP">("REQUEST_OTP")
   const [isMobile, setIsMobile] = useState(false)
 
   const [fullName, setFullName] = useState("")
   const [email, setEmail] = useState("")
-  const [phone, setPhone] = useState("")
+  const [phoneCountryCode, setPhoneCountryCode] = useState("+44")
+  const [phoneNumber, setPhoneNumber] = useState("")
 
   const [otp, setOtp] = useState<string[]>(Array(6).fill(""))
   const [resending, setResending] = useState(false)
@@ -26,8 +29,9 @@ export function ClientLogin() {
   const setToken = useAuthStore((state) => state.setToken)
   const setUserId = useAuthStore((state) => state.setUserId)
 
-  const identifier = email.trim()
-  const isOtpComplete = otp.every((d) => d !== "")
+  // const identifier = email.trim()
+  const normalizedEmail = email.trim().toLowerCase()
+  const isOtpComplete = otp.every((digit) => digit !== "")
   const isInputsDisabled =
     isMobile || step === "VERIFY_OTP" || isSending || resending || isVerifying
   const blockedEmailDomains = new Set([
@@ -57,11 +61,9 @@ export function ClientLogin() {
       case "DASHBOARD":
         return "/dashboard"
       case "PROFILE":
-        return "/profile-setup"
       case "PROFILE1":
-        return "/profile-setup"
       case "PROFILE_SETUP":
-        return "/profile-setup"
+        return "/profile"
       case "PAYMENT":
         return "/dashboard?stage=payment"
       default:
@@ -81,6 +83,60 @@ export function ClientLogin() {
       : fallbackMessage
   }
 
+  const handlePhoneNumberChange = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const digitsOnly = event.target.value
+      .replace(/\D/g, "")
+      .slice(0, MOBILE_NUMBER_LENGTH)
+    setPhoneNumber(digitsOnly)
+  }
+
+  const resetOtpStep = () => {
+    setStep("REQUEST_OTP")
+    setOtp(Array(6).fill(""))
+  }
+
+  const handleAuthModeChange = (nextMode: "SIGN_IN" | "SIGN_UP") => {
+    if (nextMode === authMode) return
+    setAuthMode(nextMode)
+    resetOtpStep()
+  }
+
+  // const getOtpRequestPayload = () => {
+  //   if (authMode === "SIGN_UP") {
+  //     return {
+  //       identifier,
+  //       fullName: fullName.trim(),
+  //       countryCode: phoneCountryCode,
+  //       phoneNumber: phoneNumber.trim(),
+  //       phone: {
+  //         countryCode: phoneCountryCode,
+  //         number: phoneNumber.trim(),
+  //       },
+  //     }
+  //   }
+
+  //   return { identifier }
+  // }
+
+  const getOtpRequestPayload = () => {
+  const payload: any = {
+    email: normalizedEmail,
+  }
+
+  if (authMode === "SIGN_UP") {
+    payload.fullName = fullName.trim()
+
+    if (phoneNumber.trim()) {
+      payload.countryCode = phoneCountryCode
+      payload.phoneNumber = phoneNumber.trim()
+    }
+  }
+
+  return payload
+}
+
   const applyOtpValue = (value: string, startIndex = 0) => {
     const digits = value.replace(/\D/g, "").slice(0, otp.length - startIndex)
     if (!digits) return
@@ -95,56 +151,68 @@ export function ClientLogin() {
     document.getElementById(`otp-${nextIndex}`)?.focus()
   }
 
-  /* ================= SUBMIT HANDLER ================= */
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
 
-
-
-    if (!identifier) {
+    // if (!identifier) {
+    if (!normalizedEmail) {
       toast.error("Please enter your email")
       return
     }
 
-    if (identifier.startsWith(".")) {
+    // if (identifier.startsWith(".")) {
+    if (normalizedEmail.startsWith(".")) {
       toast.error("Email cannot start with a dot (.)")
       return
     }
 
-    const atIndex = identifier.indexOf("@")
+    //  const atIndex = identifier.indexOf("@")
+    const atIndex = normalizedEmail.indexOf("@")
     if (atIndex <= 0) {
       toast.error("Please enter a valid email address")
       return
     }
 
-    const localPart = identifier.slice(0, atIndex)
+    // const localPart = identifier.slice(0, atIndex)
+    const localPart = normalizedEmail.slice(0, atIndex)
     if (!/^[a-z0-9.]+$/i.test(localPart)) {
       toast.error("Before @, use only letters, numbers, and periods (.)")
       return
     }
 
-    const emailDomain = identifier.toLowerCase().split("@")[1] ?? ""
+    // const emailDomain = identifier.toLowerCase().split("@")[1] ?? ""
+    const emailDomain = normalizedEmail.toLowerCase().split("@")[1] ?? ""
     if (emailDomain && blockedEmailDomains.has(emailDomain)) {
       toast.error("Please use a real email address")
       return
     }
 
-
-
-
-
-
-
-
-    /* ===== STEP 1: REQUEST OTP ===== */
     if (step === "REQUEST_OTP") {
+      if (authMode === "SIGN_UP" && !fullName.trim()) {
+        toast.error("Please enter your full name")
+        return
+      }
+
+      if (authMode === "SIGN_UP" && phoneNumber.trim()) {
+        if (phoneNumber.length !== MOBILE_NUMBER_LENGTH) {
+          toast.error(
+            `Phone number must be exactly ${MOBILE_NUMBER_LENGTH} digits`
+          )
+          return
+        }
+
+        if (isDisallowedPhoneNumber(`${phoneCountryCode}${phoneNumber}`)) {
+          toast.error("Please enter a valid phone number")
+          return
+        }
+      }
+
       try {
         setIsSending(true)
-        const res = await axiosInstance.post("/auth/send-otp", {
-          identifier,
-
-        })
+        const res = await axiosInstance.post(
+          "/auth/send-otp",
+          getOtpRequestPayload()
+        )
 
         const data = res.data as {
           message?: string
@@ -165,7 +233,7 @@ export function ClientLogin() {
           setUserId(String(responseUserId))
         }
 
-        toast.success(data?.message || `OTP sent to ${identifier}`)
+        toast.success(data?.message || `OTP sent to ${normalizedEmail}`)
         setTimeout(() => setStep("VERIFY_OTP"), 300)
       } catch (error) {
         const message = getAxiosErrorMessage(
@@ -179,7 +247,6 @@ export function ClientLogin() {
       return
     }
 
-    /* ===== STEP 2: VERIFY OTP ===== */
     const otpCode = otp.join("")
 
     if (otpCode.length !== 6) {
@@ -190,7 +257,7 @@ export function ClientLogin() {
     try {
       setIsVerifying(true)
       const res = await axiosInstance.post("/auth/verify-otp", {
-        identifier,
+        identifier: normalizedEmail,
         otp: otpCode,
       })
 
@@ -219,22 +286,16 @@ export function ClientLogin() {
     }
   }
 
-  /* ================= RESEND OTP ================= */
-
   const handleResendOtp = async () => {
-    if (!identifier) return
+    if (!normalizedEmail) return
 
     try {
       setResending(true)
-      const res = await axiosInstance.post("/auth/send-otp", {
-        identifier,
-        phoneNumber: phone,
-        fullName: fullName.trim(),
-      })
+      const res = await axiosInstance.post("/auth/send-otp", getOtpRequestPayload())
 
       const data = res.data as { message?: string }
 
-      toast.success(data?.message || `OTP resent to ${identifier}`)
+      toast.success(data?.message || `OTP resent to ${normalizedEmail}`)
     } catch (error) {
       const message = getAxiosErrorMessage(
         error,
@@ -263,16 +324,19 @@ export function ClientLogin() {
   }, [])
 
   return (
-    <div className="w-full  mx-auto p-6 sm:p-8 lg:p-10 flex flex-col justify-center">
-      {/* HEADER */}
+    <div className="mx-auto flex w-full flex-col justify-center p-6 sm:p-8 lg:p-10">
       <div className="mb-8 text-center sm:text-left">
         <h2 className="text-2xl font-bold text-slate-900">
-          Sign In
+          {authMode === "SIGN_IN"
+            ? "Sign In, Let the AI Magic Begin!"
+            : "Create Your Account with Email OTP"}
         </h2>
-        <p className="text-sm text-slate-500 mt-1">
+        <p className="mt-1 text-sm text-slate-500">
           {step === "REQUEST_OTP"
-            ? "Enter your email  to receive OTP."
-            : `OTP sent to ${identifier}`}
+            ? authMode === "SIGN_IN"
+              ? "Enter your email to receive OTP."
+              : "Fill in your details and we'll send an OTP to your email."
+            : `OTP sent to ${normalizedEmail}`}
         </p>
       </div>
 
@@ -283,13 +347,67 @@ export function ClientLogin() {
       )}
 
       <form className="space-y-5" onSubmit={handleSubmit}>
-        {/* FULL NAME */}
+        {authMode === "SIGN_UP" && (
+          <>
+            <div>
+              <label className="mb-1 block text-[11px] font-bold uppercase tracking-widest text-slate-400">
+                Full Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={fullName}
+                disabled={isInputsDisabled}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="John Doe"
+                autoComplete="name"
+                className="h-12 w-full rounded-lg border px-4 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 sm:h-14"
+              />
+            </div>
 
+            <div>
+              <label className="mb-1 block text-[11px] font-bold uppercase tracking-widest text-slate-400">
+                Phone Number
+              </label>
+              <div className="flex gap-2">
+                <select
+                  value={phoneCountryCode}
+                  disabled={isInputsDisabled}
+                  onChange={(e) => setPhoneCountryCode(e.target.value)}
+                  className="h-12 w-28 rounded-lg border bg-white px-3 text-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 sm:h-14"
+                >
+                  {COUNTRY_CODES.map((country) => (
+                    <option
+                      key={`${country.name}-${country.code}`}
+                      value={country.code}
+                    >
+                      {country.code}
+                    </option>
+                  ))}
+                </select>
 
-        {/* EMAIL */}
+                <input
+                  type="tel"
+                  value={phoneNumber}
+                  disabled={isInputsDisabled}
+                  onChange={handlePhoneNumberChange}
+                  placeholder="7123456789"
+                  inputMode="numeric"
+                  maxLength={MOBILE_NUMBER_LENGTH}
+                  pattern={`\\d{${MOBILE_NUMBER_LENGTH}}`}
+                  autoComplete="tel-national"
+                  className="h-12 w-full rounded-lg border px-4 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 sm:h-14"
+                />
+              </div>
+              <p className="mt-1 text-xs text-slate-500">
+                Optional. If entered, use exactly {MOBILE_NUMBER_LENGTH} digits.
+              </p>
+            </div>
+          </>
+        )}
+
         <div>
-          <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">
-            Email
+          <label className="mb-1 block text-[11px] font-bold uppercase tracking-widest text-slate-400">
+            Email <span className="text-red-500">*</span>
           </label>
           <input
             type="email"
@@ -297,15 +415,15 @@ export function ClientLogin() {
             disabled={isInputsDisabled}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
-            className="w-full h-12 sm:h-14 px-4 rounded-lg border text-black focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100"
+            autoComplete="email"
+            className="h-12 w-full rounded-lg border px-4 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 sm:h-14"
           />
         </div>
 
-        {/* OTP INPUT */}
         {step === "VERIFY_OTP" && (
           <div>
-            <div className="flex justify-between items-center mb-3">
-              <label className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">
+            <div className="mb-3 flex items-center justify-between">
+              <label className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
                 6-Digit OTP
               </label>
               <button
@@ -318,7 +436,7 @@ export function ClientLogin() {
               </button>
             </div>
 
-            <div className="flex justify-center items-center gap-2 flex-wrap">
+            <div className="flex flex-wrap items-center justify-center gap-2">
               {otp.map((digit, index) => (
                 <div key={index} className="flex items-center">
                   <input
@@ -369,23 +487,20 @@ export function ClientLogin() {
                         }
                       }
                     }}
-                    className="w-11 h-11 sm:w-12 sm:h-12 text-center text-lg font-semibold rounded-lg border text-black focus:ring-2 focus:ring-blue-500"
+                    className="h-11 w-11 rounded-lg border text-center text-lg font-semibold text-black focus:ring-2 focus:ring-blue-500 sm:h-12 sm:w-12"
                   />
 
-                  {/* Hyphen */}
                   {index < otp.length - 1 && (
-                    <span className="mx-2 text-slate-400 font-bold select-none">
+                    <span className="mx-2 select-none font-bold text-slate-400">
                       -
                     </span>
                   )}
                 </div>
               ))}
             </div>
-
           </div>
         )}
 
-        {/* SUBMIT BUTTON */}
         <button
           type="submit"
           disabled={
@@ -395,7 +510,7 @@ export function ClientLogin() {
             resending ||
             (step === "VERIFY_OTP" && !isOtpComplete)
           }
-          className="w-full bg-blue-500 text-white font-bold py-3 rounded-lg hover:bg-blue-600 transition disabled:bg-slate-300"
+          className="w-full rounded-lg bg-blue-500 py-3 font-bold text-white transition hover:bg-blue-600 disabled:bg-slate-300"
         >
           {step === "REQUEST_OTP"
             ? isSending
@@ -403,8 +518,27 @@ export function ClientLogin() {
               : "Send OTP"
             : isVerifying
               ? "Verifying..."
-              : "Sign In"}
+              : "Verify OTP"}
         </button>
+
+        {step === "REQUEST_OTP" && (
+          <p className="text-center text-sm text-slate-500">
+            {authMode === "SIGN_IN"
+              ? "Don't have an account?"
+              : "Already have an account?"}{" "}
+            <button
+              type="button"
+              onClick={() =>
+                handleAuthModeChange(
+                  authMode === "SIGN_IN" ? "SIGN_UP" : "SIGN_IN"
+                )
+              }
+              className="font-semibold text-blue-600 transition hover:text-blue-700 hover:underline"
+            >
+              {authMode === "SIGN_IN" ? "Sign up now" : "Sign In"}
+            </button>
+          </p>
+        )}
       </form>
     </div>
   )

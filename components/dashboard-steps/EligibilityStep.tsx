@@ -2,7 +2,7 @@
 "use client"
 import { useProject } from "@/app/context/ProjectContext"
 
-import React, { Suspense, useEffect, useState, useRef } from "react"
+import React, { Suspense, useEffect, useMemo, useState, useRef } from "react"
 import { useRouter, usePathname, useSearchParams, useParams } from "next/navigation"
 import {
   Info,
@@ -10,6 +10,7 @@ import {
   Ruler,
   ShieldCheck,
   Landmark,
+  Bot,
   CheckCircle2,
   CheckCircle,
   Upload,
@@ -26,6 +27,8 @@ import {
   resolveProjectProgressIndex,
 } from "@/lib/project-flow"
 import { useUserIdentity } from "@/lib/use-user-identity"
+import { useUserProfile } from "@/lib/use-user-profile"
+import { useResolvedServiceSelection } from "@/lib/use-service-selection"
 import axiosInstance from "@/lib/axiosinstance"
 import { ApplicantPropertyStepContent } from "@/components/dashboard-steps/eligibility/ApplicantPropertyStepContent"
 import { WorksMaterialsStepContent } from "@/components/dashboard-steps/eligibility/WorksMaterialsStepContent"
@@ -258,6 +261,17 @@ const toSuggestionText = (value: unknown): string => {
 const normalizePostcode = (value: string) =>
   value.replace(/\s+/g, " ").trim().toUpperCase()
 
+const buildTypedPostcodeSuggestion = (value: string): AutocompleteSuggestion | null => {
+  const normalized = normalizePostcode(value)
+  if (normalized.length < 1) return null
+
+  return {
+    id: `${normalized}-manual`,
+    label: normalized,
+    value: normalized,
+  }
+}
+
 const buildAutocompleteSuggestion = (value: unknown, index: number): AutocompleteSuggestion | null => {
   if (typeof value === "string") {
     const normalized = toSuggestionText(value)
@@ -330,6 +344,24 @@ const extractAutocompleteSuggestions = (payload: unknown): AutocompleteSuggestio
     accumulator.push(suggestion)
     return accumulator
   }, [])
+}
+
+const withTypedPostcodeFallback = (
+  suggestions: AutocompleteSuggestion[],
+  value: string
+): AutocompleteSuggestion[] => {
+  const typedSuggestion = buildTypedPostcodeSuggestion(value)
+  if (!typedSuggestion) return suggestions
+
+  const alreadyIncluded = suggestions.some(
+    suggestion => suggestion.value.toUpperCase() === typedSuggestion.value.toUpperCase()
+  )
+
+  if (alreadyIncluded) {
+    return suggestions
+  }
+
+  return [typedSuggestion, ...suggestions]
 }
 
 const isValidCoordinate = (value: unknown): value is number =>
@@ -490,6 +522,46 @@ const splitLegacySiteAddress = (value: unknown) => {
 
   return { line1, line2 }
 }
+
+const splitAutofillSiteAddress = (value: unknown) => {
+  if (typeof value !== "string") {
+    return { line1: "", line2: "" }
+  }
+
+  const segments = value
+    .split(/[\r\n,]+/)
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+
+  if (segments.length === 0) {
+    return { line1: "", line2: "" }
+  }
+
+  if (segments.length === 1) {
+    return { line1: segments[0], line2: "" }
+  }
+
+  return {
+    line1: segments.slice(0, 2).join(", "),
+    line2: segments.slice(2).join(", "),
+  }
+}
+
+const buildProfileAddressLine1 = (address: {
+  doorNo?: string
+  street?: string
+}) => [address.doorNo, address.street].map((value) => value?.trim()).filter(Boolean).join(", ")
+
+const buildProfileAddressLine2 = (address: {
+  locality?: string
+  city?: string
+  state?: string
+  country?: string
+}) =>
+  [address.locality, address.city, address.state, address.country]
+    .map((value) => value?.trim())
+    .filter(Boolean)
+    .join(", ")
 
 const normalizeBooleanLike = (value: unknown): boolean | null => {
   if (typeof value === "boolean") return value
@@ -691,8 +763,57 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
       paths: [["applicantAndProperty", "propertyAndOwnership", "nearConservationAreaOrListedBuilding"]],
     },
     {
-      label: "Purpose of Development",
+      label: "Are you planning any building works?",
       paths: [["applicantAndProperty", "propertyAndOwnership", "purposeOfDevelopment"]],
+      mode: "array",
+    },
+    {
+      label: "Has the property already been extended before?",
+      paths: [["applicantAndProperty", "propertyAndOwnership", "previouslyExtended"]],
+    },
+    {
+      label: "How is the property currently used?",
+      paths: [["applicantAndProperty", "propertyAndOwnership", "currentUseStatus"]],
+    },
+    {
+      label: "How many people currently live there?",
+      paths: [["applicantAndProperty", "propertyAndOwnership", "currentOccupantsCount"]],
+    },
+    {
+      label: "Are they one family or separate households?",
+      paths: [["applicantAndProperty", "propertyAndOwnership", "currentHouseholdArrangement"]],
+    },
+    {
+      label: "How many occupants do you plan to accommodate?",
+      paths: [["applicantAndProperty", "propertyAndOwnership", "plannedOccupantsCount"]],
+    },
+    {
+      label: "Will occupants share kitchen/bathroom?",
+      paths: [["applicantAndProperty", "propertyAndOwnership", "sharedKitchenBathroom"]],
+    },
+    {
+      label: "Will rooms be rented individually?",
+      paths: [["applicantAndProperty", "propertyAndOwnership", "roomsRentedIndividually"]],
+    },
+    {
+      label: "Number of bedrooms available?",
+      paths: [["worksAndMaterials", "roomLayoutCheck", "availableBedroomsCount"]],
+    },
+    {
+      label: "Number of bathrooms / shower rooms?",
+      paths: [["worksAndMaterials", "roomLayoutCheck", "bathroomsOrShowerRoomsCount"]],
+    },
+    {
+      label: "Is there a communal kitchen?",
+      paths: [["worksAndMaterials", "roomLayoutCheck", "hasCommunalKitchen"]],
+    },
+    {
+      label: "Is any lounge/dining room proposed as a bedroom?",
+      paths: [["worksAndMaterials", "roomLayoutCheck", "loungeDiningRoomAsBedroom"]],
+    },
+    {
+      label: "Approx smallest bedroom size?",
+      paths: [["worksAndMaterials", "roomLayoutCheck", "smallestBedroomSize"]],
     },
     {
       label: "Description of Proposed Works",
@@ -864,6 +985,34 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
       paths: [
         ["siteConstratints", "preApplicationAdvice", "preApplicationAdviceSummary"],
         ["siteConstraints", "preApplicationAdvice", "preApplicationAdviceSummary"],
+      ],
+    },
+    {
+      label: "Do you currently have smoke alarms installed?",
+      paths: [
+        ["utilitesAndConsents", "safetyAndCompliance", "smokeAlarmsInstalled"],
+        ["utilitiesAndConsents", "safetyAndCompliance", "smokeAlarmsInstalled"],
+      ],
+    },
+    {
+      label: "Do you have a valid Gas Safety Certificate?",
+      paths: [
+        ["utilitesAndConsents", "safetyAndCompliance", "gasSafetyCertificate"],
+        ["utilitiesAndConsents", "safetyAndCompliance", "gasSafetyCertificate"],
+      ],
+    },
+    {
+      label: "Do you have a valid Electrical Report (EICR)?",
+      paths: [
+        ["utilitesAndConsents", "safetyAndCompliance", "electricalReportEicr"],
+        ["utilitiesAndConsents", "safetyAndCompliance", "electricalReportEicr"],
+      ],
+    },
+    {
+      label: "EPC available?",
+      paths: [
+        ["utilitesAndConsents", "safetyAndCompliance", "epcAvailable"],
+        ["utilitiesAndConsents", "safetyAndCompliance", "epcAvailable"],
       ],
     },
     {
@@ -1156,15 +1305,16 @@ const normalizeEligibilityUploadsFromApi = (payload: unknown): EligibilityFileMa
   const record = unwrapEligibilityRecord(payload)
   if (!record) return {}
 
-  const plans = getPathValue(record, ["worksAndMaterials", "plansDrawingsPhotographs"])
-  if (!isRecord(plans)) return {}
-
   const uploaded: EligibilityFileMap = {}
 
   const setUploads = (label: string, rawValue: unknown, fallbackDescriptions: string[] = []) => {
-    if (!Array.isArray(rawValue)) return
+    const values = Array.isArray(rawValue)
+      ? rawValue
+      : rawValue === undefined || rawValue === null
+        ? []
+        : [rawValue]
 
-    const entries = rawValue
+    const entries = values
       .map((item, index) =>
         normalizeRemoteUploadEntry(item, fallbackDescriptions[index] ?? "", fallbackDescriptions[index])
       )
@@ -1175,13 +1325,86 @@ const normalizeEligibilityUploadsFromApi = (payload: unknown): EligibilityFileMa
     }
   }
 
-  setUploads(
+  const setUploadsFromPaths = (
+    label: string,
+    paths: string[][],
+    fallbackDescriptions: string[] = []
+  ) => {
+    const rawValue = getFirstPathValue(record, paths)
+    setUploads(label, rawValue, fallbackDescriptions)
+  }
+
+  setUploadsFromPaths("Location Plan (1:1250 or 1:2500)", [
+    ["worksAndMaterials", "plansDrawingsPhotographs", "locationPlan"],
+    ["locationPlan"],
+  ])
+  setUploadsFromPaths("Site Plan (1:200 or 1:500)", [
+    ["worksAndMaterials", "plansDrawingsPhotographs", "sitePlan"],
+    ["sitePlan"],
+  ])
+  setUploadsFromPaths(
     "Existing & Proposed Elevations",
-    plans.existingAndProposedElevations,
+    [
+      ["worksAndMaterials", "plansDrawingsPhotographs", "existingAndProposedElevations"],
+      ["existingAndProposedElevations"],
+    ],
     ["Existing elevation", "Proposed elevation"]
   )
-  setUploads("Photographs of Site", plans.photographsOfSite)
-  setUploads("Additional Drawings (floor plans, sections etc.)", plans.additionalDrawings)
+  setUploadsFromPaths("Photographs of Site", [
+    ["worksAndMaterials", "plansDrawingsPhotographs", "photographsOfSite"],
+    ["photographsOfSite"],
+  ])
+  setUploadsFromPaths("Additional Drawings (floor plans, sections etc.)", [
+    ["worksAndMaterials", "plansDrawingsPhotographs", "additionalDrawings"],
+    ["additionalDrawings"],
+  ])
+  setUploadsFromPaths("Arboriculture Report / BS5837 Report (if available)", [
+    ["siteConstratints", "treesHedgesAndLandscaping", "arboricultureReportBs5837"],
+    ["siteConstraints", "treesHedgesAndLandscaping", "arboricultureReportBs5837"],
+    ["treeSurveyReport"],
+  ])
+  setUploadsFromPaths("Flood Risk Assessment (if available)", [
+    ["siteConstratints", "floodAndEnvironmentalRisk", "floodRiskAssessment"],
+    ["siteConstraints", "floodAndEnvironmentalRisk", "floodRiskAssessment"],
+    ["floodRiskAssesmentReport"],
+    ["floodRiskAssessmentReport"],
+  ])
+  setUploadsFromPaths("Smoke Alarm Certificate Upload", [
+    ["utilitesAndConsents", "safetyAndCompliance", "smokeAlarmCertificateFile"],
+    ["utilitiesAndConsents", "safetyAndCompliance", "smokeAlarmCertificateFile"],
+    ["utilitesAndConsents", "safetyAndCompliance", "smokeAlarmCertificateUpload"],
+    ["utilitiesAndConsents", "safetyAndCompliance", "smokeAlarmCertificateUpload"],
+    ["utilitesAndConsents", "safetyAndCompliance", "smokeAlarmCertificateDocument"],
+    ["utilitiesAndConsents", "safetyAndCompliance", "smokeAlarmCertificateDocument"],
+    ["smokeAlarmCertificate"],
+  ])
+  setUploadsFromPaths("Gas Safety Certificate Upload", [
+    ["utilitesAndConsents", "safetyAndCompliance", "gasSafetyCertificateFile"],
+    ["utilitiesAndConsents", "safetyAndCompliance", "gasSafetyCertificateFile"],
+    ["utilitesAndConsents", "safetyAndCompliance", "gasSafetyCertificateUpload"],
+    ["utilitiesAndConsents", "safetyAndCompliance", "gasSafetyCertificateUpload"],
+    ["utilitesAndConsents", "safetyAndCompliance", "gasSafetyCertificateDocument"],
+    ["utilitiesAndConsents", "safetyAndCompliance", "gasSafetyCertificateDocument"],
+    ["gasSafetyCertificateFile"],
+  ])
+  setUploadsFromPaths("EICR Certificate Upload", [
+    ["utilitesAndConsents", "safetyAndCompliance", "electricalReportEicrFile"],
+    ["utilitiesAndConsents", "safetyAndCompliance", "electricalReportEicrFile"],
+    ["utilitesAndConsents", "safetyAndCompliance", "electricalReportEicrUpload"],
+    ["utilitiesAndConsents", "safetyAndCompliance", "electricalReportEicrUpload"],
+    ["utilitesAndConsents", "safetyAndCompliance", "electricalReportEicrDocument"],
+    ["utilitiesAndConsents", "safetyAndCompliance", "electricalReportEicrDocument"],
+    ["electricalReportEicrFile"],
+  ])
+  setUploadsFromPaths("EPC Certificate Upload", [
+    ["utilitesAndConsents", "safetyAndCompliance", "epcCertificateFile"],
+    ["utilitiesAndConsents", "safetyAndCompliance", "epcCertificateFile"],
+    ["utilitesAndConsents", "safetyAndCompliance", "epcCertificateUpload"],
+    ["utilitiesAndConsents", "safetyAndCompliance", "epcCertificateUpload"],
+    ["utilitesAndConsents", "safetyAndCompliance", "epcCertificateDocument"],
+    ["utilitiesAndConsents", "safetyAndCompliance", "epcCertificateDocument"],
+    ["epcCertificate"],
+  ])
 
   return uploaded
 }
@@ -1251,13 +1474,35 @@ const buildEligibilityStepPayload = (
             propertyType: getValue("Property Type"),
             ownershipStatus: getValue("Ownership Status"),
             nearConservationAreaOrListedBuilding: getValue("Conservation Area or Near Listed Building?"),
-            purposeOfDevelopment: getValue("Purpose of Development"),
+            purposeOfDevelopment: asArrayValue(
+              formValues["Are you planning any building works?"]
+            ).join(", "),
+            previouslyExtended: getValue("Has the property already been extended before?"),
+            currentUseStatus: getValue("How is the property currently used?"),
+            currentOccupantsCount: getValue("How many people currently live there?"),
+            currentHouseholdArrangement: getValue(
+              "Are they one family or separate households?"
+            ),
+            plannedOccupantsCount: getValue(
+              "How many occupants do you plan to accommodate?"
+            ),
+            sharedKitchenBathroom: getValue("Will occupants share kitchen/bathroom?"),
+            roomsRentedIndividually: getValue("Will rooms be rented individually?"),
           },
         },
       }
     case 2:
       return {
         worksAndMaterials: {
+          roomLayoutCheck: {
+            availableBedroomsCount: getValue("Number of bedrooms available?"),
+            bathroomsOrShowerRoomsCount: getValue("Number of bathrooms / shower rooms?"),
+            hasCommunalKitchen: getValue("Is there a communal kitchen?"),
+            loungeDiningRoomAsBedroom: getValue(
+              "Is any lounge/dining room proposed as a bedroom?"
+            ),
+            smallestBedroomSize: getValue("Approx smallest bedroom size?"),
+          },
           descriptionOfWorks: {
             propsedWorksDescription: getValue("Description of Proposed Works"),
             existingPropertyWidthM: getValue("Existing Property Width (m)"),
@@ -1310,6 +1555,12 @@ const buildEligibilityStepPayload = (
     case 4:
       return {
         utilitiesAndConsents: {
+          safetyAndCompliance: {
+            smokeAlarmsInstalled: getValue("Do you currently have smoke alarms installed?"),
+            gasSafetyCertificate: getValue("Do you have a valid Gas Safety Certificate?"),
+            electricalReportEicr: getValue("Do you have a valid Electrical Report (EICR)?"),
+            epcAvailable: getValue("EPC available?"),
+          },
           utilitiesAndWaste: {
             waterSupply: getValue("Water Supply"),
             sewageOrDrainage: getValue("Sewage / Drainage"),
@@ -1453,6 +1704,26 @@ const buildEligibilityMultipartFormData = ({
     "floodRiskAssesmentReport",
     getFiles("Flood Risk Assessment (if available)")
   )
+  appendSingleFile(
+    formData,
+    "smokeAlarmCertificate",
+    getFiles("Smoke Alarm Certificate Upload")
+  )
+  appendSingleFile(
+    formData,
+    "gasSafetyCertificateFile",
+    getFiles("Gas Safety Certificate Upload")
+  )
+  appendSingleFile(
+    formData,
+    "electricalReportEicrFile",
+    getFiles("EICR Certificate Upload")
+  )
+  appendSingleFile(
+    formData,
+    "epcCertificate",
+    getFiles("EPC Certificate Upload")
+  )
   appendUploadFileNames("photographsOfSiteFileNames", "Photographs of Site")
   appendUploadFileNames("additionalDrawingsFileNames", "Additional Drawings (floor plans, sections etc.)")
   if (signatureFile) {
@@ -1494,7 +1765,28 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
   "Ownership Status": "Choose the ownership situation for the site.",
   "Conservation Area or Near Listed Building?":
     "Indicate if the property is in or near heritage designations.",
-  "Purpose of Development": "Select the main type of works being proposed.",
+  "Are you planning any building works?": "Select the main type of works being proposed.",
+  "Has the property already been extended before?":
+    "Tell us whether the property has already had an extension built previously.",
+  "How is the property currently used?": "Describe the current use or occupancy status of the property.",
+  "How many people currently live there?": "Enter the number of current occupants living at the property.",
+  "Are they one family or separate households?":
+    "Tell us whether the current occupants form one household or multiple households.",
+  "How many occupants do you plan to accommodate?":
+    "Select the planned number of occupants for the proposed HMO use.",
+  "Will occupants share kitchen/bathroom?":
+    "Confirm whether the proposed occupants will share kitchen or bathroom facilities.",
+  "Will rooms be rented individually?":
+    "Tell us whether rooms will be let separately rather than as a single household.",
+  "Number of bedrooms available?": "Enter how many bedrooms are currently or will be available.",
+  "Number of bathrooms / shower rooms?":
+    "Enter the number of bathrooms or shower rooms available in the layout.",
+  "Is there a communal kitchen?":
+    "Confirm whether a shared kitchen exists already or is proposed.",
+  "Is any lounge/dining room proposed as a bedroom?":
+    "Tell us if a lounge or dining room is being used or converted into a bedroom.",
+  "Approx smallest bedroom size?":
+    "Choose the approximate size band for the smallest bedroom in the proposal.",
   "Description of Proposed Works": "Brief summary of the project scope, size, and location on site.",
   "Existing Property Width (m)": "External width of the existing property in meters.",
   "Existing Property Depth (m)": "External depth of the existing property in meters.",
@@ -1537,6 +1829,21 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
   "Officer Name": "Name of the planning officer who provided advice.",
   "Summary of Pre-App Advice Received":
     "Brief summary of the advice or guidance received.",
+  "Do you currently have smoke alarms installed?":
+    "Confirm whether smoke alarms are already installed at the property.",
+  "Smoke Alarm Certificate Upload":
+    "Upload smoke alarm compliance evidence, such as an installation or inspection certificate.",
+  "Do you have a valid Gas Safety Certificate?":
+    "Tell us whether a current gas safety certificate is available.",
+  "Gas Safety Certificate Upload":
+    "Upload the latest gas safety certificate for the property.",
+  "Do you have a valid Electrical Report (EICR)?":
+    "Tell us whether a valid electrical installation condition report is available.",
+  "EICR Certificate Upload":
+    "Upload the current Electrical Installation Condition Report.",
+  "EPC available?": "Confirm whether an Energy Performance Certificate is available.",
+  "EPC Certificate Upload":
+    "Upload the Energy Performance Certificate for the property if available.",
   "Water Supply": "Type of water supply serving the property.",
   "Sewage / Drainage": "Type of foul drainage arrangement.",
   "Surface Water Drainage": "How surface water will be drained from the site.",
@@ -1591,7 +1898,19 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Property Type",
   "Ownership Status",
   "Conservation Area or Near Listed Building?",
-  "Purpose of Development",
+  "Are you planning any building works?",
+  "Has the property already been extended before?",
+  "How is the property currently used?",
+  "How many people currently live there?",
+  "Are they one family or separate households?",
+  "How many occupants do you plan to accommodate?",
+  "Will occupants share kitchen/bathroom?",
+  "Will rooms be rented individually?",
+  "Number of bedrooms available?",
+  "Number of bathrooms / shower rooms?",
+  "Is there a communal kitchen?",
+  "Is any lounge/dining room proposed as a bedroom?",
+  "Approx smallest bedroom size?",
   "Description of Proposed Works",
   "Existing Property Width (m)",
   "Existing Property Depth (m)",
@@ -1627,6 +1946,14 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Date of Pre-App Advice",
   "Officer Name",
   "Summary of Pre-App Advice Received",
+  "Do you currently have smoke alarms installed?",
+  "Smoke Alarm Certificate Upload",
+  "Do you have a valid Gas Safety Certificate?",
+  "Gas Safety Certificate Upload",
+  "Do you have a valid Electrical Report (EICR)?",
+  "EICR Certificate Upload",
+  "EPC available?",
+  "EPC Certificate Upload",
   "Water Supply",
   "Sewage / Drainage",
   "Surface Water Drainage",
@@ -1655,7 +1982,13 @@ const ELIGIBILITY_QUESTION_NUMBER = Object.fromEntries(
 /* ─────────────────────────────────────────────
    CONSULTATION TRIGGER BANNER
 ───────────────────────────────────────────── */
-function ConsultationTrigger({ message }: { message: string }) {
+function ConsultationTrigger({
+  message,
+  children,
+}: {
+  message: string
+  children?: React.ReactNode
+}) {
   return (
     <div className="flex items-start gap-3 mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
       <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
@@ -1665,6 +1998,156 @@ function ConsultationTrigger({ message }: { message: string }) {
       </p>
     </div>
   )
+}
+
+function MissingUploadDecision({
+  fieldLabel,
+  prompt,
+  yesMessage,
+  noMessage,
+  triggerAgent = true,
+  embedded = false,
+}: {
+  fieldLabel: string
+  prompt: string
+  yesMessage?: string
+  noMessage?: string
+  triggerAgent?: boolean
+  embedded?: boolean
+}) {
+  const { data, updateSection } = useProject()
+  const { showAgentSidebar } = useEligibilityAgent()
+  const selectedValue = asStringValue(data.eligibility?.formData?.[fieldLabel])
+
+  const handleSelect = (value: "Yes" | "No") => {
+    updateSection("eligibility", {
+      formData: {
+        ...(data.eligibility?.formData || {}),
+        [fieldLabel]: value,
+      },
+    })
+
+    if (triggerAgent) {
+      const message =
+        value === "Yes"
+          ? yesMessage ?? `Agent Z is helping with ${fieldLabel}.`
+          : noMessage ?? `Agent Z has noted that you do not need help with ${fieldLabel} right now.`
+
+      showAgentSidebar(
+        createAgentSidebarPayload(fieldLabel, message, {
+          requestType: "ask-agent",
+          responseMode: "info",
+        })
+      )
+    }
+  }
+
+  return (
+    <div
+      className={
+        embedded
+          ? ""
+          : "mt-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3"
+      }
+    >
+      <p className={`text-xs font-medium ${embedded ? "text-amber-900" : "text-blue-900"}`}>
+        {prompt}
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {(["Yes", "No"] as const).map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => handleSelect(option)}
+            className={`rounded-xl border px-4 py-2 text-sm font-medium transition-all ${
+              selectedValue === option
+                ? embedded
+                  ? "border-amber-700 bg-amber-600 text-white"
+                  : "border-blue-700 bg-blue-600 text-white"
+                : embedded
+                  ? "border-amber-300 bg-white text-amber-900 hover:border-amber-400 hover:bg-amber-100"
+                  : "border-blue-200 bg-white text-blue-800 hover:border-blue-400 hover:bg-blue-100"
+            }`}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function MissingUploadTriggerCard({
+  message,
+  decision,
+}: {
+  message: string
+  decision?: {
+    fieldLabel: string
+    prompt: string
+    yesMessage?: string
+    noMessage?: string
+    triggerAgent?: boolean
+  }
+}) {
+  return (
+    <div className="mt-3 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-amber-800">
+          <span className="font-semibold">Agent can help · </span>
+          {message}
+        </p>
+        {decision ? (
+          <div className="mt-3">
+            <MissingUploadDecision
+              fieldLabel={decision.fieldLabel}
+              prompt={decision.prompt}
+              yesMessage={decision.yesMessage}
+              noMessage={decision.noMessage}
+              triggerAgent={decision.triggerAgent}
+              embedded
+            />
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+function getMissingUploadTriggerConfig(
+  onMissingTrigger:
+    | string
+    | {
+        message: string
+        decision?: {
+          fieldLabel: string
+          prompt: string
+          yesMessage?: string
+          noMessage?: string
+          triggerAgent?: boolean
+        }
+      }
+    | undefined
+) {
+  if (!onMissingTrigger) {
+    return {
+      message: undefined,
+      decision: undefined,
+    }
+  }
+
+  if (typeof onMissingTrigger === "string") {
+    return {
+      message: onMissingTrigger,
+      decision: undefined,
+    }
+  }
+
+  return {
+    message: onMissingTrigger.message,
+    decision: onMissingTrigger.decision,
+  }
 }
 
 function AgentActionButton({
@@ -1703,7 +2186,18 @@ function FileUploadArea({
   accept?: string
   multiple?: boolean
   hint?: string
-  onMissingTrigger?: string
+  onMissingTrigger?:
+    | string
+    | {
+        message: string
+        decision?: {
+          fieldLabel: string
+          prompt: string
+          yesMessage?: string
+          noMessage?: string
+          triggerAgent?: boolean
+        }
+      }
   tooltip?: string
   questionNumber?: number
 }) {
@@ -1752,6 +2246,7 @@ function FileUploadArea({
   }
 
   const fieldId = getFieldId(label)
+  const missingTriggerConfig = getMissingUploadTriggerConfig(onMissingTrigger)
 
   return (
     <div className="col-span-2" id={fieldId}>
@@ -1821,8 +2316,11 @@ function FileUploadArea({
         </ul>
       )}
 
-      {files.length === 0 && onMissingTrigger && (
-        <ConsultationTrigger message={onMissingTrigger} />
+      {files.length === 0 && missingTriggerConfig.message && (
+        <MissingUploadTriggerCard
+          message={missingTriggerConfig.message}
+          decision={missingTriggerConfig.decision}
+        />
       )}
     </div>
   )
@@ -1845,7 +2343,18 @@ function StructuredFileUploadArea({
   label: string
   accept?: string
   hint?: string
-  onMissingTrigger?: string
+  onMissingTrigger?:
+    | string
+    | {
+        message: string
+        decision?: {
+          fieldLabel: string
+          prompt: string
+          yesMessage?: string
+          noMessage?: string
+          triggerAgent?: boolean
+        }
+      }
   tooltip?: string
   questionNumber?: number
   minSlots?: number
@@ -1980,6 +2489,7 @@ function StructuredFileUploadArea({
   })
 
   const uploadedCount = entries.filter((entry) => hasUploadedAsset(entry)).length
+  const missingTriggerConfig = getMissingUploadTriggerConfig(onMissingTrigger)
 
   return (
     <div className="col-span-2" id={fieldId}>
@@ -2080,8 +2590,11 @@ function StructuredFileUploadArea({
         Uploaded files: {uploadedCount}
       </p>
 
-      {uploadedCount === 0 && onMissingTrigger && (
-        <ConsultationTrigger message={onMissingTrigger} />
+      {uploadedCount === 0 && missingTriggerConfig.message && (
+        <MissingUploadTriggerCard
+          message={missingTriggerConfig.message}
+          decision={missingTriggerConfig.decision}
+        />
       )}
     </div>
   )
@@ -2388,15 +2901,28 @@ function EligibilityCheckPage() {
   const params = useParams()
   const { data, updateSection } = useProject()
   const { fullName, userId } = useUserIdentity()
+  const { profile: userProfile } = useUserProfile()
+  const serviceSelection = useResolvedServiceSelection(data.service)
   const displayName = fullName || "User"
-  const savedFormData = data.eligibility?.formData || {}
+  const savedFormData = useMemo(
+    () => data.eligibility?.formData || {},
+    [data.eligibility?.formData]
+  )
+  const selectedServiceAppliedName = "Mandatory HMO License"
+    // serviceSelection?.plan?.trim() ||
+    // serviceSelection?.serviceTitle?.trim() ||
+    // serviceSelection?.category?.trim() ||
+    // "No service selected"
   const [storedProjectId, setStoredProjectId] = useState<string | null>(null)
   const [storedProjectStageId, setStoredProjectStageId] = useState<string | null>(null)
   const projectIdFromQuery =
     searchParams.get("projectId") ?? searchParams.get("eligibilityProjectId")
   const existingProjectId =
     data.eligibility?.projectId ?? projectIdFromQuery ?? storedProjectId ?? null
-  const subServices = data.service?.serviceId?.trim() || ELIGIBILITY_SERVICE_ID
+  const subServices =
+    serviceSelection?.subServiceId?.trim() ||
+    serviceSelection?.serviceId?.trim() ||
+    ELIGIBILITY_SERVICE_ID
 
   const stageParam =
     typeof params?.stage === "string"
@@ -2434,6 +2960,14 @@ function EligibilityCheckPage() {
   const [step, setStep] = useState<Step>(1)
   const hasSubmittedEligibility = Boolean(data.eligibility?.completedAt)
   const isReviewOnly = isReadOnly || hasSubmittedEligibility
+  const hasPersistedEligibilityProgress =
+    Boolean(existingProjectId) ||
+    Boolean(data.eligibility?.isDraft) ||
+    Boolean(data.eligibility?.draftSavedAt) ||
+    Boolean(data.eligibility?.isEligible)
+  const [isEligibilityFormVisible, setIsEligibilityFormVisible] = useState(
+    hasSubmittedEligibility || isReadOnly || hasPersistedEligibilityProgress
+  )
   const [showVerification, setShowVerification] = useState(hasSubmittedEligibility)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isSavingDraft, setIsSavingDraft] = useState(false)
@@ -2446,13 +2980,21 @@ function EligibilityCheckPage() {
   const [uploadedFiles, setUploadedFiles] = useState<EligibilityFileMap>({})
   const [signatureFile, setSignatureFile] = useState<File | null>(null)
   const fetchedEligibilityProjectRef = useRef<string | null>(null)
+  const profileAutofillKeyRef = useRef<string | null>(null)
 
   const TOTAL_STEPS = 5
   const showAgentSidebar = Boolean(agentSidebar)
-  const hasRightPanel = showVerification || showAgentSidebar
+  const shouldShowEligibilitySidePanel =
+    !isEligibilityFormVisible || showAgentSidebar || showVerification
 
   const nextStep = () => setStep(prev => (prev < TOTAL_STEPS ? ((prev + 1) as Step) : prev))
   const prevStep = () => setStep(prev => (prev > 1 ? ((prev - 1) as Step) : prev))
+
+  useEffect(() => {
+    if (hasSubmittedEligibility || isReadOnly || hasPersistedEligibilityProgress) {
+      setIsEligibilityFormVisible(true)
+    }
+  }, [hasPersistedEligibilityProgress, hasSubmittedEligibility, isReadOnly])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -2520,6 +3062,7 @@ function EligibilityCheckPage() {
 
         if (normalized.completedAt || normalized.isEligible) {
           setShowVerification(true)
+          setIsEligibilityFormVisible(true)
         }
       } catch {
         if (!isCancelled) {
@@ -2538,7 +3081,92 @@ function EligibilityCheckPage() {
     return () => {
       isCancelled = true
     }
-  }, [existingProjectId])
+  }, [existingProjectId, savedFormData, updateSection])
+
+  useEffect(() => {
+    if (isLoadingEligibility) return
+    const paymentCustomerDetails = data.payment?.customerDetails
+    const paymentPostcode =
+      paymentCustomerDetails?.serviceLocationType === "different" &&
+      paymentCustomerDetails.servicePostalCode?.trim()
+        ? paymentCustomerDetails.servicePostalCode
+        : paymentCustomerDetails?.postalCode ?? ""
+    const paymentAddress = splitAutofillSiteAddress(paymentCustomerDetails?.fullAddress)
+    const applicantFullName =
+      userProfile?.fullName ||
+      paymentCustomerDetails?.fullName ||
+      fullName ||
+      ""
+    const siteAddressLine1 =
+      buildProfileAddressLine1(userProfile?.address ?? {}) || paymentAddress.line1
+    const siteAddressLine2 =
+      buildProfileAddressLine2(userProfile?.address ?? {}) || paymentAddress.line2
+    const autofillKeyParts = [
+      userProfile?.userId ?? userId ?? "",
+      applicantFullName,
+      userProfile?.email || paymentCustomerDetails?.email || "",
+      userProfile?.phone.countryCode || paymentCustomerDetails?.phoneCountryCode || "",
+      userProfile?.phone.number || paymentCustomerDetails?.phoneNumber || "",
+      siteAddressLine1,
+      siteAddressLine2,
+      userProfile?.address.postalCode || paymentPostcode,
+      userProfile?.council || "",
+    ]
+
+    if (!autofillKeyParts.some((value) => value.trim())) return
+
+    const autofillKey = `${existingProjectId ?? "new"}:${autofillKeyParts.join("|")}`
+    if (profileAutofillKeyRef.current === autofillKey) return
+
+    const nextFormData = { ...savedFormData }
+    let hasAutofilledValues = false
+
+    const setMissingValue = (label: string, value: string) => {
+      if (!value.trim()) return
+      if (asStringValue(nextFormData[label]).trim()) return
+
+      nextFormData[label] = value
+      hasAutofilledValues = true
+    }
+
+    const applicantName = splitApplicantFullName(applicantFullName)
+
+    setMissingValue("Applicant First Name", applicantName.firstName)
+    setMissingValue("Applicant Middle Name", applicantName.middleName)
+    setMissingValue("Applicant Last Name", applicantName.lastName)
+    setMissingValue("Email Address", userProfile?.email || paymentCustomerDetails?.email || "")
+    setMissingValue(
+      "Country Code",
+      userProfile?.phone.countryCode || paymentCustomerDetails?.phoneCountryCode || ""
+    )
+    setMissingValue(
+      "Phone Number",
+      userProfile?.phone.number || paymentCustomerDetails?.phoneNumber || ""
+    )
+    setMissingValue("Site Address Line 1", siteAddressLine1)
+    setMissingValue("Site Address Line 2", siteAddressLine2)
+    setMissingValue("Postcode", userProfile?.address.postalCode || paymentPostcode)
+    setMissingValue("Council", userProfile?.council || "")
+
+    profileAutofillKeyRef.current = autofillKey
+
+    if (!hasAutofilledValues) return
+
+    updateSection("eligibility", {
+      ...(data.eligibility || {}),
+      formData: nextFormData,
+    })
+  }, [
+    data.eligibility,
+    data.payment?.customerDetails,
+    existingProjectId,
+    fullName,
+    isLoadingEligibility,
+    savedFormData,
+    updateSection,
+    userId,
+    userProfile,
+  ])
 
   const upsertEligibilityProject = async (status: EligibilitySaveStatus = "in_progress") => {
     if (step === 1 && !existingProjectId) {
@@ -2714,10 +3342,16 @@ function EligibilityCheckPage() {
           <p className="text-xl text-slate-600 mt-2">
             Customer ID: <span className="font-medium"> {userId} </span>
           </p>
-          <p className="text-sm text-slate-500 mt-1">
+          {/* <p className="text-sm text-slate-500 mt-1">
             Current Stage:{" "}
             <span className="font-medium text-slate-700">
               {PROJECT_FLOW[currentStageIndex]?.label}
+            </span>
+          </p> */}
+          <p className="text-md text-slate-700 mt-1">
+            Service Selected:{" "}
+            <span className="font-medium text-slate-700">
+              <strong>{selectedServiceAppliedName}</strong>
             </span>
           </p>
         </div>
@@ -2740,7 +3374,7 @@ function EligibilityCheckPage() {
 
       {/* ROADMAP */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
-        <div className="lg:col-span-8 space-y-6">
+        <div className={`${isEligibilityFormVisible ? "lg:col-span-8" : "lg:col-span-12"} space-y-6`}>
           <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-semibold text-slate-800">Project Stages</h2>
@@ -2776,34 +3410,36 @@ function EligibilityCheckPage() {
             </div>
           </div>
         </div>
-        <div className="lg:col-span-4">
-          <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-lg flex flex-col h-[220px]">
-            <h3 className="text-lg font-semibold mb-3">
-              {currentStepCard?.title ?? "Eligibility Check"}
-            </h3>
-            {currentStepCard?.description && (
-              <p className="text-sm opacity-90 mb-4">
-                {currentStepCard.description}
-              </p>
-            )}
-            {currentStepCard?.highlights?.map((highlight, index) => (
-              <p key={index} className="text-sm opacity-90">
-                {highlight}
-              </p>
-            ))}
-            {currentStepCard?.ctaLabel && currentStepCta && (
-              <div className="mt-auto">
-                <button
-                  onClick={() => router.push(currentStepCta)}
-                  className="w-full rounded-xl bg-white text-blue-600 font-semibold py-3
-                    hover:bg-blue-50 active:scale-[0.98] transition cursor-pointer"
-                >
-                  {currentStepCard.ctaLabel}
-                </button>
-              </div>
-            )}
+        {isEligibilityFormVisible && (
+          <div className="lg:col-span-4">
+            <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-lg flex flex-col h-[220px]">
+              <h3 className="text-lg font-semibold mb-3">
+                {currentStepCard?.title ?? "Eligibility Check"}
+              </h3>
+              {currentStepCard?.description && (
+                <p className="text-sm opacity-90 mb-4">
+                  {currentStepCard.description}
+                </p>
+              )}
+              {currentStepCard?.highlights?.map((highlight, index) => (
+                <p key={index} className="text-sm opacity-90">
+                  {highlight}
+                </p>
+              ))}
+              {currentStepCard?.ctaLabel && currentStepCta && (
+                <div className="mt-auto">
+                  <button
+                    onClick={() => router.push(currentStepCta)}
+                    className="w-full rounded-xl bg-white text-blue-600 font-semibold py-3
+                      hover:bg-blue-50 active:scale-[0.98] transition cursor-pointer"
+                  >
+                    {currentStepCard.ctaLabel}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* FORM */}
@@ -2823,9 +3459,33 @@ function EligibilityCheckPage() {
             setSignatureFile,
           }}
         >
-          <div className={`grid gap-6 transition-all duration-500 ${hasRightPanel ? "grid-cols-12" : "grid-cols-1"}`}>
-            <div className={hasRightPanel ? "col-span-8" : "col-span-12"}>
-              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+            <div className={shouldShowEligibilitySidePanel ? "lg:col-span-8" : "lg:col-span-12"}>
+              {isEligibilityFormVisible ? (
+                <div className="rounded-2xl border bg-white p-6 shadow-sm">
+                  <div className="mb-6 flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">
+                        Eligibility Workspace
+                      </p>
+                      <h2 className="mt-2 text-xl font-semibold text-slate-900">
+                        Continue your eligibility assessment
+                      </h2>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Complete the form step by step for{" "}
+                        <span className="font-medium text-slate-700">{selectedServiceAppliedName}</span>.
+                      </p>
+                    </div>
+                    {!isReviewOnly && (
+                      <button
+                        type="button"
+                        onClick={() => setIsEligibilityFormVisible(false)}
+                        className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                      >
+                        Hide form
+                      </button>
+                    )}
+                  </div>
 
               {/* Step tabs */}
               <div className="flex gap-6 border-b pb-4 mb-6 text-sm overflow-x-auto">
@@ -2867,6 +3527,7 @@ function EligibilityCheckPage() {
                   RadioGroupField,
                   SelectField,
                   FieldLabel,
+                  CheckboxGroup,
                 }}
               />
             )}
@@ -2915,6 +3576,7 @@ function EligibilityCheckPage() {
                   RadioGroupField,
                   SelectField,
                   FieldLabel,
+                  FileUploadArea,
                   CheckboxGroup,
                 }}
               />
@@ -3000,12 +3662,24 @@ function EligibilityCheckPage() {
               {submitError && (
                 <p className="mt-3 text-sm text-red-600">{submitError}</p>
               )}
+                </div>
+              ) : (
+                <EligibilityEntryCard
+                  serviceName={selectedServiceAppliedName}
+                  onActivate={() => setIsEligibilityFormVisible(true)}
+                />
+              )}
             </div>
-          </div>
 
-          {/* RIGHT: VERIFICATION CALENDAR */}
-            {hasRightPanel && (
-              <div className="col-span-4 space-y-6">
+            {shouldShowEligibilitySidePanel && (
+              <div className="space-y-6 lg:col-span-4">
+                {!isEligibilityFormVisible && (
+                  <AgenticAssistantCard
+                    serviceName={selectedServiceAppliedName}
+                    councilName="Newham Council"
+                    hasAgentRequest={showAgentSidebar}
+                  />
+                )}
                 {showAgentSidebar && agentSidebar && (
                   <FloatingAgentWidget
                     requestId={agentSidebar.id}
@@ -3029,6 +3703,277 @@ function EligibilityCheckPage() {
       {isAnalyzing && <AnalysisModal />}
     </main>
   )
+}
+
+function EligibilityEntryCard({
+  serviceName,
+  onActivate,
+}: {
+  serviceName: string
+  onActivate: () => void
+}) {
+  return (
+    <div className="rounded-3xl border border-blue-100 bg-white p-6 shadow-sm sm:p-8">
+      <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-700">
+        <CheckCircle className="h-3.5 w-3.5" />
+        Eligibility Access
+      </div>
+
+      <h2 className="mt-5 text-2xl font-semibold text-slate-900">
+        Start your eligibility review
+      </h2>
+      <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+        We will only show the eligibility form after you confirm that you want to
+        start this stage. Your selected service is{" "}
+        <span className="font-medium text-slate-800">{serviceName}</span>.
+      </p>
+
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+          What happens next
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <p className="text-sm font-semibold text-slate-900">Open the form</p>
+            <p className="mt-2 text-sm text-slate-500">
+              Unlock the full multi-step eligibility workflow.
+            </p>
+          </div>
+          <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <p className="text-sm font-semibold text-slate-900">Complete each step</p>
+            <p className="mt-2 text-sm text-slate-500">
+              Save draft progress and move through the assessment at your pace.
+            </p>
+          </div>
+          <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <p className="text-sm font-semibold text-slate-900">Get guided support</p>
+            <p className="mt-2 text-sm text-slate-500">
+              Use the agentic workspace on the right as guidance is added.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={onActivate}
+        className="mt-6 rounded-2xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
+      >
+        Open Eligibility Check
+      </button>
+    </div>
+  )
+}
+
+function AgenticAssistantCard({
+  serviceName,
+  councilName,
+  hasAgentRequest,
+}: {
+  serviceName: string
+  councilName: string
+  hasAgentRequest: boolean
+}) {
+  const typeSpeed = 14
+  const pauseBetweenLines = 280
+  const headingText = `Welcome to your ${serviceName} Dashboard`
+  const introText = `We're here to help you manage your ${serviceName} application smoothly and confidently.`
+  const councilText = `Your selected council authority is ${councilName}.`
+  const guidanceText =
+    "To guide you accurately through the council requirements, regulations, and next steps, please begin by completing your Eligibility Check Questionnaire."
+  const assessmentText =
+    "This will help us assess your property, identify any planning or licensing requirements, and create the best route for your application."
+  const quickPointOne = "Takes only a few minutes"
+  const quickPointTwo = "Tailored to your council area"
+  const quickPointThree = "Helps avoid delays or errors"
+  const aiSupportText =
+    "Your subscription includes 10 smart AI buttons designed to support you through every stage of your application journey."
+  const exploreText =
+    "Explore each feature and enjoy your personalised AI experience."
+  const beginText = "Click Eligibility Check  to begin."
+
+  const introDelay = headingText.length * typeSpeed + pauseBetweenLines
+  const councilDelay = introDelay + introText.length * typeSpeed + pauseBetweenLines
+  const guidanceDelay = councilDelay + councilText.length * typeSpeed + pauseBetweenLines
+  const assessmentDelay = guidanceDelay + guidanceText.length * typeSpeed + pauseBetweenLines
+  const pointOneDelay = assessmentDelay + assessmentText.length * typeSpeed + pauseBetweenLines
+  const pointTwoDelay = pointOneDelay + quickPointOne.length * typeSpeed + pauseBetweenLines
+  const pointThreeDelay = pointTwoDelay + quickPointTwo.length * typeSpeed + pauseBetweenLines
+  const aiSupportDelay = pointThreeDelay + quickPointThree.length * typeSpeed + pauseBetweenLines
+  const exploreDelay = aiSupportDelay + aiSupportText.length * typeSpeed + pauseBetweenLines
+  const beginDelay = exploreDelay + exploreText.length * typeSpeed + pauseBetweenLines
+
+  return (
+    <div className="overflow-hidden rounded-3xl bg-slate-900 text-white shadow-xl">
+      <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-blue-900 p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            {/* <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/10">
+              <Bot className="h-5 w-5 text-cyan-300" />
+            </div> */}
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-400/10 ring-1 ring-white/10 overflow-hidden">
+                    <video
+                      className="h-8 w-8 object-cover rounded-xl"
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                    >
+                      <source src="/video-logo-animation.mp4" type="video/mp4" />
+                      Your browser does not support the video tag.
+                    </video>
+                  </div>
+            <div>
+              <p className="text-sm font-semibold">Agent Z</p>
+              <p className="text-xs text-slate-300">AI4Planning Intelligence</p>
+            </div>
+          </div>
+          <span className="rounded-full bg-emerald-400/15 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
+            {hasAgentRequest ? "Active" : "Standby"}
+          </span>
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
+          <TypewriterText
+            text={headingText}
+            className="text-lg font-semibold text-white"
+            speed={typeSpeed}
+          />
+          <TypewriterText
+            text={introText}
+            className="mt-3 text-sm leading-6 text-slate-200"
+            speed={typeSpeed}
+            startDelay={introDelay}
+          />
+          <TypewriterText
+            text={councilText}
+            className="mt-3 text-sm leading-6 text-cyan-100"
+            speed={typeSpeed}
+            startDelay={councilDelay}
+          />
+          <TypewriterText
+            text={guidanceText}
+            className="mt-3 text-sm leading-6 text-slate-300"
+            speed={typeSpeed}
+            startDelay={guidanceDelay}
+          />
+          <TypewriterText
+            text={assessmentText}
+            className="mt-3 text-sm leading-6 text-slate-300"
+            speed={typeSpeed}
+            startDelay={assessmentDelay}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-3 bg-slate-950/80 p-6">
+        <div className="rounded-2xl border border-white/8 bg-white/5 p-4">
+          <div className="space-y-2">
+            <div className="flex items-start gap-2">
+              <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+              <TypewriterText
+                text={quickPointOne}
+                className="text-sm text-slate-200"
+                speed={typeSpeed}
+                startDelay={pointOneDelay}
+              />
+            </div>
+            <div className="flex items-start gap-2">
+              <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+              <TypewriterText
+                text={quickPointTwo}
+                className="text-sm text-slate-200"
+                speed={typeSpeed}
+                startDelay={pointTwoDelay}
+              />
+            </div>
+            <div className="flex items-start gap-2">
+              <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+              <TypewriterText
+                text={quickPointThree}
+                className="text-sm text-slate-200"
+                speed={typeSpeed}
+                startDelay={pointThreeDelay}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4 text-sm text-cyan-100">
+          <div className="flex items-start gap-2">
+            <Bot className="mt-0.5 h-4 w-4 shrink-0 text-cyan-200" />
+            <TypewriterText
+              text={aiSupportText}
+              className="text-sm text-cyan-100"
+              speed={typeSpeed}
+              startDelay={aiSupportDelay}
+            />
+          </div>
+          <TypewriterText
+            text={exploreText}
+            className="mt-3 text-cyan-50"
+            speed={typeSpeed}
+            startDelay={exploreDelay}
+          />
+          <TypewriterText
+            text={beginText}
+            className="mt-5 font-medium text-white"
+            speed={typeSpeed}
+            startDelay={beginDelay}
+          />
+          {/* <button
+            type="button"
+            onClick={onActivate}
+            className="mt-4 w-full rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
+          >
+            Begin Eligibility Check
+          </button> */}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TypewriterText({
+  text,
+  className,
+  speed = 16,
+  startDelay = 0,
+}: {
+  text: string
+  className?: string
+  speed?: number
+  startDelay?: number
+}) {
+  const [visibleLength, setVisibleLength] = useState(0)
+
+  useEffect(() => {
+    let intervalTimer: number | null = null
+
+    const startTimer = window.setTimeout(() => {
+      setVisibleLength(0)
+      intervalTimer = window.setInterval(() => {
+        setVisibleLength((currentLength) => {
+          if (currentLength >= text.length) {
+            if (intervalTimer !== null) {
+              window.clearInterval(intervalTimer)
+            }
+            return currentLength
+          }
+
+          return currentLength + 1
+        })
+      }, speed)
+    }, startDelay)
+
+    return () => {
+      window.clearTimeout(startTimer)
+      if (intervalTimer !== null) {
+        window.clearInterval(intervalTimer)
+      }
+    }
+  }, [speed, startDelay, text])
+
+  return <p className={className}>{text.slice(0, visibleLength)}</p>
 }
 
 export default function Page() {
@@ -3185,6 +4130,7 @@ function Input({
   onAction,
   actionDisabled,
   actionMessage,
+  actionOpensAgentSidebar = true,
 }: {
   label: string
   placeholder?: string
@@ -3193,9 +4139,10 @@ function Input({
   autocompleteKind?: "postcode"
   fieldIdOverride?: string
   actionLabel?: string
-  onAction?: () => void
+  onAction?: () => void | Promise<void>
   actionDisabled?: boolean
   actionMessage?: string
+  actionOpensAgentSidebar?: boolean
 }) {
   const { data, updateSection } = useProject()
   const { showAgentSidebar } = useEligibilityAgent()
@@ -3225,7 +4172,7 @@ function Input({
       return
     }
 
-    if (trimmedValue.length < 2) {
+    if (trimmedValue.length < 1) {
       setSuggestions([])
       setIsAutocompleteOpen(false)
       setIsLoadingSuggestions(false)
@@ -3252,18 +4199,21 @@ function Input({
         }
 
         const payload = await response.json()
-        const nextSuggestions = extractAutocompleteSuggestions(payload)
+        const nextSuggestions = withTypedPostcodeFallback(
+          extractAutocompleteSuggestions(payload),
+          trimmedValue
+        )
 
         setSuggestions(nextSuggestions)
         setIsAutocompleteOpen(nextSuggestions.length > 0)
-      } catch (error) {
+      } catch {
         if (controller.signal.aborted) return
 
-        setSuggestions([])
-        setIsAutocompleteOpen(false)
-        setAutocompleteError(
-          error instanceof Error ? error.message : "Unable to load postcode suggestions."
-        )
+        const fallbackSuggestion = buildTypedPostcodeSuggestion(trimmedValue)
+
+        setSuggestions(fallbackSuggestion ? [fallbackSuggestion] : [])
+        setIsAutocompleteOpen(Boolean(fallbackSuggestion))
+        setAutocompleteError(null)
       } finally {
         if (!controller.signal.aborted) {
           setIsLoadingSuggestions(false)
@@ -3349,14 +4299,10 @@ function Input({
             ds: typeof payload.ds === "string" ? payload.ds : undefined,
           },
         })
-      } catch (error) {
+      } catch {
         if (controller.signal.aborted) return
 
-        setPostcodeLookupError(
-          error instanceof Error
-            ? error.message
-            : "Unable to resolve postcode coordinates."
-        )
+        setPostcodeLookupError(null)
       }
     }, 250)
 
@@ -3405,6 +4351,33 @@ function Input({
       formData: { ...(data.eligibility?.formData || {}), [label]: nextValue },
       ...(shouldClearStoredLocation ? { location: undefined } : {}),
     })
+  }
+
+  const handleActionClick = () => {
+    if (!onAction) return
+
+    void (async () => {
+      try {
+        await onAction()
+
+        if (!actionOpensAgentSidebar) {
+          return
+        }
+
+        showAgentSidebar(
+          createAgentSidebarPayload(
+            label,
+            actionMessage ?? `${actionLabel} requested for ${label}.`,
+            {
+              requestType: "action",
+              responseMode: "info",
+            }
+          )
+        )
+      } catch {
+        // Action handlers surface their own errors in the form when needed.
+      }
+    })()
   }
 
   return (
@@ -3469,19 +4442,7 @@ function Input({
             label={actionLabel}
             disabled={actionDisabled}
             className="w-full xl:mt-0 xl:w-auto xl:min-w-[110px]"
-            onClick={() => {
-              onAction()
-              showAgentSidebar(
-                createAgentSidebarPayload(
-                  label,
-                  actionMessage ?? `${actionLabel} requested for ${label}.`,
-                  {
-                    requestType: "action",
-                    responseMode: "info",
-                  }
-                )
-              )
-            }}
+            onClick={handleActionClick}
           />
         )}
       </div>
@@ -3816,5 +4777,6 @@ function RoadmapStep({ label, status, icon: Icon, onClick }: {
 function RoadmapLine() {
   return <div className="flex-1 h-[2px] bg-slate-200 mx-2 min-w-[120px]" />
 }
+
 
 

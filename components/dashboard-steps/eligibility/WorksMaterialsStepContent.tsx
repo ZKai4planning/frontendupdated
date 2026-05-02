@@ -16,8 +16,7 @@ export function WorksMaterialsStepContent({
     AgentActionButton,
     FileUploadArea,
     StructuredFileUploadArea,
-  } =
-    components
+  } = components
 
   if (
     !SectionHeading ||
@@ -33,18 +32,28 @@ export function WorksMaterialsStepContent({
   }
 
   const proposedWorksDescription = asStringValue(savedFormData["Description of Proposed Works"]).trim()
+  const proposedWorksRawValue = asStringValue(savedFormData["Description of Proposed Works"])
 
   const summarizeProposedWorks = (value: string) => {
     const normalized = value.replace(/\s+/g, " ").trim()
     if (!normalized) return ""
 
-    const sentences = normalized
+    const sentenceLikeParts = normalized
       .split(/(?<=[.!?])\s+/)
       .map(sentence => sentence.trim())
       .filter(Boolean)
 
-    if (sentences.length >= 2) {
-      return sentences.slice(0, 2).join(" ")
+    if (sentenceLikeParts.length > 0) {
+      const sentenceSummary = sentenceLikeParts
+        .slice(0, 2)
+        .join(" ")
+        .split(/\s+/)
+        .slice(0, 28)
+        .join(" ")
+
+      if (sentenceSummary) {
+        return sentenceSummary.replace(/\s+([,.!?;:])/g, "$1").trim()
+      }
     }
 
     const clauses = normalized
@@ -53,41 +62,91 @@ export function WorksMaterialsStepContent({
       .filter(Boolean)
 
     if (clauses.length > 1) {
-      return clauses.slice(0, 3).join(", ")
+      return clauses
+        .slice(0, 3)
+        .join(", ")
+        .split(/\s+/)
+        .slice(0, 24)
+        .join(" ")
+        .replace(/\s+([,.!?;:])/g, "$1")
+        .trim()
     }
 
-    return normalized.length > 180 ? `${normalized.slice(0, 177).trim()}...` : normalized
+    const words = normalized.split(/\s+/)
+    if (words.length > 24) {
+      return `${words.slice(0, 24).join(" ").trim()}...`
+    }
+
+    return normalized.length > 140 ? `${normalized.slice(0, 137).trim()}...` : normalized
   }
 
   const handleSummarizeProposedWorks = () => {
-    if (!proposedWorksDescription) return
+    if (!proposedWorksRawValue.trim()) return
+
+    const summary = summarizeProposedWorks(proposedWorksRawValue)
+    if (!summary) return
 
     updateSection("eligibility", {
       formData: {
         ...savedFormData,
-        "Description of Proposed Works": summarizeProposedWorks(proposedWorksDescription),
+        "Description of Proposed Works": summary,
       },
     })
   }
 
   return (
     <>
+      <SectionHeading>Current Layout</SectionHeading>
+      <div className="mb-6 grid grid-cols-2 gap-6">
+        <Input
+          label="Number of bedrooms available?"
+          placeholder="Enter number of bedrooms"
+        />
+        <Input
+          label="Number of bathrooms / shower rooms?"
+          placeholder="Enter number of bathrooms or shower rooms"
+        />
+        <RadioGroupField
+          label="Is there a communal kitchen?"
+          options={["Yes", "No", "Planning to create one"]}
+        />
+        <RadioGroupField
+          label="Is any lounge/dining room proposed as a bedroom?"
+          options={["Yes", "No"]}
+        />
+        <div className="col-span-2">
+          <div className="space-y-4 rounded-2xl border p-4">
+            <RadioGroupField
+              label="Approx smallest bedroom size?"
+              options={["Under 6.5 m²", "6.5–10 m²", "10+ m²", "Ask Agent Z"]}
+            />
+            {/* <Input
+              label="Approx smallest bedroom size details"
+              placeholder="Enter the room size, dimensions, or any notes"
+              actionLabel="Ask Agent Z"
+              onAction={() => {}}
+              actionMessage="Agent Z is helping estimate the smallest bedroom size based on the room details provided."
+            /> */}
+          </div>
+        </div>
+      </div>
+
       <SectionHeading>Description of Works</SectionHeading>
-      <div className="grid grid-cols-2 gap-6 mb-6">
+      <div className="mb-6 grid grid-cols-2 gap-6">
         <div className="col-span-2">
           <div className="mb-1 flex items-center justify-between gap-3">
             <FieldLabel label="Description of Proposed Works" wrapperClassName="mb-0" />
             <AgentActionButton
-              label="Summarize"
+              label="Ask Agent Z to Summarize"
               onClick={handleSummarizeProposedWorks}
-              disabled={!proposedWorksDescription}
+              disabled={!proposedWorksRawValue.trim()}
               className="mt-0 shrink-0"
             />
           </div>
           <textarea
             rows={3}
             placeholder="Summarise the proposal, including size, number of storeys and position... Ask Agent Z to help to concise"
-            className="w-full rounded-xl border px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
+            className="w-full resize-none rounded-xl border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
             value={asStringValue(savedFormData["Description of Proposed Works"])}
             onChange={e =>
               updateSection("eligibility", {
@@ -99,7 +158,7 @@ export function WorksMaterialsStepContent({
       </div>
 
       <SectionHeading>Dimensions</SectionHeading>
-      <div className="grid grid-cols-2 gap-6 mb-6">
+      <div className="mb-6 grid grid-cols-2 gap-6">
         <Input label="Existing Property Width (m)" />
         <Input label="Existing Property Depth (m)" />
         <Input label="Proposed Extension Width (m)" />
@@ -109,7 +168,7 @@ export function WorksMaterialsStepContent({
       </div>
 
       <SectionHeading>Materials</SectionHeading>
-      <div className="grid grid-cols-2 gap-6 mb-6">
+      <div className="mb-6 grid grid-cols-2 gap-6">
         <SelectField
           label="Wall Materials"
           options={[
@@ -142,20 +201,40 @@ export function WorksMaterialsStepContent({
       </div>
 
       <SectionHeading>Plans, Drawings & Photographs</SectionHeading>
-      <div className="grid grid-cols-2 gap-4 mb-2">
+      <div className="mb-2 grid grid-cols-2 gap-4">
         <FileUploadArea
           label="Location Plan (1:1250 or 1:2500)"
           accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf"
           multiple={false}
           hint="Ordnance Survey based plan showing site in context"
-          onMissingTrigger="No location plan uploaded — we offer professional drawing services (CAD, surveys). Book a consultation."
+          onMissingTrigger={{
+            message: "No location plan uploaded - we offer professional drawing services and surveys.",
+            decision: {
+              fieldLabel: "Need help with location plan?",
+              prompt: "Would you like Agent Z to help arrange or prepare your location plan?",
+              yesMessage:
+                "Agent Z is preparing support options for your missing location plan, including drawing and survey help.",
+              noMessage:
+                "Agent Z has noted that you do not need help with the location plan right now.",
+            },
+          }}
         />
         <FileUploadArea
           label="Site Plan (1:200 or 1:500)"
           accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf"
           multiple={false}
           hint="Block plan of the site showing proposed development"
-          onMissingTrigger="No site plan uploaded — our CAD team can prepare this for you."
+          onMissingTrigger={{
+            message: "No site plan uploaded - our CAD team can prepare this for you.",
+            decision: {
+              fieldLabel: "Need help with site plan?",
+              prompt: "Would you like Agent Z to help prepare your site plan?",
+              yesMessage:
+                "Agent Z is preparing support for your missing site plan and can guide the next steps.",
+              noMessage:
+                "Agent Z has noted that you do not need help with the site plan right now.",
+            },
+          }}
         />
         <StructuredFileUploadArea
           label="Existing & Proposed Elevations"
@@ -163,7 +242,17 @@ export function WorksMaterialsStepContent({
           hint="All affected elevations at 1:50 or 1:100"
           slotLabels={["Existing elevation", "Proposed elevation"]}
           showDescriptionInput={false}
-          onMissingTrigger="No elevations uploaded — our architects can prepare these drawings."
+          onMissingTrigger={{
+            message: "No elevations uploaded - our architects can prepare these drawings.",
+            decision: {
+              fieldLabel: "Need help with elevations?",
+              prompt: "Would you like Agent Z to help prepare the existing and proposed elevations?",
+              yesMessage:
+                "Agent Z is preparing guidance and support for the missing existing and proposed elevations.",
+              noMessage:
+                "Agent Z has noted that you do not need help with elevations right now.",
+            },
+          }}
         />
         <StructuredFileUploadArea
           label="Photographs of Site"
@@ -173,7 +262,7 @@ export function WorksMaterialsStepContent({
           singleRow
           allowAddMore
           descriptionPlaceholder="For example: front view, rear garden, side boundary"
-          onMissingTrigger="No photographs uploaded — please add photos of the existing property."
+          onMissingTrigger="No photographs uploaded - please add photos of the existing property."
         />
         <StructuredFileUploadArea
           label="Additional Drawings (floor plans, sections etc.)"
@@ -183,7 +272,14 @@ export function WorksMaterialsStepContent({
           singleRow
           allowAddMore
           descriptionPlaceholder="For example: ground floor plan, roof plan, section A-A"
-          onMissingTrigger="Consider uploading floor plans or sections to support your application."
+          onMissingTrigger={{
+            message: "Consider uploading floor plans or sections to support your application.",
+            decision: {
+              fieldLabel: "Need help with additional drawings?",
+              prompt: "Do you want help with additional drawings such as floor plans or sections?",
+              triggerAgent: false,
+            },
+          }}
         />
       </div>
     </>

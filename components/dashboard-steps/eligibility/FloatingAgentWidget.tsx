@@ -52,6 +52,13 @@ const RIGHTS_OF_WAY_ENDPOINT =
   process.env.NEXT_PUBLIC_ZYNAPSIS_RIGHTS_OF_WAY_ENDPOINT ??
   "http://localhost:8000/api/v1/ds03/rights-of-way"
 const DEFAULT_RIGHTS_OF_WAY_RADIUS_METERS = "150"
+const DUMMY_REQUEST_BUTTONS = [
+  { label: "Overview", accent: "bg-blue-400", active: true },
+  { label: "Recent", accent: "bg-emerald-400" },
+  { label: "Pending", accent: "bg-amber-400" },
+  { label: "Resolved", accent: "bg-violet-400" },
+  { label: "Flagged", accent: "bg-rose-400" },
+]
 
 type FloatingAgentWidgetProps = {
   requestId: string
@@ -827,6 +834,13 @@ export function FloatingAgentWidget({
           </button>
         </div>
 
+        <div className="px-4 pb-3 flex-shrink-0">
+          <p className="text-[15px] font-semibold text-slate-900">Agent Z Workspace</p>
+          <p className="mt-1 text-[11px] text-slate-500">
+            Planning intelligence for eligibility requests
+          </p>
+        </div>
+
         <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4 min-h-0">
           {!isRunning && orderedHistoryEntries.length === 0 && tasks.length === 0 && insights.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12 gap-2">
@@ -835,28 +849,56 @@ export function FloatingAgentWidget({
             </div>
           )}
 
-          {orderedHistoryEntries.length > 0 && (
-            <div className="space-y-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                Previous Requests
-              </p>
-              {orderedHistoryEntries.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3"
-                >
-                  <p className="text-[11px] font-semibold text-slate-900">{entry.fieldLabel}</p>
-                  <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">{entry.question}</p>
-                  <p className="mt-2 text-[12px] text-slate-700">{getHistoryResult(entry)}</p>
-                </div>
-              ))}
+          <div className="space-y-2">
+            <div className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-50 via-white to-slate-50 p-2 shadow-sm">
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {DUMMY_REQUEST_BUTTONS.map((button) => (
+                  <button
+                    key={button.label}
+                    type="button"
+                    aria-pressed={button.active ? "true" : "false"}
+                    className={`group shrink-0 rounded-xl border px-3 py-2 text-[11px] font-medium transition-all duration-200 ${
+                      button.active
+                        ? "border-slate-900 bg-slate-900 text-white shadow-md shadow-slate-200"
+                        : "border-slate-200 bg-white text-slate-600 shadow-sm hover:-translate-y-0.5 hover:border-slate-300 hover:text-slate-900"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span
+                        className={`h-2 w-2 rounded-full ${button.accent} ${
+                          button.active ? "ring-2 ring-white/30" : ""
+                        }`}
+                      />
+                      <span>{button.label}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
-          )}
+
+            {orderedHistoryEntries.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                  Previous Requests
+                </p>
+                {orderedHistoryEntries.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3"
+                  >
+                    <p className="text-[11px] font-semibold text-slate-900">{entry.fieldLabel}</p>
+                    <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">{entry.question}</p>
+                    <p className="mt-2 text-[12px] text-slate-700">{getHistoryResult(entry)}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {(messages.length > 0 || tasks.length > 0 || insights.length > 0) && (
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                Current Request
+                Planning Intelligence is at work ...
               </p>
               <p className="mt-2 text-[13px] text-slate-700 leading-relaxed">{currentMessage}</p>
 

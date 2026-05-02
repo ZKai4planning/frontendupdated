@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 
 import PaymentStep from "@/components/dashboard-steps/PaymentStep"
+import PlansStep from "@/components/dashboard-steps/PlansStep"
 import EligibilityStep from "@/components/dashboard-steps/EligibilityStep"
 import ConsultantStep from "@/components/dashboard-steps/ConsultantStep"
 import InitialQuotationStep from "@/components/dashboard-steps/InitialQuotationStep"
@@ -30,6 +31,7 @@ import {
 } from "@/lib/project-flow"
 import { useUserIdentity } from "@/lib/use-user-identity"
 import { extractProjectFromResponse } from "@/lib/project-api"
+import { useResolvedServiceSelection } from "@/lib/use-service-selection"
 import { resolveProjectServiceName, useServiceCatalog } from "@/lib/use-service-catalog"
 
 type StepStatus = "completed" | "active"
@@ -73,6 +75,7 @@ type ProjectDetailApiResponse = {
 }
 
 const STAGE_COMPONENTS = {
+  plans: PlansStep,
   payment: PaymentStep,
   eligibility: EligibilityStep,
   consultant: ConsultantStep,
@@ -101,8 +104,8 @@ const resolveStageFromStatus = (status?: string | null) => {
 const formatProjectStatus = (status?: string) =>
   status
     ? status
-        .replace(/_/g, " ")
-        .replace(/\b\w/g, (char) => char.toUpperCase())
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (char) => char.toUpperCase())
     : "No status available"
 
 const getPrimaryProjectService = (project?: ProjectDetail | null) =>
@@ -142,6 +145,7 @@ function DashboardOverview() {
   const searchParams = useSearchParams()
   const { data } = useProject()
   const { fullName } = useUserIdentity()
+  const serviceSelection = useResolvedServiceSelection(data.service)
   const serviceLabelMap = useServiceCatalog()
 
   const displayName = fullName || "User"
@@ -234,7 +238,8 @@ function DashboardOverview() {
   const primaryProjectService = getPrimaryProjectService(projectDetail)
   const projectServiceLabel =
     resolveProjectServiceName(primaryProjectService, serviceLabelMap) ||
-    data.service?.plan ||
+    serviceSelection?.plan ||
+    serviceSelection?.serviceTitle ||
     "No service selected"
   const projectSummaryText =
     currentStage === "eligibility" && projectDetail?.currentStep
@@ -251,6 +256,70 @@ function DashboardOverview() {
   if (!selectedProjectId && !isLoadingProject) {
     return (
       <main className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
+        <div className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-6 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-2xl flex-1">
+
+              <h2 className="mt-4 text-xl font-semibold leading-tight text-slate-900 sm:text-2xl">
+                Welcome {displayName},
+              </h2>
+
+              <p className="mt-2 text-base font-medium text-slate-700 sm:text-lg">
+                Thank you for choosing AI4Planning
+              </p>
+
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-[15px]">
+                Your dashboard is ready. Explore services, understand your planning journey, and our AI Agent Z can guide you through services,
+                planning steps, and help you choose the right next action.
+              </p>
+            </div>
+
+            <div className="w-full max-w-sm rounded-[24px] bg-slate-800 p-5 text-white shadow-lg">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  {/* <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-400/10 ring-1 ring-white/10">
+                    <Bot className="h-5 w-5 text-cyan-300" />
+                  </div> */}
+
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-400/10 ring-1 ring-white/10 overflow-hidden">
+                    <video
+                      className="h-8 w-8 object-cover rounded-xl"
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                    >
+                      <source src="/video-logo-animation.mp4" type="video/mp4" />
+                      Your browser does not support the video tag.
+                    </video>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-semibold">Agent Z</p>
+                    <p className="text-xs text-slate-300">AI4Planning Assistant</p>
+                  </div>
+                </div>
+
+                <span className="rounded-full bg-emerald-400/15 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
+                  Online
+                </span>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Support Preview</p>
+                <p className="mt-2 text-sm leading-6 text-slate-100">
+                  I can help you understand services, explain planning stages, and
+                  guide your next step with clarity.
+                </p>
+              </div>
+
+              <button className="mt-4 flex w-full items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm font-medium text-slate-900 transition hover:bg-slate-100">
+                Start with Agent Z
+                <ArrowRight className="h-4 w-4 text-blue-600" />
+              </button>
+            </div>
+          </div>
+        </div>
         <div className="rounded-2xl border border-dashed bg-white p-8 text-center shadow-sm">
           <h2 className="text-xl font-semibold text-slate-900">No project selected</h2>
           <p className="mt-2 text-sm text-slate-500">
@@ -289,7 +358,7 @@ function DashboardOverview() {
 
   return (
     <main className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-8">
+      {/* <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6 mb-8">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
             Welcome back, {displayName}
@@ -314,9 +383,9 @@ function DashboardOverview() {
             <p className="text-sm font-semibold text-slate-700">{projectStatusLabel}</p>
           </div>
         </div>
-      </div>
+      </div> */}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-8 space-y-6">
           <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
             <div className="flex items-center justify-between mb-6">
@@ -326,7 +395,7 @@ function DashboardOverview() {
               </span>
             </div>
 
-            <div className="flex items-center justify-between overflow-x-auto pb-2 min-h-[120px]">
+            <div className="flex items-center justify-between overflow-x-auto pb-2 min-h-30">
               {overviewSteps.map((step, index) => (
                 <div key={step.id} className="flex items-center">
                   <RoadmapStep
@@ -383,7 +452,7 @@ function DashboardOverview() {
         </div>
 
         <div className="lg:col-span-4 space-y-6">
-          <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-lg flex flex-col min-h-[200px]">
+          <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-lg flex flex-col min-h-50">
             <h3 className="text-lg font-semibold mb-3">
               {nextStepCard?.title ?? "Next Step"}
             </h3>
@@ -419,9 +488,9 @@ function DashboardOverview() {
             )}
           </div>
         </div>
-      </div>
+      </div> */}
 
-      <div className="mt-10">
+      {/* <div className="mt-10">
         <h3 className="text-sm font-semibold text-slate-700 mb-4">
           The Planning Team
         </h3>
@@ -455,7 +524,7 @@ function DashboardOverview() {
           <div className="rounded-2xl border bg-white p-6 shadow-sm flex flex-col">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-linear-to-r from-indigo-500 to-purple-500 flex items-center justify-center">
                   <Bot className="w-5 h-5 text-white" />
                 </div>
                 <div>
@@ -493,7 +562,87 @@ function DashboardOverview() {
             />
           </div>
         </div>
-      </div>
+      </div> */}
+
+
+      <main className="min-h-screen bg-slate-50 p-4 sm:p-6 lg:p-8">
+        <div className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-6 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="max-w-2xl flex-1">
+
+              <h2 className="mt-4 text-xl font-semibold leading-tight text-slate-900 sm:text-2xl">
+                Welcome {displayName},
+              </h2>
+
+              <p className="mt-2 text-base font-medium text-slate-700 sm:text-lg">
+                Thank you for choosing AI4Planning
+              </p>
+
+              <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-[15px]">
+                Your dashboard is ready. Explore services, understand your planning journey, and our AI Agent Z can guide you through services,
+                planning steps, and help you choose the right next action.
+              </p>
+            </div>
+
+            <div className="w-full max-w-sm rounded-[24px] bg-slate-800 p-5 text-white shadow-lg">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  {/* <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-400/10 ring-1 ring-white/10">
+                    <Bot className="h-5 w-5 text-cyan-300" />
+                  </div> */}
+
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-400/10 ring-1 ring-white/10 overflow-hidden">
+                    <video
+                      className="h-8 w-8 object-cover rounded-xl"
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                    >
+                      <source src="/video-logo-animation.mp4" type="video/mp4" />
+                      Your browser does not support the video tag.
+                    </video>
+                  </div>
+
+                  <div>
+                    <p className="text-sm font-semibold">Agent Z</p>
+                    <p className="text-xs text-slate-300">AI4Planning Assistant</p>
+                  </div>
+                </div>
+
+                <span className="rounded-full bg-emerald-400/15 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
+                  Online
+                </span>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+                <p className="text-xs uppercase tracking-[0.18em] text-slate-400">Support Preview</p>
+                <p className="mt-2 text-sm leading-6 text-slate-100">
+                  I can help you understand services, explain planning stages, and
+                  guide your next step with clarity.
+                </p>
+              </div>
+
+              <button className="mt-4 flex w-full items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm font-medium text-slate-900 transition hover:bg-slate-100">
+                Start with Agent Z
+                <ArrowRight className="h-4 w-4 text-blue-600" />
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-dashed bg-white p-8 text-center shadow-sm">
+          <h2 className="text-xl font-semibold text-slate-900">No project selected</h2>
+          <p className="mt-2 text-sm text-slate-500">
+            Create a new project to start your planning journey.
+          </p>
+          <button
+            onClick={() => router.push("/services")}
+            className="mt-5 rounded-xl bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700"
+          >
+            New Project
+          </button>
+        </div>
+      </main>
     </main>
   )
 }
@@ -512,18 +661,16 @@ function RoadmapStep({
   return (
     <div
       onClick={onClick}
-      className={`flex flex-col items-center gap-2 min-w-[110px] ${
-        onClick ? "cursor-pointer" : ""
-      }`}
+      className={`flex flex-col items-center gap-2 min-w-27.5 ${onClick ? "cursor-pointer" : ""
+        }`}
     >
       <div
-        className={`w-10 h-10 rounded-full flex items-center justify-center ${
-          status === "completed"
+        className={`w-10 h-10 rounded-full flex items-center justify-center ${status === "completed"
             ? "bg-blue-600 text-white"
             : status === "active"
               ? "border-2 border-blue-600 text-blue-600"
               : "bg-gray-200 text-gray-500"
-        }`}
+          }`}
       >
         {status === "completed" ? (
           <CheckCircle className="w-5 h-5" />
@@ -538,7 +685,7 @@ function RoadmapStep({
 }
 
 function RoadmapLine() {
-  return <div className="flex-1 h-[2px] bg-slate-200 mx-2 min-w-[120px]" />
+  return <div className="flex-1 h-0.5 bg-slate-200 mx-2 min-w-30" />
 }
 
 function ActivityItem({
@@ -561,3 +708,4 @@ function ActivityItem({
     </div>
   )
 }
+
