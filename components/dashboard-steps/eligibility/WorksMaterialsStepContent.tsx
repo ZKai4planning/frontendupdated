@@ -145,7 +145,7 @@ export function WorksMaterialsStepContent({
 
       <SectionHeading>Dimensions</SectionHeading>
       <div className="mb-6 grid grid-cols-2 gap-6">
- 
+
         <Input
           label="Total internal floor area"
           placeholder="Enter total internal floor area (m²) "
@@ -247,7 +247,7 @@ export function WorksMaterialsStepContent({
           </div>
         </div>
       </div>
- 
+
 
       <SectionHeading>Current Materials Used</SectionHeading>
       <div className="mb-6 grid grid-cols-2 gap-6">

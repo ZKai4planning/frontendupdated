@@ -223,6 +223,7 @@ export default function DashboardHeader({
     null
   const hasProjects = projects.length > 0
   const hasSingleProject = projects.length === 1
+  const singleProject = hasSingleProject ? projects[0] : null
 
   const getProjectLabel = (project: UserProject) => {
     const service = getPrimaryProjectService(project)
@@ -497,12 +498,21 @@ export default function DashboardHeader({
                     <span>New Project</span>
                   </button>
                 ) : hasSingleProject ? (
-                  <div className="flex max-w-[320px] items-center gap-2 rounded-xl border px-4 py-2 text-sm text-slate-700 bg-slate-50">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (singleProject) {
+                        void handleProjectSelect(singleProject)
+                      }
+                    }}
+                    className="flex max-w-[320px] items-center gap-2 rounded-xl border px-4 py-2 text-sm text-slate-700 bg-slate-50 transition hover:bg-slate-100"
+                    aria-label={`Open project ${selectedProjectLabel || singleProject?.projectId || ""}`}
+                  >
                     <Folder className="h-4 w-4 shrink-0 text-blue-600" />
                     <span className="truncate">
-                      Project: {selectedProjectLabel || projects[0]?.projectId}
+                      Project: {selectedProjectLabel || singleProject?.projectId}
                     </span>
-                  </div>
+                  </button>
                 ) : (
                   <>
                     <button

@@ -370,39 +370,39 @@ export function ApplicantPropertyStepContent({
           },
           ...(lookupPayload
             ? {
-                location: {
-                  postcode: normalizePostcode(lookupPayload.postcode || normalizedPostcode),
-                  lat: isValidCoordinate(lookupPayload.lat) ? lookupPayload.lat : undefined,
-                  lng: isValidCoordinate(lookupPayload.lng) ? lookupPayload.lng : undefined,
-                  lpaCode:
-                    typeof lookupPayload.lpa_code === "string"
-                      ? lookupPayload.lpa_code
-                      : undefined,
-                  lpaName:
-                    typeof lookupPayload.lpa_name === "string"
-                      ? lookupPayload.lpa_name
-                      : undefined,
-                  region:
-                    typeof lookupPayload.region === "string"
-                      ? lookupPayload.region
-                      : undefined,
-                  country:
-                    typeof lookupPayload.country === "string"
-                      ? lookupPayload.country
-                      : undefined,
-                  ward:
-                    typeof lookupPayload.ward === "string" ? lookupPayload.ward : undefined,
-                  constituency:
-                    typeof lookupPayload.constituency === "string"
-                      ? lookupPayload.constituency
-                      : undefined,
-                  source:
-                    typeof lookupPayload.source === "string"
-                      ? lookupPayload.source
-                      : undefined,
-                  ds: typeof lookupPayload.ds === "string" ? lookupPayload.ds : undefined,
-                },
-              }
+              location: {
+                postcode: normalizePostcode(lookupPayload.postcode || normalizedPostcode),
+                lat: isValidCoordinate(lookupPayload.lat) ? lookupPayload.lat : undefined,
+                lng: isValidCoordinate(lookupPayload.lng) ? lookupPayload.lng : undefined,
+                lpaCode:
+                  typeof lookupPayload.lpa_code === "string"
+                    ? lookupPayload.lpa_code
+                    : undefined,
+                lpaName:
+                  typeof lookupPayload.lpa_name === "string"
+                    ? lookupPayload.lpa_name
+                    : undefined,
+                region:
+                  typeof lookupPayload.region === "string"
+                    ? lookupPayload.region
+                    : undefined,
+                country:
+                  typeof lookupPayload.country === "string"
+                    ? lookupPayload.country
+                    : undefined,
+                ward:
+                  typeof lookupPayload.ward === "string" ? lookupPayload.ward : undefined,
+                constituency:
+                  typeof lookupPayload.constituency === "string"
+                    ? lookupPayload.constituency
+                    : undefined,
+                source:
+                  typeof lookupPayload.source === "string"
+                    ? lookupPayload.source
+                    : undefined,
+                ds: typeof lookupPayload.ds === "string" ? lookupPayload.ds : undefined,
+              },
+            }
             : {}),
         })
       } catch {
@@ -436,7 +436,7 @@ export function ApplicantPropertyStepContent({
       "What was previously proposed, and was it approved, refused, or withdrawn?":
         asStringValue(
           savedFormData[
-            "What was previously proposed, and was it approved, refused, or withdrawn?"
+          "What was previously proposed, and was it approved, refused, or withdrawn?"
           ]
         ).trim() ||
         `Reference ${planningReferenceNumber} reviewed by the council. Previous scheme details have been brought in for review.`,
@@ -550,7 +550,7 @@ export function ApplicantPropertyStepContent({
                 className="w-full rounded-xl border px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
                 value={asStringValue(
                   savedFormData[
-                    "What was previously proposed, and was it approved, refused, or withdrawn?"
+                  "What was previously proposed, and was it approved, refused, or withdrawn?"
                   ]
                 )}
                 onChange={e =>
@@ -638,11 +638,10 @@ export function ApplicantPropertyStepContent({
             options={["Yes", "No", "Unsure / Ask Agent Z"]}
           />
         </div>
-        <div className="col-span-2">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Current Use Status
-          </p>
-        </div>
+      </div>
+
+      <SectionHeading>Current Use Status</SectionHeading>
+      <div className="grid grid-cols-2 gap-6 mb-2">
         <SelectField
           label="How is the property currently used?"
           options={[
@@ -663,11 +662,10 @@ export function ApplicantPropertyStepContent({
             options={["One household", "2 households", "3+ households"]}
           />
         </div>
-        <div className="col-span-2">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Proposed HMO Use
-          </p>
-        </div>
+      </div>
+
+      <SectionHeading>Proposed HMO Use</SectionHeading>
+      <div className="grid grid-cols-2 gap-6 mb-2">
         <div className="col-span-2">
           <RadioGroupField
             label="How many occupants do you plan to accommodate?"

@@ -726,10 +726,19 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
       paths: [["applicantAndProperty", "applicantDetails", "siteAddress", "line2"]],
     },
     {
+      label: "Council",
+      paths: [
+        ["applicantAndProperty", "councilApplicationHistory", "councilName"],
+        ["location", "lpaName"],
+        ["location", "lpa_name"],
+      ],
+    },
+    {
       label: "Postcode",
       paths: [
         ["applicantAndProperty", "applicantDetails", "siteAddress", "postcode"],
         ["applicantAndProperty", "applicantDetails", "postcode"],
+        ["location", "postcode"],
       ],
     },
     {
@@ -785,10 +794,6 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
       label: "Planning Reference Number *",
       paths: [["applicantAndProperty", "councilApplicationHistory", "planningReferenceNumber"]],
     },
-      {
-        label: "Council",
-        paths: [["applicantAndProperty", "councilApplicationHistory", "councilName"]],
-      },
     {
       label: "Type of Application *",
       paths: [["applicantAndProperty", "councilApplicationHistory", "previousApplicationType"]],
@@ -3277,6 +3282,7 @@ function EligibilityCheckPage() {
   const [signatureFile, setSignatureFile] = useState<File | null>(null)
   const fetchedEligibilityProjectRef = useRef<string | null>(null)
   const profileAutofillKeyRef = useRef<string | null>(null)
+  const latestEligibilityFormDataRef = useRef(savedFormData)
 
   const TOTAL_STEPS = 5
   const showAgentSidebar = Boolean(agentSidebar)
@@ -3285,6 +3291,10 @@ function EligibilityCheckPage() {
 
   const nextStep = () => setStep(prev => (prev < TOTAL_STEPS ? ((prev + 1) as Step) : prev))
   const prevStep = () => setStep(prev => (prev > 1 ? ((prev - 1) as Step) : prev))
+
+  useEffect(() => {
+    latestEligibilityFormDataRef.current = savedFormData
+  }, [savedFormData])
 
   useEffect(() => {
     if (hasSubmittedEligibility || isReadOnly || hasPersistedEligibilityProgress) {
@@ -3321,7 +3331,6 @@ function EligibilityCheckPage() {
     if (fetchedEligibilityProjectRef.current === existingProjectId) return
 
     let isCancelled = false
-    fetchedEligibilityProjectRef.current = existingProjectId
 
     const loadSavedEligibility = async () => {
       setIsLoadingEligibility(true)
@@ -3342,7 +3351,7 @@ function EligibilityCheckPage() {
         updateSection("eligibility", {
           projectId: normalized.projectId,
           formData: {
-            ...savedFormData,
+            ...latestEligibilityFormDataRef.current,
             ...normalized.formData,
           },
           location: normalized.location,
@@ -3351,6 +3360,7 @@ function EligibilityCheckPage() {
           completedAt: normalized.completedAt,
           isEligible: normalized.isEligible,
         })
+        fetchedEligibilityProjectRef.current = normalized.projectId || existingProjectId
         setUploadedFiles(normalizedUploads)
 
         if (normalized.step && normalized.step >= 1 && normalized.step <= TOTAL_STEPS) {
@@ -3378,7 +3388,7 @@ function EligibilityCheckPage() {
     return () => {
       isCancelled = true
     }
-  }, [existingProjectId, savedFormData, updateSection])
+  }, [existingProjectId, updateSection])
 
   useEffect(() => {
     if (isLoadingEligibility) return
