@@ -167,7 +167,7 @@ export function WorksMaterialsStepContent({
         <Input label="Distance from Boundary (m)" />
       </div>
 
-      <SectionHeading>Materials</SectionHeading>
+      <SectionHeading>Current Materials Used</SectionHeading>
       <div className="mb-6 grid grid-cols-2 gap-6">
         <SelectField
           label="Wall Materials"

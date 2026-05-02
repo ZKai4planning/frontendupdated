@@ -1,39 +1,34 @@
 "use client"
 
-import type { ChangeEvent, ElementType, InputHTMLAttributes, ReactNode } from "react"
-import { useEffect, useState } from "react"
 import axios from "axios"
-import { Check, Info, Mail, MapPin, Phone, UploadCloud, User } from "lucide-react"
+import { useCallback, useEffect, useRef, useState } from "react"
+import { Check, Info, UploadCloud } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
 import Link from "next/link"
 import toast from "react-hot-toast"
 
 import { useProject } from "@/app/context/ProjectContext"
-import { plans as pricingPlans } from "@/components/pricingcards-landing"
-import axiosInstance from "@/lib/axiosinstance"
 import {
-  COUNTRY_CODES,
+  ClientDetailsCard,
+  type CustomerAddressDetails,
+  type CustomerDetailsForm,
+} from "@/components/dashboard-steps/payment/ClientDetailsCard"
+import { plans as pricingPlans } from "@/components/pricingcards-landing"
+import {
   mergeProfileData,
   MOBILE_NUMBER_LENGTH,
   type ProfileModel,
 } from "@/lib/profile-validation"
+import {
+  getProfile,
+  getProfileErrorMessage,
+  isProfileNotFoundError,
+  updateProfile,
+} from "@/lib/profile-api"
 import { useResolvedServiceSelection } from "@/lib/use-service-selection"
 import { PROFILE_COMPLETION_UPDATED_EVENT } from "@/lib/use-profile-completion-status"
 import { USER_IDENTITY_UPDATED_EVENT, useUserIdentity } from "@/lib/use-user-identity"
-
-type ServiceLocationType = "same" | "different"
-
-type CustomerDetailsForm = {
-  fullName: string
-  phoneCountryCode: string
-  phoneNumber: string
-  email: string
-  fullAddress: string
-  postalCode: string
-  serviceLocationType: ServiceLocationType
-  servicePostalCode: string
-}
 
 type TypewriterTextProps = {
   text: string
@@ -43,55 +38,53 @@ type TypewriterTextProps = {
   delay?: number
 }
 
-const asRecord = (value: unknown): Record<string, unknown> => {
-  if (typeof value === "object" && value !== null) {
-    return value as Record<string, unknown>
-  }
-
-  return {}
-}
-
-const extractProfileFromResponse = (responseData: unknown): Partial<ProfileModel> | null => {
-  const responseObject = asRecord(responseData)
-  const payload = Object.keys(asRecord(responseObject.data)).length
-    ? asRecord(responseObject.data)
-    : responseObject
-  const profile = Object.keys(asRecord(payload.profile)).length
-    ? asRecord(payload.profile)
-    : payload
-
-  return Object.keys(profile).length ? (profile as Partial<ProfileModel>) : null
-}
-
-const getErrorMessage = (error: unknown, fallback: string) => {
-  if (!axios.isAxiosError(error)) return fallback
-
-  const data = error.response?.data
-  if (typeof data === "string" && data.trim()) return data
-
-  if (typeof data === "object" && data !== null) {
-    const message = (data as { message?: unknown }).message
-    if (typeof message === "string" && message.trim()) {
-      return message
-    }
-  }
-
-  return fallback
-}
-
-const shouldTryNextMethod = (error: unknown) => {
-  if (!axios.isAxiosError(error)) return false
-  const status = error.response?.status
-  return status === 404 || status === 405 || status === 415
-}
-
 const normalizeAddressPart = (value: string) => value.trim().replace(/\s+/g, " ")
+
+const getEmptyCustomerAddressDetails = (): CustomerAddressDetails => ({
+  doorNo: "",
+  street: "",
+  locality: "",
+  city: "",
+  state: "",
+  country: "",
+  postalCode: "",
+})
+
+const hasStructuredAddressDetails = (address: CustomerAddressDetails) =>
+  Boolean(
+    address.doorNo ||
+      address.street ||
+      address.locality ||
+      address.city ||
+      address.state ||
+      address.country ||
+      address.postalCode
+  )
+
+const buildStructuredAddress = (
+  partial?: Partial<CustomerAddressDetails> | null
+): CustomerAddressDetails => ({
+  ...getEmptyCustomerAddressDetails(),
+  ...partial,
+})
 
 const applyPaymentAddressToProfile = (
   existingAddress: ProfileModel["address"],
   fullAddress: string,
-  postalCode: string
+  postalCode: string,
+  explicitAddress?: CustomerAddressDetails
 ): ProfileModel["address"] => {
+  if (explicitAddress && hasStructuredAddressDetails(explicitAddress)) {
+    return {
+      ...existingAddress,
+      ...buildStructuredAddress(explicitAddress),
+      postalCode:
+        normalizeAddressPart(postalCode) ||
+        normalizeAddressPart(explicitAddress.postalCode) ||
+        existingAddress.postalCode,
+    }
+  }
+
   const nextAddress = { ...existingAddress }
   const segments = fullAddress
     .split(/[\n,]+/)
@@ -121,17 +114,137 @@ const createInitialCustomerDetails = (
   storedDetails?: Partial<CustomerDetailsForm> & {
     postCode?: string
     servicePostCode?: string
-  }
+  },
+  defaults?: Partial<Pick<CustomerDetailsForm, "fullName" | "email">>
 ): CustomerDetailsForm => ({
-  fullName: storedDetails?.fullName ?? "",
+  fullName: storedDetails?.fullName ?? defaults?.fullName ?? "",
   phoneCountryCode: storedDetails?.phoneCountryCode ?? "+44",
   phoneNumber: storedDetails?.phoneNumber ?? "",
-  email: storedDetails?.email ?? "",
+  email: storedDetails?.email ?? defaults?.email ?? "",
   fullAddress: storedDetails?.fullAddress ?? "",
   postalCode: storedDetails?.postalCode ?? storedDetails?.postCode ?? "",
+  addressDetails: buildStructuredAddress(storedDetails?.addressDetails),
   serviceLocationType: storedDetails?.serviceLocationType ?? "same",
   servicePostalCode:
     storedDetails?.servicePostalCode ?? storedDetails?.servicePostCode ?? "",
+})
+
+const buildFullAddressFromAddress = (address: CustomerAddressDetails) =>
+  [
+    address.doorNo,
+    address.street,
+    address.locality,
+    address.city,
+    address.state,
+    address.country,
+  ]
+    .map(normalizeAddressPart)
+    .filter(Boolean)
+    .join(", ")
+
+const buildAddressDetailsFromLocation = (address: Record<string, unknown>) =>
+  buildStructuredAddress({
+    doorNo: typeof address.house_number === "string" ? address.house_number : "",
+    street: typeof address.road === "string" ? address.road : "",
+    locality:
+      typeof address.suburb === "string"
+        ? address.suburb
+        : typeof address.neighbourhood === "string"
+          ? address.neighbourhood
+          : "",
+    city:
+      typeof address.city === "string"
+        ? address.city
+        : typeof address.town === "string"
+          ? address.town
+          : typeof address.village === "string"
+            ? address.village
+            : "",
+    state: typeof address.state === "string" ? address.state : "",
+    country: typeof address.country === "string" ? address.country : "",
+    postalCode: typeof address.postcode === "string" ? address.postcode : "",
+  })
+
+const SAMPLE_UK_ADDRESSES: CustomerAddressDetails[] = [
+  {
+    doorNo: "221B",
+    street: "Baker Street",
+    locality: "Marylebone",
+    city: "London",
+    state: "England",
+    country: "United Kingdom",
+    postalCode: "NW1 6XE",
+  },
+  {
+    doorNo: "10",
+    street: "Downing Street",
+    locality: "Westminster",
+    city: "London",
+    state: "England",
+    country: "United Kingdom",
+    postalCode: "SW1A 2AA",
+  },
+  {
+    doorNo: "47",
+    street: "Deansgate",
+    locality: "City Centre",
+    city: "Manchester",
+    state: "England",
+    country: "United Kingdom",
+    postalCode: "M3 2AY",
+  },
+  {
+    doorNo: "15",
+    street: "George Street",
+    locality: "New Town",
+    city: "Edinburgh",
+    state: "Scotland",
+    country: "United Kingdom",
+    postalCode: "EH2 2PA",
+  },
+]
+
+const mergeCustomerDetailsWithProfile = (
+  current: CustomerDetailsForm,
+  profile: ProfileModel,
+  profileEmail: string
+): CustomerDetailsForm => {
+  const fullAddressFromProfile = buildFullAddressFromAddress(profile.address)
+  const canHydratePhoneCountryCode =
+    !current.phoneNumber.trim() &&
+    (!current.phoneCountryCode.trim() || current.phoneCountryCode === "+44")
+
+  return {
+    ...current,
+    fullName: current.fullName.trim() || profile.fullName || current.fullName,
+    phoneCountryCode: canHydratePhoneCountryCode
+      ? profile.phone.countryCode || current.phoneCountryCode
+      : current.phoneCountryCode,
+    phoneNumber: current.phoneNumber.trim() || profile.phone.number || current.phoneNumber,
+    email: current.email.trim() || profileEmail || current.email,
+    fullAddress:
+      current.fullAddress.trim() || fullAddressFromProfile || current.fullAddress,
+    postalCode:
+      current.postalCode.trim() || profile.address.postalCode || current.postalCode,
+    addressDetails: hasStructuredAddressDetails(current.addressDetails)
+      ? current.addressDetails
+      : buildStructuredAddress(profile.address),
+  }
+}
+
+const replaceCustomerDetailsWithProfile = (
+  current: CustomerDetailsForm,
+  profile: ProfileModel,
+  profileEmail: string
+): CustomerDetailsForm => ({
+  ...current,
+  fullName: profile.fullName || current.fullName,
+  phoneCountryCode: profile.phone.countryCode || current.phoneCountryCode || "+44",
+  phoneNumber: profile.phone.number || current.phoneNumber,
+  email: profileEmail || current.email,
+  fullAddress: buildFullAddressFromAddress(profile.address) || current.fullAddress,
+  postalCode: profile.address.postalCode || current.postalCode,
+  addressDetails: buildStructuredAddress(profile.address),
 })
 
 export default function PaymentUI() {
@@ -146,9 +259,11 @@ export default function PaymentUI() {
   const [file, setFile] = useState<File | null>(null)
   const [transactionRef, setTransactionRef] = useState(storedPayment?.transactionRef ?? "")
   const [customerDetails, setCustomerDetails] = useState<CustomerDetailsForm>(() =>
-    createInitialCustomerDetails(storedPayment?.customerDetails)
+    createInitialCustomerDetails(storedPayment?.customerDetails, { fullName, email })
   )
   const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [isFetchingAddress, setIsFetchingAddress] = useState(false)
+  const hasAttemptedAutoAddressRef = useRef(false)
 
   const serviceCategory =
     serviceSelection?.category || "Residential: Homeowners & landlords"
@@ -165,10 +280,166 @@ export default function PaymentUI() {
   const selectedPlanConfig = pricingPlans.find((plan) => plan.name === pricingPlan)
   const selectedPlanFeatures = selectedPlanConfig?.features ?? []
   const persistedProofFileName = storedPayment?.proofFileName ?? null
-  const effectiveFullName = customerDetails.fullName || fullName || ""
+
+  useEffect(() => {
+    setCustomerDetails((current) => {
+      const nextFullName = current.fullName || fullName || ""
+      const nextEmail = current.email || email || ""
+
+      if (nextFullName === current.fullName && nextEmail === current.email) {
+        return current
+      }
+
+      return {
+        ...current,
+        fullName: nextFullName,
+        email: nextEmail,
+      }
+    })
+  }, [email, fullName])
+
+  useEffect(() => {
+    if (!userId) return
+
+    let isActive = true
+
+    const loadProfileDetails = async () => {
+      try {
+        const { profile, email: profileEmail } = await getProfile(userId)
+        if (!isActive) return
+
+        setCustomerDetails((current) =>
+          mergeCustomerDetailsWithProfile(current, profile, profileEmail)
+        )
+      } catch (error) {
+        if (isProfileNotFoundError(error)) return
+        toast.error(getProfileErrorMessage(error, "Failed to load profile"))
+      }
+    }
+
+    void loadProfileDetails()
+
+    return () => {
+      isActive = false
+    }
+  }, [userId])
+
+  const applyRandomUkAddress = useCallback(() => {
+    const randomAddress =
+      SAMPLE_UK_ADDRESSES[Math.floor(Math.random() * SAMPLE_UK_ADDRESSES.length)]
+
+    setCustomerDetails((current) => ({
+      ...current,
+      fullAddress: buildFullAddressFromAddress(randomAddress),
+      postalCode: randomAddress.postalCode,
+      addressDetails: buildStructuredAddress(randomAddress),
+    }))
+
+    toast.success("Random UK address applied")
+  }, [])
+
+  const fetchAddressFromCurrentLocation = useCallback(
+    async (showSuccessToast = true) => {
+      if (typeof window === "undefined" || !navigator.geolocation) {
+        toast.error("Geolocation is not supported on this device")
+        return false
+      }
+
+      setIsFetchingAddress(true)
+
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 10000,
+          })
+        })
+
+        const { latitude, longitude } = position.coords
+        const reverseGeoUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`
+        const geoResponse = await axios.get(reverseGeoUrl)
+        const address = geoResponse.data?.address
+
+        if (!address || typeof address !== "object") {
+          throw new Error("Address not found")
+        }
+
+        const structuredAddress = buildAddressDetailsFromLocation(
+          address as Record<string, unknown>
+        )
+        const normalizedAddress = buildFullAddressFromAddress(structuredAddress)
+        const normalizedPostalCode = normalizeAddressPart(structuredAddress.postalCode)
+
+        if (!normalizedAddress && !normalizedPostalCode) {
+          throw new Error("Address not found")
+        }
+
+        setCustomerDetails((current) => ({
+          ...current,
+          fullAddress: normalizedAddress || current.fullAddress,
+          postalCode: normalizedPostalCode || current.postalCode,
+          addressDetails: buildStructuredAddress(structuredAddress),
+        }))
+
+        if (showSuccessToast) {
+          toast.success("Address fetched from your current location")
+        }
+
+        return true
+      } catch (error) {
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          error.code === 1
+        ) {
+          toast.error("Location access was denied")
+          return false
+        }
+
+        toast.error("Unable to fetch address from current location")
+        return false
+      } finally {
+        setIsFetchingAddress(false)
+      }
+    },
+    []
+  )
+
+  useEffect(() => {
+    if (hasAttemptedAutoAddressRef.current) return
+    if (isReadOnly) return
+    if (customerDetails.fullAddress.trim()) return
+
+    hasAttemptedAutoAddressRef.current = true
+
+    if (typeof window === "undefined" || !("permissions" in navigator)) return
+
+    const maybeAutoFetchAddress = async () => {
+      try {
+        const permissionStatus = await navigator.permissions.query({
+          name: "geolocation",
+        })
+
+        if (permissionStatus.state === "granted") {
+          await fetchAddressFromCurrentLocation(false)
+        }
+      } catch {
+        // Ignore permission API issues and allow manual location fetch instead.
+      }
+    }
+
+    void maybeAutoFetchAddress()
+  }, [
+    customerDetails.fullAddress,
+    fetchAddressFromCurrentLocation,
+    isReadOnly,
+  ])
+
+  const effectiveFullName = customerDetails.fullName
   const effectivePhoneCountryCode = customerDetails.phoneCountryCode || "+44"
   const effectivePhoneNumber = customerDetails.phoneNumber
-  const effectiveEmail = customerDetails.email || email || ""
+  const effectiveEmail = customerDetails.email
   const effectiveFullAddress = customerDetails.fullAddress
   const effectivePostCode = customerDetails.postalCode
   const effectiveServiceLocationType = customerDetails.serviceLocationType
@@ -181,6 +452,7 @@ export default function PaymentUI() {
         fullName: effectiveFullName,
         phoneCountryCode: effectivePhoneCountryCode,
         email: effectiveEmail,
+        addressDetails: customerDetails.addressDetails,
       },
       transactionRef,
       proofFileName: file?.name ?? persistedProofFileName,
@@ -196,28 +468,39 @@ export default function PaymentUI() {
     updateSection,
   ])
 
-  const handleDetailChange =
-    (field: keyof CustomerDetailsForm) =>
-      (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        const value = event.target.value
-        setCustomerDetails((current) => ({
-          ...current,
-          [field]: value,
-        }))
-      }
-
-  const handlePhoneCountryCodeChange = (event: ChangeEvent<HTMLSelectElement>) => {
+  const handleDetailChange = (
+    field: keyof Pick<
+      CustomerDetailsForm,
+      "fullName" | "email" | "fullAddress" | "postalCode" | "servicePostalCode"
+    >,
+    value: string
+  ) => {
     setCustomerDetails((current) => ({
       ...current,
-      phoneCountryCode: event.target.value,
+      [field]: value,
+      addressDetails:
+        field === "fullAddress"
+          ? getEmptyCustomerAddressDetails()
+          : field === "postalCode"
+            ? {
+                ...current.addressDetails,
+                postalCode: value,
+              }
+            : current.addressDetails,
     }))
   }
 
-  const handlePhoneChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const nextValue = event.target.value.replace(/\D/g, "").slice(0, MOBILE_NUMBER_LENGTH)
+  const handlePhoneCountryCodeChange = (value: string) => {
     setCustomerDetails((current) => ({
       ...current,
-      phoneNumber: nextValue,
+      phoneCountryCode: value,
+    }))
+  }
+
+  const handlePhoneChange = (value: string) => {
+    setCustomerDetails((current) => ({
+      ...current,
+      phoneNumber: value,
     }))
   }
 
@@ -250,7 +533,6 @@ export default function PaymentUI() {
       return false
     }
 
-    const endpoint = `/profile/${encodeURIComponent(userId)}`
     const normalizedFullName = effectiveFullName.trim()
     const normalizedPhoneCountryCode = effectivePhoneCountryCode.trim()
     const normalizedPhoneNumber = effectivePhoneNumber.trim()
@@ -265,10 +547,10 @@ export default function PaymentUI() {
       let existingProfile: Partial<ProfileModel> | null = null
 
       try {
-        const response = await axiosInstance.get(endpoint)
-        existingProfile = extractProfileFromResponse(response.data)
+        const response = await getProfile(userId)
+        existingProfile = response.profile
       } catch (error) {
-        if (!axios.isAxiosError(error) || error.response?.status !== 404) {
+        if (!isProfileNotFoundError(error)) {
           throw error
         }
       }
@@ -284,35 +566,43 @@ export default function PaymentUI() {
         address: applyPaymentAddressToProfile(
           mergedProfile.address,
           normalizedFullAddress,
-          normalizedPostCode
+          normalizedPostCode,
+          customerDetails.addressDetails
         ),
       }
 
-      try {
-        await axiosInstance.put(endpoint, profilePayload)
-      } catch (error) {
-        if (!shouldTryNextMethod(error)) throw error
+      await updateProfile(userId, profilePayload)
 
-        try {
-          await axiosInstance.patch(endpoint, profilePayload)
-        } catch (patchError) {
-          if (!shouldTryNextMethod(patchError)) throw patchError
-          await axiosInstance.post(endpoint, profilePayload)
+      let nextCustomerDetails: CustomerDetailsForm = {
+        ...customerDetails,
+        fullName: normalizedFullName,
+        phoneCountryCode: normalizedPhoneCountryCode,
+        phoneNumber: normalizedPhoneNumber,
+        email: normalizedEmail,
+        fullAddress: normalizedFullAddress,
+        postalCode: normalizedPostCode,
+        addressDetails: buildStructuredAddress(profilePayload.address),
+        serviceLocationType: effectiveServiceLocationType,
+        servicePostalCode: normalizedServicePostCode,
+      }
+
+      try {
+        const refreshedProfile = await getProfile(userId)
+        nextCustomerDetails = replaceCustomerDetailsWithProfile(
+          nextCustomerDetails,
+          refreshedProfile.profile,
+          refreshedProfile.email || normalizedEmail
+        )
+      } catch (refreshError) {
+        if (!isProfileNotFoundError(refreshError)) {
+          console.error("Profile refresh failed after update", refreshError)
         }
       }
 
+      setCustomerDetails(nextCustomerDetails)
+
       updateSection("payment", {
-        customerDetails: {
-          ...customerDetails,
-          fullName: normalizedFullName,
-          phoneCountryCode: normalizedPhoneCountryCode,
-          phoneNumber: normalizedPhoneNumber,
-          email: normalizedEmail,
-          fullAddress: normalizedFullAddress,
-          postalCode: normalizedPostCode,
-          serviceLocationType: effectiveServiceLocationType,
-          servicePostalCode: normalizedServicePostCode,
-        }
+        customerDetails: nextCustomerDetails,
       })
 
       if (typeof window !== "undefined") {
@@ -326,7 +616,7 @@ export default function PaymentUI() {
 
       return true
     } catch (error) {
-      toast.error(getErrorMessage(error, "Failed to save client details"))
+      toast.error(getProfileErrorMessage(error, "Failed to save client details"))
       return false
     } finally {
       setIsSavingProfile(false)
@@ -386,7 +676,7 @@ export default function PaymentUI() {
                 </p>
               </div>
 
-              <div className="relative mt-10 w-full overflow-hidden rounded-xl border border-white/10 shadow-2xl aspect-[16/9]">
+              <div className="relative mt-10 w-full overflow-hidden rounded-xl border border-white/10 shadow-2xl aspect-video">
                 <Image
                   src={serviceImage}
                   alt={servicePlan}
@@ -397,138 +687,35 @@ export default function PaymentUI() {
                 />
               </div>
 
-              <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-5">
-                <div className="mb-5">
-                  <h3 className="text-base font-semibold text-white">Client Details</h3>
-                  <p className="mt-1 text-sm text-slate-300">
-                    Please confirm the contact and property details for this
-                    planning request before submitting payment.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <FormField
-                    label="Full Name"
-                    icon={User}
-                    value={effectiveFullName}
-                    onChange={handleDetailChange("fullName")}
-                    disabled={isReadOnly}
-                    placeholder="Enter your full name"
-                    autoComplete="name"
-                    required
-                    className="sm:col-span-2"
-                  />
-
-                  <div className="sm:col-span-2">
-                    <FieldLabel label="Phone Number" required />
-                    <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-3">
-                      <select
-                        value={effectivePhoneCountryCode}
-                        onChange={handlePhoneCountryCodeChange}
-                        disabled={isReadOnly}
-                        className="rounded-xl border border-white/10 bg-white/10 px-3 py-3 text-sm text-white outline-none transition focus:border-blue-400 focus:bg-white/15 focus:ring-2 focus:ring-blue-400/30 disabled:cursor-not-allowed disabled:opacity-70"
-                      >
-                        {COUNTRY_CODES.map((country) => (
-                          <option
-                            key={`${country.name}-${country.code}`}
-                            value={country.code}
-                            className="text-slate-900"
-                          >
-                            {country.code}
-                          </option>
-                        ))}
-                      </select>
-
-                      <div className="relative">
-                        <Phone className="pointer-events-none absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
-                        <input
-                          value={effectivePhoneNumber}
-                          onChange={handlePhoneChange}
-                          disabled={isReadOnly}
-                          placeholder="Enter your phone number"
-                          autoComplete="tel-national"
-                          inputMode="numeric"
-                          maxLength={MOBILE_NUMBER_LENGTH}
-                          className="w-full rounded-xl border border-white/10 bg-white/10 px-4 py-3 pl-11 text-sm text-white placeholder:text-slate-400 outline-none transition focus:border-blue-400 focus:bg-white/15 focus:ring-2 focus:ring-blue-400/30 disabled:cursor-not-allowed disabled:opacity-70"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <FormField
-                    label="Email Address"
-                    icon={Mail}
-                    value={effectiveEmail}
-                    onChange={() => { }}
-                    disabled={isReadOnly}
-                    placeholder="Email address"
-                    autoComplete="email"
-                    type="email"
-                    className="sm:col-span-2"
-                    required
-                    readOnly
-                  />
-
-                  <FormField
-                    label="Full Address"
-                    icon={MapPin}
-                    value={effectiveFullAddress}
-                    onChange={handleDetailChange("fullAddress")}
-                    disabled={isReadOnly}
-                    placeholder="Enter your full current address"
-                    autoComplete="street-address"
-                    multiline
-                    className="sm:col-span-2"
-                    optional
-                  />
-
-                  <div>
-                    <FormField
-                      label="Post Code"
-                      icon={MapPin}
-                      value={effectivePostCode}
-                      onChange={handleDetailChange("postalCode")}
-                      disabled={isReadOnly}
-                      placeholder="Enter your Post Code"
-                      autoComplete="postal-code"
-                      required
-                    />
-
-                    <div className="group relative mt-2 inline-flex items-center gap-2 text-xs text-slate-300">
-                      <Info className="h-3.5 w-3.5 text-blue-300" />
-                      <button
-                        type="button"
-                        className="cursor-help underline decoration-dotted underline-offset-4 focus:outline-none"
-                      >
-                        Why do we need this?
-                      </button>
-                      <div className="pointer-events-none invisible absolute left-0 top-full z-30 mt-2 w-72 max-w-[calc(100vw-4rem)] rounded-xl border border-white/10 bg-slate-950 p-3 text-left text-xs leading-5 text-slate-200 opacity-0 shadow-2xl transition-all duration-200 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100">
-                        Please give the postal code for the current service
-                        requested. If the service location uses a different postal
-                        code, you can provide that below.
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {!isReadOnly ? (
-                  <div className="mt-5 flex items-center justify-between gap-3 border-t border-white/10 pt-4">
-                    <p className="text-xs text-slate-300">
-                      Save these client details to update the profile before payment.
-                    </p>
-                    <button
-                      type="button"
-                      disabled={!isClientDetailsSaveEnabled}
-                      onClick={() => {
-                        void saveClientDetails()
-                      }}
-                      className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {isSavingProfile ? "Saving..." : "Save Client Details"}
-                    </button>
-                  </div>
-                ) : null}
-              </div>
+              <ClientDetailsCard
+                customerDetails={{
+                  ...customerDetails,
+                  fullName: effectiveFullName,
+                  phoneCountryCode: effectivePhoneCountryCode,
+                  phoneNumber: effectivePhoneNumber,
+                  email: effectiveEmail,
+                  fullAddress: effectiveFullAddress,
+                  postalCode: effectivePostCode,
+                  addressDetails: customerDetails.addressDetails,
+                  serviceLocationType: effectiveServiceLocationType,
+                  servicePostalCode: effectiveServicePostCode,
+                }}
+                isReadOnly={isReadOnly}
+                isSavingProfile={isSavingProfile}
+                isFetchingAddress={isFetchingAddress}
+                canUseRandomUkAddress
+                isSaveEnabled={isClientDetailsSaveEnabled}
+                onFieldChange={handleDetailChange}
+                onPhoneCountryCodeChange={handlePhoneCountryCodeChange}
+                onPhoneNumberChange={handlePhoneChange}
+                onUseRandomUkAddress={applyRandomUkAddress}
+                onAutoFetchAddress={() => {
+                  void fetchAddressFromCurrentLocation()
+                }}
+                onSave={() => {
+                  void saveClientDetails()
+                }}
+              />
             </div>
           </div>
         </div>
@@ -773,99 +960,5 @@ function TypewriterText({
         <span className="ml-0.5 inline-block h-4 w-px animate-pulse bg-current align-middle opacity-70" />
       ) : null}
     </Component>
-  )
-}
-
-function FormField({
-  label,
-  icon: Icon,
-  value,
-  onChange,
-  disabled,
-  placeholder,
-  autoComplete,
-  type = "text",
-  inputMode,
-  multiline = false,
-  className = "",
-  required = false,
-  optional = false,
-  readOnly = false,
-}: {
-  label: string
-  icon: ElementType
-  value: string
-  onChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void
-  disabled?: boolean
-  placeholder?: string
-  autoComplete?: string
-  type?: string
-  inputMode?: InputHTMLAttributes<HTMLInputElement>["inputMode"]
-  multiline?: boolean
-  className?: string
-  required?: boolean
-  optional?: boolean
-  readOnly?: boolean
-}) {
-  const sharedClassName =
-    `w-full rounded-xl border px-4 py-3 pl-11 text-sm text-white outline-none transition ${readOnly
-      ? "cursor-not-allowed border-white/10 bg-white/5 text-slate-300 placeholder:text-slate-500"
-      : "border-white/10 bg-white/10 placeholder:text-slate-400 focus:border-blue-400 focus:bg-white/15 focus:ring-2 focus:ring-blue-400/30"
-    } disabled:cursor-not-allowed disabled:opacity-70`
-
-  return (
-    <div className={className}>
-      <FieldLabel label={label} required={required} optional={optional} />
-      <div className="relative">
-        <Icon className="pointer-events-none absolute left-4 top-3.5 h-4 w-4 text-slate-400" />
-        {multiline ? (
-          <textarea
-            rows={4}
-            value={value}
-            onChange={onChange}
-            disabled={disabled}
-            readOnly={readOnly}
-            placeholder={placeholder}
-            autoComplete={autoComplete}
-            className={`${sharedClassName} resize-none`}
-          />
-        ) : (
-          <input
-            type={type}
-            value={value}
-            onChange={onChange}
-            disabled={disabled}
-            readOnly={readOnly}
-            placeholder={placeholder}
-            autoComplete={autoComplete}
-            inputMode={inputMode}
-            className={sharedClassName}
-          />
-        )}
-      </div>
-    </div>
-  )
-}
-
-function FieldLabel({
-  label,
-  required = false,
-  optional = false,
-  trailing,
-}: {
-  label: string
-  required?: boolean
-  optional?: boolean
-  trailing?: ReactNode
-}) {
-  return (
-    <div className="mb-1.5 flex items-center gap-2">
-      <label className="block text-sm font-medium text-slate-200">
-        {label}{" "}
-        {required ? <span className="text-red-400">*</span> : null}
-        {optional ? <span className="text-xs font-normal text-slate-400">(Optional)</span> : null}
-      </label>
-      {trailing}
-    </div>
   )
 }

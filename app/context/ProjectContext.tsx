@@ -90,6 +90,15 @@ export type ProjectData = {
       email?: string
       fullAddress?: string
       postalCode?: string
+      addressDetails?: {
+        doorNo?: string
+        street?: string
+        locality?: string
+        city?: string
+        state?: string
+        country?: string
+        postalCode?: string
+      }
       serviceLocationType?: "same" | "different"
       servicePostalCode?: string
     }

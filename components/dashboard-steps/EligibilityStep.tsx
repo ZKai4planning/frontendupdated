@@ -73,6 +73,12 @@ type EligibilityAgentContextValue = {
 
 const DEFAULT_ELIGIBILITY_TOOLTIP = ""
 const ELIGIBILITY_SERVICE_ID = "grexnb"
+const SAFETY_COMPLIANCE_UPLOAD_LABEL = "Upload safety & compliance documents"
+const SAFETY_COMPLIANCE_SLOT_LABELS = [
+  "Gas Safety Certificate",
+  "Electrical Report (EICR)",
+  "EPC Certificate",
+] as const
 const ELIGIBILITY_CREATE_ENDPOINT =
   process.env.NEXT_PUBLIC_ELIGIBILITY_CREATE_ENDPOINT ?? "/eligibility"
 const SELECTED_PROJECT_STORAGE_KEY = "selectedProjectId"
@@ -1369,42 +1375,51 @@ const normalizeEligibilityUploadsFromApi = (payload: unknown): EligibilityFileMa
     ["floodRiskAssesmentReport"],
     ["floodRiskAssessmentReport"],
   ])
-  setUploadsFromPaths("Smoke Alarm Certificate Upload", [
-    ["utilitesAndConsents", "safetyAndCompliance", "smokeAlarmCertificateFile"],
-    ["utilitiesAndConsents", "safetyAndCompliance", "smokeAlarmCertificateFile"],
-    ["utilitesAndConsents", "safetyAndCompliance", "smokeAlarmCertificateUpload"],
-    ["utilitiesAndConsents", "safetyAndCompliance", "smokeAlarmCertificateUpload"],
-    ["utilitesAndConsents", "safetyAndCompliance", "smokeAlarmCertificateDocument"],
-    ["utilitiesAndConsents", "safetyAndCompliance", "smokeAlarmCertificateDocument"],
-    ["smokeAlarmCertificate"],
-  ])
-  setUploadsFromPaths("Gas Safety Certificate Upload", [
-    ["utilitesAndConsents", "safetyAndCompliance", "gasSafetyCertificateFile"],
-    ["utilitiesAndConsents", "safetyAndCompliance", "gasSafetyCertificateFile"],
-    ["utilitesAndConsents", "safetyAndCompliance", "gasSafetyCertificateUpload"],
-    ["utilitiesAndConsents", "safetyAndCompliance", "gasSafetyCertificateUpload"],
-    ["utilitesAndConsents", "safetyAndCompliance", "gasSafetyCertificateDocument"],
-    ["utilitiesAndConsents", "safetyAndCompliance", "gasSafetyCertificateDocument"],
-    ["gasSafetyCertificateFile"],
-  ])
-  setUploadsFromPaths("EICR Certificate Upload", [
-    ["utilitesAndConsents", "safetyAndCompliance", "electricalReportEicrFile"],
-    ["utilitiesAndConsents", "safetyAndCompliance", "electricalReportEicrFile"],
-    ["utilitesAndConsents", "safetyAndCompliance", "electricalReportEicrUpload"],
-    ["utilitiesAndConsents", "safetyAndCompliance", "electricalReportEicrUpload"],
-    ["utilitesAndConsents", "safetyAndCompliance", "electricalReportEicrDocument"],
-    ["utilitiesAndConsents", "safetyAndCompliance", "electricalReportEicrDocument"],
-    ["electricalReportEicrFile"],
-  ])
-  setUploadsFromPaths("EPC Certificate Upload", [
-    ["utilitesAndConsents", "safetyAndCompliance", "epcCertificateFile"],
-    ["utilitiesAndConsents", "safetyAndCompliance", "epcCertificateFile"],
-    ["utilitesAndConsents", "safetyAndCompliance", "epcCertificateUpload"],
-    ["utilitiesAndConsents", "safetyAndCompliance", "epcCertificateUpload"],
-    ["utilitesAndConsents", "safetyAndCompliance", "epcCertificateDocument"],
-    ["utilitiesAndConsents", "safetyAndCompliance", "epcCertificateDocument"],
-    ["epcCertificate"],
-  ])
+  const safetyComplianceEntries = [
+    normalizeRemoteUploadEntry(
+      getFirstPathValue(record, [
+        ["utilitesAndConsents", "safetyAndCompliance", "gasSafetyCertificateFile"],
+        ["utilitiesAndConsents", "safetyAndCompliance", "gasSafetyCertificateFile"],
+        ["utilitesAndConsents", "safetyAndCompliance", "gasSafetyCertificateUpload"],
+        ["utilitiesAndConsents", "safetyAndCompliance", "gasSafetyCertificateUpload"],
+        ["utilitesAndConsents", "safetyAndCompliance", "gasSafetyCertificateDocument"],
+        ["utilitiesAndConsents", "safetyAndCompliance", "gasSafetyCertificateDocument"],
+        ["gasSafetyCertificateFile"],
+      ]),
+      SAFETY_COMPLIANCE_SLOT_LABELS[0],
+      SAFETY_COMPLIANCE_SLOT_LABELS[0]
+    ) ?? createUploadEntry(SAFETY_COMPLIANCE_SLOT_LABELS[0]),
+    normalizeRemoteUploadEntry(
+      getFirstPathValue(record, [
+        ["utilitesAndConsents", "safetyAndCompliance", "electricalReportEicrFile"],
+        ["utilitiesAndConsents", "safetyAndCompliance", "electricalReportEicrFile"],
+        ["utilitesAndConsents", "safetyAndCompliance", "electricalReportEicrUpload"],
+        ["utilitiesAndConsents", "safetyAndCompliance", "electricalReportEicrUpload"],
+        ["utilitesAndConsents", "safetyAndCompliance", "electricalReportEicrDocument"],
+        ["utilitiesAndConsents", "safetyAndCompliance", "electricalReportEicrDocument"],
+        ["electricalReportEicrFile"],
+      ]),
+      SAFETY_COMPLIANCE_SLOT_LABELS[1],
+      SAFETY_COMPLIANCE_SLOT_LABELS[1]
+    ) ?? createUploadEntry(SAFETY_COMPLIANCE_SLOT_LABELS[1]),
+    normalizeRemoteUploadEntry(
+      getFirstPathValue(record, [
+        ["utilitesAndConsents", "safetyAndCompliance", "epcCertificateFile"],
+        ["utilitiesAndConsents", "safetyAndCompliance", "epcCertificateFile"],
+        ["utilitesAndConsents", "safetyAndCompliance", "epcCertificateUpload"],
+        ["utilitiesAndConsents", "safetyAndCompliance", "epcCertificateUpload"],
+        ["utilitesAndConsents", "safetyAndCompliance", "epcCertificateDocument"],
+        ["utilitiesAndConsents", "safetyAndCompliance", "epcCertificateDocument"],
+        ["epcCertificate"],
+      ]),
+      SAFETY_COMPLIANCE_SLOT_LABELS[2],
+      SAFETY_COMPLIANCE_SLOT_LABELS[2]
+    ) ?? createUploadEntry(SAFETY_COMPLIANCE_SLOT_LABELS[2]),
+  ]
+
+  if (safetyComplianceEntries.some((entry) => entry.remoteFileUrl)) {
+    uploaded[SAFETY_COMPLIANCE_UPLOAD_LABEL] = safetyComplianceEntries
+  }
 
   return uploaded
 }
@@ -1420,9 +1435,15 @@ const getBooleanFieldValue = (
 
 const buildEligibilityStepPayload = (
   step: Step,
-  formValues: EligibilityFormValues
+  formValues: EligibilityFormValues,
+  uploadedFiles?: EligibilityFileMap
 ) => {
   const getValue = (label: string) => asStringValue(formValues[label])
+  const hasSafetyComplianceUpload = (index: number) =>
+    Boolean(
+      uploadedFiles?.[SAFETY_COMPLIANCE_UPLOAD_LABEL]?.[index] &&
+        hasUploadedAsset(uploadedFiles[SAFETY_COMPLIANCE_UPLOAD_LABEL][index])
+    )
   const buildApplicantSiteAddress = () => {
     const line1 = getValue("Site Address Line 1")
     const line2 = getValue("Site Address Line 2")
@@ -1557,9 +1578,15 @@ const buildEligibilityStepPayload = (
         utilitiesAndConsents: {
           safetyAndCompliance: {
             smokeAlarmsInstalled: getValue("Do you currently have smoke alarms installed?"),
-            gasSafetyCertificate: getValue("Do you have a valid Gas Safety Certificate?"),
-            electricalReportEicr: getValue("Do you have a valid Electrical Report (EICR)?"),
-            epcAvailable: getValue("EPC available?"),
+            gasSafetyCertificate:
+              getValue("Do you have a valid Gas Safety Certificate?") ||
+              (hasSafetyComplianceUpload(0) ? "Yes" : ""),
+            electricalReportEicr:
+              getValue("Do you have a valid Electrical Report (EICR)?") ||
+              (hasSafetyComplianceUpload(1) ? "Yes" : ""),
+            epcAvailable:
+              getValue("EPC available?") ||
+              (hasSafetyComplianceUpload(2) ? "Yes" : ""),
           },
           utilitiesAndWaste: {
             waterSupply: getValue("Water Supply"),
@@ -1609,12 +1636,15 @@ const buildSerializableEligibilityFormData = (formValues: EligibilityFormValues)
     return accumulator
   }, {})
 
-const buildEligibilityPayload = (formValues: EligibilityFormValues) => ({
-  ...buildEligibilityStepPayload(1, formValues),
-  ...buildEligibilityStepPayload(2, formValues),
-  ...buildEligibilityStepPayload(3, formValues),
-  ...buildEligibilityStepPayload(4, formValues),
-  ...buildEligibilityStepPayload(5, formValues),
+const buildEligibilityPayload = (
+  formValues: EligibilityFormValues,
+  uploadedFiles?: EligibilityFileMap
+) => ({
+  ...buildEligibilityStepPayload(1, formValues, uploadedFiles),
+  ...buildEligibilityStepPayload(2, formValues, uploadedFiles),
+  ...buildEligibilityStepPayload(3, formValues, uploadedFiles),
+  ...buildEligibilityStepPayload(4, formValues, uploadedFiles),
+  ...buildEligibilityStepPayload(5, formValues, uploadedFiles),
   formData: buildSerializableEligibilityFormData(formValues),
 })
 
@@ -1639,12 +1669,13 @@ const buildEligibilityMultipartFormData = ({
 }) => {
   const formData = new FormData()
   const getEntries = (label: string) => uploadedFiles[label] ?? []
+  const getFileAt = (label: string, index: number) => getEntries(label)[index]?.file ?? null
   const getFiles = (label: string, limit?: number) =>
     getEntries(label)
       .map((entry) => entry.file)
       .filter((file): file is File => Boolean(file))
       .slice(0, limit)
-  const payload = buildEligibilityPayload(formValues)
+  const payload = buildEligibilityPayload(formValues, uploadedFiles)
   const appendUploadFileNames = (key: string, label: string) => {
     const labels = getEntries(label)
       .filter((entry) => entry.file)
@@ -1706,23 +1737,18 @@ const buildEligibilityMultipartFormData = ({
   )
   appendSingleFile(
     formData,
-    "smokeAlarmCertificate",
-    getFiles("Smoke Alarm Certificate Upload")
-  )
-  appendSingleFile(
-    formData,
     "gasSafetyCertificateFile",
-    getFiles("Gas Safety Certificate Upload")
+    [getFileAt(SAFETY_COMPLIANCE_UPLOAD_LABEL, 0)].filter((file): file is File => Boolean(file))
   )
   appendSingleFile(
     formData,
     "electricalReportEicrFile",
-    getFiles("EICR Certificate Upload")
+    [getFileAt(SAFETY_COMPLIANCE_UPLOAD_LABEL, 1)].filter((file): file is File => Boolean(file))
   )
   appendSingleFile(
     formData,
     "epcCertificate",
-    getFiles("EPC Certificate Upload")
+    [getFileAt(SAFETY_COMPLIANCE_UPLOAD_LABEL, 2)].filter((file): file is File => Boolean(file))
   )
   appendUploadFileNames("photographsOfSiteFileNames", "Photographs of Site")
   appendUploadFileNames("additionalDrawingsFileNames", "Additional Drawings (floor plans, sections etc.)")
@@ -1831,19 +1857,13 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
     "Brief summary of the advice or guidance received.",
   "Do you currently have smoke alarms installed?":
     "Confirm whether smoke alarms are already installed at the property.",
-  "Smoke Alarm Certificate Upload":
-    "Upload smoke alarm compliance evidence, such as an installation or inspection certificate.",
   "Do you have a valid Gas Safety Certificate?":
     "Tell us whether a current gas safety certificate is available.",
-  "Gas Safety Certificate Upload":
-    "Upload the latest gas safety certificate for the property.",
   "Do you have a valid Electrical Report (EICR)?":
     "Tell us whether a valid electrical installation condition report is available.",
-  "EICR Certificate Upload":
-    "Upload the current Electrical Installation Condition Report.",
   "EPC available?": "Confirm whether an Energy Performance Certificate is available.",
-  "EPC Certificate Upload":
-    "Upload the Energy Performance Certificate for the property if available.",
+  "Upload safety & compliance documents":
+    "Upload the Gas Safety Certificate, Electrical Report (EICR), and EPC documents if they are available.",
   "Water Supply": "Type of water supply serving the property.",
   "Sewage / Drainage": "Type of foul drainage arrangement.",
   "Surface Water Drainage": "How surface water will be drained from the site.",
@@ -1947,13 +1967,10 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Officer Name",
   "Summary of Pre-App Advice Received",
   "Do you currently have smoke alarms installed?",
-  "Smoke Alarm Certificate Upload",
   "Do you have a valid Gas Safety Certificate?",
-  "Gas Safety Certificate Upload",
   "Do you have a valid Electrical Report (EICR)?",
-  "EICR Certificate Upload",
   "EPC available?",
-  "EPC Certificate Upload",
+  "Upload safety & compliance documents",
   "Water Supply",
   "Sewage / Drainage",
   "Surface Water Drainage",
@@ -3576,7 +3593,7 @@ function EligibilityCheckPage() {
                   RadioGroupField,
                   SelectField,
                   FieldLabel,
-                  FileUploadArea,
+                  StructuredFileUploadArea,
                   CheckboxGroup,
                 }}
               />
