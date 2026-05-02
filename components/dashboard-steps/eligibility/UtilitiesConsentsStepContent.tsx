@@ -79,19 +79,19 @@ export function UtilitiesConsentsStepContent({
           ]}
           showDescriptionInput={false}
           singleRow
-          onMissingTrigger={{
-            message:
-              "No safety or compliance documents uploaded - we can help you confirm which certificates are needed for this property.",
-            decision: {
-              fieldLabel: "Need help with safety & compliance documents?",
-              prompt:
-                "Do you want help with the Gas Safety Certificate, EICR, or EPC documents?",
-              yesMessage:
-                "Agent Z is preparing support for your safety and compliance document requirements.",
-              noMessage:
-                "Agent Z has noted that you do not need help with safety and compliance documents right now.",
-            },
-          }}
+          // onMissingTrigger={{
+          //   message:
+          //     "No safety or compliance documents uploaded - we can help you confirm which certificates are needed for this property.",
+          //   decision: {
+          //     fieldLabel: "Need help with safety & compliance documents?",
+          //     prompt:
+          //       "Do you want help with the Gas Safety Certificate, EICR, or EPC documents?",
+          //     yesMessage:
+          //       "Agent Z is preparing support for your safety and compliance document requirements.",
+          //     noMessage:
+          //       "Agent Z has noted that you do not need help with safety and compliance documents right now.",
+          //   },
+          // }}
         />
       </div>
 
@@ -170,6 +170,12 @@ export function UtilitiesConsentsStepContent({
             "Ask Agent Z / need advice",
           ]}
           consultTrigger="Additional consents may be required. Our team can advise on the right applications."
+          optionStyleOverrides={{
+            "Ask Agent Z / need advice": {
+              hideIndicator: true,
+              centerLabel: true,
+            },
+          }}
         />
         <div className="col-span-2">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">

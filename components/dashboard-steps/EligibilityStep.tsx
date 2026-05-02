@@ -2882,9 +2882,9 @@ function StructuredFileUploadArea({
         </button>
       )}
 
-      <p className="mt-2 text-xs text-slate-400">
+      {/* <p className="mt-2 text-xs text-slate-400">
         Uploaded files: {uploadedCount}
-      </p>
+      </p> */}
 
       {uploadedCount === 0 && missingTriggerConfig.message && (
         <MissingUploadTriggerCard
@@ -3084,12 +3084,20 @@ function CheckboxGroup({
   consultTrigger,
   tooltip,
   questionNumber,
+  optionStyleOverrides,
 }: {
   label: string
   options: string[]
   consultTrigger?: string
   tooltip?: string
   questionNumber?: number
+  optionStyleOverrides?: Record<
+    string,
+    {
+      hideIndicator?: boolean
+      centerLabel?: boolean
+    }
+  >
 }) {
   const { data, updateSection } = useProject()
   const { showAgentSidebar } = useEligibilityAgent()
@@ -3138,6 +3146,9 @@ function CheckboxGroup({
         {options.map(o => {
           const isAgentOption = isAgentOptionLabel(o)
           const isSelected = selected.includes(o)
+          const optionStyleOverride = optionStyleOverrides?.[o]
+          const hideIndicator = Boolean(optionStyleOverride?.hideIndicator)
+          const centerLabel = Boolean(optionStyleOverride?.centerLabel)
 
           return (
             <button
@@ -3146,7 +3157,9 @@ function CheckboxGroup({
               onClick={() => toggle(o)}
               className={`${
                 isAgentOption ? "eligibility-agent-button" : ""
-              } flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm text-left transition-all ${
+              } flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm transition-all ${
+                centerLabel ? "justify-center text-center" : "text-left"
+              } ${
                 isSelected
                   ? isAgentOption
                     ? "border-blue-900/60 bg-gradient-to-r from-slate-800/92 via-[#1f3d9a]/86 to-blue-800/84 text-white"
@@ -3156,28 +3169,34 @@ function CheckboxGroup({
                     : "hover:bg-blue-50 border-slate-200 text-slate-700"
               }`}
             >
-              <span className="relative z-10 flex items-center gap-2">
-                <span
-                  className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                    isSelected
-                      ? isAgentOption
-                        ? "bg-white border-white"
-                        : "bg-white border-white"
-                      : isAgentOption
-                        ? "border-blue-500"
-                        : "border-slate-300"
-                  }`}
-                >
-                  {isSelected && (
-                    <svg
-                      className="w-3 h-3 text-blue-600"
-                      viewBox="0 0 12 12"
-                      fill="none"
-                    >
-                      <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )}
-                </span>
+              <span
+                className={`relative z-10 flex items-center ${
+                  centerLabel ? "justify-center text-center" : "gap-2"
+                }`}
+              >
+                {!hideIndicator && (
+                  <span
+                    className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                      isSelected
+                        ? isAgentOption
+                          ? "bg-white border-white"
+                          : "bg-white border-white"
+                        : isAgentOption
+                          ? "border-blue-500"
+                          : "border-slate-300"
+                    }`}
+                  >
+                    {isSelected && (
+                      <svg
+                        className="w-3 h-3 text-blue-600"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                      >
+                        <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </span>
+                )}
                 {renderAgentOptionLabel(o)}
               </span>
               {isAgentOption && <EligibilityAgentMovingBorder size={58} />}
@@ -4714,37 +4733,50 @@ function Input({
                 setIsAutocompleteOpen(Boolean(e.target.value.trim()))
               }
             }}
-            className="w-full rounded-xl border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 transition-shadow"
+            className={`w-full rounded-xl border px-4 py-2 text-sm transition-shadow focus:outline-none focus:ring-2 focus:ring-blue-200 ${
+              isPostcodeAutocomplete ? "pr-10" : ""
+            }`}
           />
           {isPostcodeAutocomplete && isLoadingSuggestions && (
-            <p className="mt-1 text-xs text-slate-400">Loading postcode suggestions...</p>
-          )}
-          {isPostcodeAutocomplete && autocompleteError && (
-            <p className="mt-1 text-xs text-red-600">{autocompleteError}</p>
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
+              <span className="block h-4 w-4 rounded-full border-2 border-slate-300 border-t-blue-600 animate-spin" />
+            </span>
           )}
           {isPostcodeAutocomplete && postcodeLookupError && (
             <p className="mt-1 text-xs text-red-600">{postcodeLookupError}</p>
           )}
-          {isPostcodeAutocomplete && isAutocompleteOpen && suggestions.length > 0 && (
+          {isPostcodeAutocomplete &&
+            isAutocompleteOpen &&
+            (isLoadingSuggestions || suggestions.length > 0 || autocompleteError) && (
             <div className="absolute z-30 mt-2 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
-              {suggestions.map((suggestion) => (
-                <button
-                  key={suggestion.id}
-                  type="button"
-                  onMouseDown={(event) => {
-                    event.preventDefault()
-                    updateInputValue(suggestion.value, {
-                      suppressAutocompleteLookup: true,
-                    })
-                    setIsAutocompleteOpen(false)
-                  }}
-                  className="block w-full px-4 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-blue-50"
-                >
-                  {suggestion.label}
-                </button>
-              ))}
+              {isLoadingSuggestions && (
+                <div className="flex items-center gap-2 px-4 py-3 text-sm text-slate-500">
+                  <span className="block h-4 w-4 rounded-full border-2 border-slate-300 border-t-blue-600 animate-spin" />
+                  <span>Loading postcode suggestions...</span>
+                </div>
+              )}
+              {!isLoadingSuggestions && autocompleteError && (
+                <p className="px-4 py-3 text-sm text-red-600">{autocompleteError}</p>
+              )}
+              {!isLoadingSuggestions &&
+                suggestions.map((suggestion) => (
+                  <button
+                    key={suggestion.id}
+                    type="button"
+                    onMouseDown={(event) => {
+                      event.preventDefault()
+                      updateInputValue(suggestion.value, {
+                        suppressAutocompleteLookup: true,
+                      })
+                      setIsAutocompleteOpen(false)
+                    }}
+                    className="block w-full px-4 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-blue-50"
+                  >
+                    {suggestion.label}
+                  </button>
+                ))}
             </div>
-          )}
+            )}
         </div>
         {actionLabel && onAction && (
           <AgentActionButton

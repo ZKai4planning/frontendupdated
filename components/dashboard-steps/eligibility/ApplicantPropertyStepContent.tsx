@@ -630,6 +630,12 @@ export function ApplicantPropertyStepContent({
             "New build",
             "Unsure / Ask Agent Z",
           ]}
+          optionStyleOverrides={{
+            "Unsure / Ask Agent Z": {
+              hideIndicator: true,
+              centerLabel: true,
+            },
+          }}
           consultTrigger="Our consultant can help clarify the development type."
         />
         <div className="col-span-2">

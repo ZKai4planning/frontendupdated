@@ -23,6 +23,11 @@ export type MissingUploadTrigger =
       }
     }
 
+export type EligibilityOptionStyleOverride = {
+  hideIndicator?: boolean
+  centerLabel?: boolean
+}
+
 export type EligibilitySharedComponents = {
   SectionHeading?: React.ComponentType<{ children: React.ReactNode }>
   Input?: React.ComponentType<
@@ -89,6 +94,7 @@ export type EligibilitySharedComponents = {
     BaseFieldProps & {
       options: string[]
       consultTrigger?: string
+      optionStyleOverrides?: Record<string, EligibilityOptionStyleOverride>
     }
   >
   DeclarationCheckbox?: React.ComponentType<BaseFieldProps & { fieldKey: string }>
