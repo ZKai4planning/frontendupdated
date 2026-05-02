@@ -259,6 +259,20 @@ type PostcodeLookupResponse = {
   ds?: string
 }
 
+type EligibilityLocation = {
+  postcode?: string
+  lat?: number
+  lng?: number
+  lpaCode?: string
+  lpaName?: string
+  region?: string
+  country?: string
+  ward?: string
+  constituency?: string
+  source?: string
+  ds?: string
+}
+
 const toSuggestionText = (value: unknown): string => {
   if (typeof value !== "string") return ""
   return value.replace(/\s+/g, " ").trim()
@@ -737,22 +751,22 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
         ["applicantAndProperty", "applicantDetails", "correspondenceAddress", "postcode"],
       ],
     },
-    {
-      label: "Are you using a planning agent?",
-      paths: [["applicantAndProperty", "agentDetails", "usesPlanningAgent"]],
-    },
-    {
-      label: "Agent Name",
-      paths: [["applicantAndProperty", "agentDetails", "agentName"]],
-    },
-    {
-      label: "Agent Address",
-      paths: [["applicantAndProperty", "agentDetails", "agentAddress"]],
-    },
-    {
-      label: "Agent Contact",
-      paths: [["applicantAndProperty", "agentDetails", "agentContactEmailPhone"]],
-    },
+    // {
+    //   label: "Are you using a planning agent?",
+    //   paths: [["applicantAndProperty", "agentDetails", "usesPlanningAgent"]],
+    // },
+    // {
+    //   label: "Agent Name",
+    //   paths: [["applicantAndProperty", "agentDetails", "agentName"]],
+    // },
+    // {
+    //   label: "Agent Address",
+    //   paths: [["applicantAndProperty", "agentDetails", "agentAddress"]],
+    // },
+    // {
+    //   label: "Agent Contact",
+    //   paths: [["applicantAndProperty", "agentDetails", "agentContactEmailPhone"]],
+    // },
     {
       label: "Have you previously applied to the council?",
       paths: [["applicantAndProperty", "councilApplicationHistory", "hasPreviousCouncilApplication"]],
@@ -944,7 +958,10 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
     },
     {
       label: "Conservation Area or Near Listed Building?",
-      paths: [["applicantAndProperty", "propertyAndOwnership", "nearConservationAreaOrListedBuilding"]],
+      paths: [
+        ["applicantAndProperty", "propertyAndOwnership", "nearConservationAreaOrListedBuilding"],
+        ["siteConstraints", "heritageAndListing", "conservationAreaOrNearListedBuilding"],
+      ],
     },
     // {
     //   label: "Is the property a Listed Building?",
@@ -1030,13 +1047,13 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
         ["siteConstraints", "floodAndEnvironmentalRisk", "isSiteContaminatedLand"],
       ],
     },
-    {
-      label: "Has pre-application advice been sought?",
-      paths: [
-        ["siteConstratints", "preApplicationAdvice", "soughtPreAppAdvice"],
-        ["siteConstraints", "preApplicationAdvice", "soughtPreAppAdvice"],
-      ],
-    },
+    // {
+    //   label: "Has pre-application advice been sought?",
+    //   paths: [
+    //     ["siteConstratints", "preApplicationAdvice", "soughtPreAppAdvice"],
+    //     ["siteConstraints", "preApplicationAdvice", "soughtPreAppAdvice"],
+    //   ],
+    // },
     {
       label: "Pre-Application Reference Number",
       paths: [
@@ -1143,7 +1160,7 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
       ],
     },
     {
-      label: "Other Owners Details",
+      label: "Names & Addresses of Other Owners (if Certificate B, C or D)",
       paths: [
         ["utilitesAndConsents", "ownershipCertificate", "ownershipDetails"],
         ["utilitiesAndConsents", "ownershipCertificate", "ownershipDetails"],
@@ -1272,6 +1289,10 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
   setMissingValue("Postcode", legacyPostcode)
   setMissingValue("Council", legacyCouncil)
   setMissingValue("Council", formData["Which council have you applied for?"])
+  setMissingValue(
+    "Names & Addresses of Other Owners (if Certificate B, C or D)",
+    formData["Other Owners Details"]
+  )
 
   return formData
 }
@@ -1296,6 +1317,39 @@ const extractBooleanFromPaths = (
   const value = getFirstPathValue(record, paths)
   const normalized = normalizeBooleanLike(value)
   return normalized ?? undefined
+}
+
+const normalizeEligibilityLocationFromApi = (
+  record: Record<string, unknown> | null
+): EligibilityLocation | undefined => {
+  if (!record) return undefined
+
+  const rawLocation = getFirstPathValue(record, [["location"]])
+  if (!isRecord(rawLocation)) return undefined
+
+  const location: EligibilityLocation = {
+    postcode: extractStringFromPaths(rawLocation, [["postcode"]]),
+    lat:
+      typeof rawLocation.lat === "number" && Number.isFinite(rawLocation.lat)
+        ? rawLocation.lat
+        : undefined,
+    lng:
+      typeof rawLocation.lng === "number" && Number.isFinite(rawLocation.lng)
+        ? rawLocation.lng
+        : undefined,
+    lpaCode: extractStringFromPaths(rawLocation, [["lpaCode"], ["lpa_code"]]),
+    lpaName: extractStringFromPaths(rawLocation, [["lpaName"], ["lpa_name"]]),
+    region: extractStringFromPaths(rawLocation, [["region"]]),
+    country: extractStringFromPaths(rawLocation, [["country"]]),
+    ward: extractStringFromPaths(rawLocation, [["ward"]]),
+    constituency: extractStringFromPaths(rawLocation, [["constituency"]]),
+    source: extractStringFromPaths(rawLocation, [["source"]]),
+    ds: extractStringFromPaths(rawLocation, [["ds"]]),
+  }
+
+  return Object.values(location).some((value) => value !== undefined && value !== "")
+    ? location
+    : undefined
 }
 
 const normalizeEligibilityResponseFromApi = (payload: unknown, fallbackProjectId: string) => {
@@ -1347,6 +1401,7 @@ const normalizeEligibilityResponseFromApi = (payload: unknown, fallbackProjectId
   return {
     projectId: extractProjectId(payload) ?? fallbackProjectId,
     formData: normalizeEligibilityFormDataFromApi(payload),
+    location: normalizeEligibilityLocationFromApi(record),
     isDraft,
     draftSavedAt: extractStringFromPaths(record, [["draftSavedAt"]]),
     completedAt,
@@ -1439,6 +1494,7 @@ const normalizeEligibilityUploadsFromApi = (payload: unknown): EligibilityFileMa
   setUploadsFromPaths("Arboriculture Report / BS5837 Report (if available)", [
     ["siteConstratints", "treesHedgesAndLandscaping", "arboricultureReportBs5837"],
     ["siteConstraints", "treesHedgesAndLandscaping", "arboricultureReportBs5837"],
+    ["siteConstraints", "treesHedgesLandscaping", "arboricultureReportBs5837"],
     ["treeSurveyReport"],
   ])
   setUploadsFromPaths("Flood Risk Assessment (if available)", [
@@ -1511,6 +1567,9 @@ const buildEligibilityStepPayload = (
   uploadedFiles?: EligibilityFileMap
 ) => {
   const getValue = (label: string) => asStringValue(formValues[label])
+  const conservationAreaOrNearListedBuilding = getValue(
+    "Conservation Area or Near Listed Building?"
+  )
   const hasSafetyComplianceUpload = (index: number) =>
     Boolean(
       uploadedFiles?.[SAFETY_COMPLIANCE_UPLOAD_LABEL]?.[index] &&
@@ -1557,12 +1616,12 @@ const buildEligibilityStepPayload = (
             ),
             correspondenceAddress: buildCorrespondenceAddress(),
           },
-          agentDetails: {
-            usesPlanningAgent: getBooleanFieldValue(formValues, "Are you using a planning agent?"),
-            agentName: getValue("Agent Name"),
-            agentAddress: getValue("Agent Address"),
-            agentContactEmailPhone: getValue("Agent Contact"),
-          },
+          // agentDetails: {
+          //   usesPlanningAgent: getBooleanFieldValue(formValues, "Are you using a planning agent?"),
+          //   agentName: getValue("Agent Name"),
+          //   agentAddress: getValue("Agent Address"),
+          //   agentContactEmailPhone: getValue("Agent Contact"),
+          // },
           councilApplicationHistory: {
             hasPreviousCouncilApplication: getBooleanFieldValue(
               formValues,
@@ -1616,8 +1675,10 @@ const buildEligibilityStepPayload = (
             propsedWorksDescription: getValue("Description of Proposed Works"),
             existingPropertyWidthM: getValue("Existing Property Width (m)"),
             existingPropertyHeightM: getValue("Existing Property Depth (m)"),
+            existingPropertyDepthM: getValue("Existing Property Depth (m)"),
             proposedExtensionWidthM: getValue("Proposed Extension Width (m)"),
             proposedExtensionDepthM: getValue("Proposed Extension Depth (m)"),
+            proposedExtensionHeightM: getValue("Proposed Extension Depth (m)"),
             ridgeOrEavesHeightM: getValue("Ridge / Eaves Height (m)"),
             distanceFromBoundaryM: getValue("Distance from Boundary (m)"),
           },
@@ -1648,8 +1709,13 @@ const buildEligibilityStepPayload = (
       return {
         siteConstraints: {
           heritageAndListing: {
-            isListedBuilding: getValue("Is the property a Listed Building?"),
-            isInConservationArea: getValue("Conservation Area?"),
+            isListedBuilding:
+              getValue("Is the property a Listed Building?") ||
+              conservationAreaOrNearListedBuilding,
+            isInConservationArea:
+              getValue("Conservation Area?") ||
+              conservationAreaOrNearListedBuilding,
+            conservationAreaOrNearListedBuilding,
           },
           accessAndParking: {
             newOrAlteredAccess: getValue("New or altered vehicle access?"),
@@ -1667,13 +1733,13 @@ const buildEligibilityStepPayload = (
             isSiteInFloodRiskArea: getValue("Is the site in Flood Zone 2 or 3?"),
             isSiteContaminatedLand: getValue("Any known contamination on site?"),
           },
-          preApplicationAdvice: {
-            soughtPreAppAdvice: getValue("Has pre-application advice been sought?"),
-            preApplicationReferenceNumber: getValue("Pre-Application Reference Number"),
-            dateOfPreAppAdvice: getValue("Date of Pre-App Advice"),
-            officerName: getValue("Officer Name"),
-            preApplicationAdviceSummary: getValue("Summary of Pre-App Advice Received"),
-          },
+          // preApplicationAdvice: {
+          //   soughtPreAppAdvice: getValue("Has pre-application advice been sought?"),
+          //   preApplicationReferenceNumber: getValue("Pre-Application Reference Number"),
+          //   dateOfPreAppAdvice: getValue("Date of Pre-App Advice"),
+          //   officerName: getValue("Officer Name"),
+          //   preApplicationAdviceSummary: getValue("Summary of Pre-App Advice Received"),
+          // },
         },
       }
     case 4:
@@ -1701,7 +1767,9 @@ const buildEligibilityStepPayload = (
           },
           ownershipCertificate: {
             certificateOfOwnership: getValue("Which Ownership Certificate applies?"),
-            ownershipDetails: getValue("Other Owners Details"),
+            ownershipDetails:
+              getValue("Names & Addresses of Other Owners (if Certificate B, C or D)") ||
+              getValue("Other Owners Details"),
           },
           additionalConsents: asArrayValue(formValues["Additional Consents"]).join(", "),
           communityConsultation: getValue("Community consultation undertaken?"),
@@ -1739,15 +1807,33 @@ const buildSerializableEligibilityFormData = (formValues: EligibilityFormValues)
     return accumulator
   }, {})
 
+const buildSerializableEligibilityLocation = (location?: EligibilityLocation) => {
+  if (!location) return undefined
+
+  const entries = Object.entries(location).filter(([, value]) => {
+    if (value === undefined || value === null) return false
+    if (typeof value === "string") return value.trim().length > 0
+    return true
+  })
+
+  if (entries.length === 0) return undefined
+
+  return Object.fromEntries(entries) as EligibilityLocation
+}
+
 const buildEligibilityPayload = (
   formValues: EligibilityFormValues,
-  uploadedFiles?: EligibilityFileMap
+  uploadedFiles?: EligibilityFileMap,
+  location?: EligibilityLocation
 ) => ({
   ...buildEligibilityStepPayload(1, formValues, uploadedFiles),
   ...buildEligibilityStepPayload(2, formValues, uploadedFiles),
   ...buildEligibilityStepPayload(3, formValues, uploadedFiles),
   ...buildEligibilityStepPayload(4, formValues, uploadedFiles),
   ...buildEligibilityStepPayload(5, formValues, uploadedFiles),
+  ...(buildSerializableEligibilityLocation(location)
+    ? { location: buildSerializableEligibilityLocation(location) }
+    : {}),
   formData: buildSerializableEligibilityFormData(formValues),
 })
 
@@ -1756,6 +1842,7 @@ const buildEligibilityMultipartFormData = ({
   status,
   formValues,
   uploadedFiles,
+  location,
   signatureFile,
   subServices,
   userId,
@@ -1765,6 +1852,7 @@ const buildEligibilityMultipartFormData = ({
   status: EligibilitySaveStatus
   formValues: EligibilityFormValues
   uploadedFiles: EligibilityFileMap
+  location?: EligibilityLocation
   signatureFile: File | null
   subServices?: string | null
   userId?: string | null
@@ -1778,7 +1866,7 @@ const buildEligibilityMultipartFormData = ({
       .map((entry) => entry.file)
       .filter((file): file is File => Boolean(file))
       .slice(0, limit)
-  const payload = buildEligibilityPayload(formValues, uploadedFiles)
+  const payload = buildEligibilityPayload(formValues, uploadedFiles, location)
   const appendUploadFileNames = (key: string, label: string) => {
     const labels = getEntries(label)
       .filter((entry) => entry.file)
@@ -1878,11 +1966,11 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
   "Correspondence Address Line 2": "Optional second address line for correspondence.",
   "Correspondence Postcode": "Postcode for the correspondence address.",
   Council:
-    "Name of the council that handled the earlier application.",
-  "Are you using a planning agent?": "Tell us if a professional is acting on your behalf for the application.",
-  "Agent Name": "Name of the planning agent or firm.",
-  "Agent Address": "Address of the planning agent or firm.",
-  "Agent Contact": "Best email or phone for the agent.",
+    "Local planning authority or council for this property and any related previous application.",
+  // "Are you using a planning agent?": "Tell us if a professional is acting on your behalf for the application.",
+  // "Agent Name": "Name of the planning agent or firm.",
+  // "Agent Address": "Address of the planning agent or firm.",
+  // "Agent Contact": "Best email or phone for the agent.",
   "Have you previously applied to the council?":
     "Tell us whether there has already been a council application connected to this site or proposal.",
   "What was previously proposed, and was it approved, refused, or withdrawn?":
@@ -1969,13 +2057,13 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
   "Is the site in Flood Zone 2 or 3?": "Flood zones may require additional assessments.",
   "Any known contamination on site?": "Known contamination can trigger further reports.",
   "Flood Risk Assessment (if available)": "Upload an FRA if already commissioned.",
-  "Has pre-application advice been sought?":
-    "Let us know if the LPA has already advised on this scheme.",
-  "Pre-Application Reference Number": "Reference from the local planning authority.",
-  "Date of Pre-App Advice": "Date the pre-application advice was issued.",
-  "Officer Name": "Name of the planning officer who provided advice.",
-  "Summary of Pre-App Advice Received":
-    "Brief summary of the advice or guidance received.",
+  // "Has pre-application advice been sought?":
+  //   "Let us know if the LPA has already advised on this scheme.",
+  // "Pre-Application Reference Number": "Reference from the local planning authority.",
+  // "Date of Pre-App Advice": "Date the pre-application advice was issued.",
+  // "Officer Name": "Name of the planning officer who provided advice.",
+  // "Summary of Pre-App Advice Received":
+  //   "Brief summary of the advice or guidance received.",
   "Do you currently have smoke alarms installed?":
     "Confirm whether smoke alarms are already installed at the property.",
   "Do you have a valid Gas Safety Certificate?":
@@ -2030,10 +2118,10 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Correspondence Address Line 1",
   "Correspondence Address Line 2",
   "Correspondence Postcode",
-  "Are you using a planning agent?",
-  "Agent Name",
-  "Agent Address",
-  "Agent Contact",
+  // "Are you using a planning agent?",
+  // "Agent Name",
+  // "Agent Address",
+  // "Agent Contact",
   "Have you previously applied to the council?",
   "What was previously proposed, and was it approved, refused, or withdrawn?",
   "Planning Reference Number *",
@@ -2056,16 +2144,16 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Is any lounge/dining room proposed as a bedroom?",
   "Approx smallest bedroom size?",
   "Description of Proposed Works",
+  "Total internal floor area (m²)",
+  "Number of floors (G / 1st / Loft / Basement)",
   "Existing Property Width (m)",
   "Existing Property Depth (m)",
   "Proposed Extension Width (m)",
   "Proposed Extension Depth (m)",
+  "Garden depth (metres)",
   "Ridge / Eaves Height (m)",
   "Distance from Boundary (m)",
-  "Total internal floor area (m²)",
-  "Number of floors (G / 1st / Loft / Basement)",
   "Property footprint (approx length × width in metres)",
-  "Garden depth (metres)",
   "Plot width (metres)",
   "Kitchen Room Length (metres)",
   "Kitchen Room Width (metres)",
@@ -2095,11 +2183,11 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Is the site in Flood Zone 2 or 3?",
   "Any known contamination on site?",
   "Flood Risk Assessment (if available)",
-  "Has pre-application advice been sought?",
-  "Pre-Application Reference Number",
-  "Date of Pre-App Advice",
-  "Officer Name",
-  "Summary of Pre-App Advice Received",
+  // "Has pre-application advice been sought?",
+  // "Pre-Application Reference Number",
+  // "Date of Pre-App Advice",
+  // "Officer Name",
+  // "Summary of Pre-App Advice Received",
   "Do you currently have smoke alarms installed?",
   "Do you have a valid Gas Safety Certificate?",
   "Do you have a valid Electrical Report (EICR)?",
@@ -3200,6 +3288,7 @@ function EligibilityCheckPage() {
             ...savedFormData,
             ...normalized.formData,
           },
+          location: normalized.location,
           isDraft: normalized.isDraft,
           draftSavedAt: normalized.draftSavedAt,
           completedAt: normalized.completedAt,
@@ -3333,6 +3422,7 @@ function EligibilityCheckPage() {
         status,
         formValues: savedFormData,
         uploadedFiles,
+        location: data.eligibility?.location,
         signatureFile,
         subServices,
         userId,
@@ -3365,6 +3455,7 @@ function EligibilityCheckPage() {
       status,
       formValues: savedFormData,
       uploadedFiles,
+      location: data.eligibility?.location,
       signatureFile,
       subServices,
       userId,

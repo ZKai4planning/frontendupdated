@@ -8,6 +8,8 @@ export function SiteConstraintsStepContent({
   components,
 }: EligibilityStepContentProps) {
   const { SectionHeading, Input, RadioGroupField, FieldLabel, FileUploadArea } = components
+  // const hasPreApplicationAdvice =
+  //   asStringValue(savedFormData["Has pre-application advice been sought?"]).trim() === "Yes"
 
   if (!SectionHeading || !Input || !RadioGroupField || !FieldLabel || !FileUploadArea) {
     return null
@@ -17,16 +19,6 @@ export function SiteConstraintsStepContent({
     <>
       <SectionHeading>Heritage & Listing</SectionHeading>
       <div className="mb-6 grid grid-cols-2 gap-6">
-        {/* <RadioGroupField
-          label="Is the property a Listed Building?"
-          options={["Yes", "No", "Ask Agent Z"]}
-          consultTrigger="Listed buildings require separate Listed Building Consent. Agent X can advise."
-        />
-        <RadioGroupField
-          label="Conservation Area?"
-          options={["Yes", "No", "Ask Agent Z"]}
-          consultTrigger="We can provide a heritage impact assessment."
-        /> */}
         <RadioGroupField
           label="Conservation Area or Near Listed Building?"
           options={["Yes", "No", "Ask Agent Z"]}
@@ -118,25 +110,33 @@ export function SiteConstraintsStepContent({
         <RadioGroupField
           label="Has pre-application advice been sought?"
           options={["Yes", "No", "Ask Agent Z"]}
-          consultTrigger="We strongly recommend pre-application advice. Book a session with Agent X."
+          consultTrigger="We strongly recommend pre-application advice. Agent Z can help you prepare or review it."
         />
-        <Input label="Pre-Application Reference Number" />
-        <Input label="Date of Pre-App Advice" />
-        <Input label="Officer Name" />
-        <div className="col-span-2">
-          <FieldLabel label="Summary of Pre-App Advice Received" wrapperClassName="mb-1" />
-          <textarea
-            rows={2}
-            placeholder="Briefly describe any advice received from the LPA..."
-            className="w-full resize-none rounded-xl border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-            value={asStringValue(savedFormData["Summary of Pre-App Advice Received"])}
-            onChange={e =>
-              updateSection("eligibility", {
-                formData: { ...savedFormData, "Summary of Pre-App Advice Received": e.target.value },
-              })
-            }
-          />
-        </div>
+
+        {hasPreApplicationAdvice && (
+          <>
+            <Input label="Pre-Application Reference Number" />
+            <Input label="Date of Pre-App Advice" />
+            <Input label="Officer Name" />
+            <div className="col-span-2">
+              <FieldLabel label="Summary of Pre-App Advice Received" wrapperClassName="mb-1" />
+              <textarea
+                rows={2}
+                placeholder="Briefly describe any advice received from the LPA..."
+                className="w-full resize-none rounded-xl border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                value={asStringValue(savedFormData["Summary of Pre-App Advice Received"])}
+                onChange={e =>
+                  updateSection("eligibility", {
+                    formData: {
+                      ...savedFormData,
+                      "Summary of Pre-App Advice Received": e.target.value,
+                    },
+                  })
+                }
+              />
+            </div>
+          </>
+        )}
       </div> */}
     </>
   )

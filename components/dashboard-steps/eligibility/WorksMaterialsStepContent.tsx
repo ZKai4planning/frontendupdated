@@ -31,8 +31,9 @@ export function WorksMaterialsStepContent({
     return null
   }
 
-  const proposedWorksDescription = asStringValue(savedFormData["Description of Proposed Works"]).trim()
   const proposedWorksRawValue = asStringValue(savedFormData["Description of Proposed Works"])
+  const totalInternalFloorAreaLabel = "Total internal floor area (m\u00C2\u00B2)"
+  const propertyFootprintLabel = "Property footprint (approx length \u00C3\u00D7 width in metres)"
 
   const summarizeProposedWorks = (value: string) => {
     const normalized = value.replace(/\s+/g, " ").trim()
@@ -144,7 +145,7 @@ export function WorksMaterialsStepContent({
 
       <SectionHeading>Dimensions</SectionHeading>
       <div className="mb-6 grid grid-cols-2 gap-6">
-
+ 
         <Input
           label="Total internal floor area (m²)"
           placeholder="Enter total internal floor area (m²) "
@@ -163,22 +164,80 @@ export function WorksMaterialsStepContent({
         />
         <Input label="Ridge / Eaves Height (m)" />
         <Input label="Distance from Boundary (m)" />
-        <Input
-          label="Kitchen Room Length (metres)"
-          placeholder="Enter kitchen room length"
-        />
-        <Input
-          label="Kitchen Room Width (metres)"
-          placeholder="Enter kitchen room width"
-        />
-        <Input
-          label="Bathroom Room Length (metres)"
-          placeholder="Enter bathroom room length"
-        />
-        <Input
-          label="Bathroom Room Width (metres)"
-          placeholder="Enter bathroom room width"
-        />
+        <div className="col-span-2">
+          <FieldLabel label="Kitchen Room Dimensions (metres)" />
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <p className="mb-2 text-sm font-medium text-slate-700">Length</p>
+              <input
+                value={asStringValue(savedFormData["Kitchen Room Length (metres)"])}
+                placeholder="Enter kitchen room length"
+                onChange={e =>
+                  updateSection("eligibility", {
+                    formData: {
+                      ...savedFormData,
+                      "Kitchen Room Length (metres)": e.target.value,
+                    },
+                  })
+                }
+                className="w-full rounded-xl border px-4 py-2 text-sm transition-shadow focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+            </div>
+            <div>
+              <p className="mb-2 text-sm font-medium text-slate-700">Width</p>
+              <input
+                value={asStringValue(savedFormData["Kitchen Room Width (metres)"])}
+                placeholder="Enter kitchen room width"
+                onChange={e =>
+                  updateSection("eligibility", {
+                    formData: {
+                      ...savedFormData,
+                      "Kitchen Room Width (metres)": e.target.value,
+                    },
+                  })
+                }
+                className="w-full rounded-xl border px-4 py-2 text-sm transition-shadow focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+            </div>
+          </div>
+        </div>
+        <div className="col-span-2">
+          <FieldLabel label="Bathroom Room Dimensions (metres)" />
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <p className="mb-2 text-sm font-medium text-slate-700">Length</p>
+              <input
+                value={asStringValue(savedFormData["Bathroom Room Length (metres)"])}
+                placeholder="Enter bathroom room length"
+                onChange={e =>
+                  updateSection("eligibility", {
+                    formData: {
+                      ...savedFormData,
+                      "Bathroom Room Length (metres)": e.target.value,
+                    },
+                  })
+                }
+                className="w-full rounded-xl border px-4 py-2 text-sm transition-shadow focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+            </div>
+            <div>
+              <p className="mb-2 text-sm font-medium text-slate-700">Width</p>
+              <input
+                value={asStringValue(savedFormData["Bathroom Room Width (metres)"])}
+                placeholder="Enter bathroom room width"
+                onChange={e =>
+                  updateSection("eligibility", {
+                    formData: {
+                      ...savedFormData,
+                      "Bathroom Room Width (metres)": e.target.value,
+                    },
+                  })
+                }
+                className="w-full rounded-xl border px-4 py-2 text-sm transition-shadow focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+            </div>
+          </div>
+        </div>
         <div className="col-span-2">
           <div className="space-y-4">
             <RadioGroupField
@@ -188,6 +247,7 @@ export function WorksMaterialsStepContent({
           </div>
         </div>
       </div>
+ 
 
       <SectionHeading>Current Materials Used</SectionHeading>
       <div className="mb-6 grid grid-cols-2 gap-6">

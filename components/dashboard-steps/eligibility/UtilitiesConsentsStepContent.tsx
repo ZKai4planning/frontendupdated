@@ -29,6 +29,8 @@ export function UtilitiesConsentsStepContent({
     return null
   }
 
+  const otherOwnersDetailsLabel =
+    "Names & Addresses of Other Owners (if Certificate B, C or D)"
   const safetyComplianceFields = [
     {
       label: "Do you currently have smoke alarms installed?",
@@ -136,17 +138,17 @@ export function UtilitiesConsentsStepContent({
         />
         <div className="col-span-2">
           <FieldLabel
-            label="Names & Addresses of Other Owners (if Certificate B, C or D)"
+            label={otherOwnersDetailsLabel}
             wrapperClassName="mb-1"
           />
           <textarea
             rows={2}
             placeholder="List any other known owners or agricultural tenants..."
             className="w-full rounded-xl border px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
-            value={asStringValue(savedFormData["Other Owners Details"])}
+            value={asStringValue(savedFormData[otherOwnersDetailsLabel])}
             onChange={e =>
               updateSection("eligibility", {
-                formData: { ...savedFormData, "Other Owners Details": e.target.value },
+                formData: { ...savedFormData, [otherOwnersDetailsLabel]: e.target.value },
               })
             }
           />

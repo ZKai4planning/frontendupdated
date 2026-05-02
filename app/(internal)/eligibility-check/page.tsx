@@ -278,7 +278,7 @@ export default function EligibilityCheckPage() {
                   <RadioGroup label="TPO?" defaultValue={formData.constraints.tpo} options={["Yes","No","Don’t know"]} />
                   <RadioGroup label="Flood Zone?" defaultValue={formData.constraints.floodZone} options={["Yes","No","Don’t know"]} />
                   <RadioGroup label="Vehicle access?" defaultValue={formData.constraints.vehicleAccess} options={["Yes","No","Don’t know"]} />
-                  <RadioGroup label="Pre-application advice?" defaultValue={formData.constraints.preApplicationAdvice} options={["Yes","No","Don’t know"]} />
+                  {/* <RadioGroup label="Pre-application advice?" defaultValue={formData.constraints.preApplicationAdvice} options={["Yes","No","Don’t know"]} /> */}
                   <Select label="Additional Consents Required" defaultValue={formData.constraints.additionalConsentsRequired} options={["None","Listed Building Consent","Tree works","Advertisement consent","Unsure"]} />
                 </div>
                 <InfoBox>Constraints may override permitted development rights.</InfoBox>

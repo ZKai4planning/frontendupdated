@@ -230,6 +230,8 @@ export function ApplicantPropertyStepContent({
   const previousCouncilApplication = savedFormData["Have you previously applied to the council?"]
   const useAlternateCorrespondenceAddress =
     asStringValue(savedFormData["Alternate address for correspondence?"]).trim() === "Yes"
+  const usesPlanningAgent =
+    asStringValue(savedFormData["Are you using a planning agent?"]).trim() === "Yes"
   const siteAddressLine1 = asStringValue(savedFormData["Site Address Line 1"]).trim()
   const postcode = asStringValue(savedFormData["Postcode"]).trim()
   const planningReferenceNumber = asStringValue(savedFormData["Planning Reference Number *"]).trim()
@@ -470,6 +472,10 @@ export function ApplicantPropertyStepContent({
           <div className="md:col-span-2">
             <Input label="Site Address Line 1" />
           </div>
+          <Input label="Site Address Line 2" />
+        </div>
+        <div className="grid gap-6 md:grid-cols-2">
+          <Input label="Council" />
           <Input
             label="Postcode"
             autocompleteKind="postcode"
@@ -478,10 +484,6 @@ export function ApplicantPropertyStepContent({
             actionDisabled={!siteAddressLine1 || !postcode || isGettingAddress}
             actionOpensAgentSidebar={false}
           />
-        </div>
-        <div className="grid gap-6 md:grid-cols-2">
-          <Input label="Site Address Line 2" />
-          <Input label="Council" />
         </div>
         <div className="grid gap-6 md:grid-cols-2">
           <div className="md:col-span-2">
@@ -494,21 +496,35 @@ export function ApplicantPropertyStepContent({
 
           {useAlternateCorrespondenceAddress && (
             <div className="md:col-span-2 grid gap-6 animate-in fade-in duration-300">
-              <div className="grid gap-6 md:grid-cols-3">
-                <div className="md:col-span-2">
-                  <Input label="Correspondence Address Line 1" />
-                </div>
-                <Input
-                  label="Correspondence Postcode"
-                  autocompleteKind="postcode"
-                />
-              </div>
               <div className="grid gap-6 md:grid-cols-2">
+                <Input label="Correspondence Address Line 1" />
                 <Input label="Correspondence Address Line 2" />
               </div>
+              <Input
+                label="Correspondence Postcode"
+                autocompleteKind="postcode"
+              />
             </div>
           )}
         </div>
+        {/* <div className="grid gap-6 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <RadioGroupField
+              label="Are you using a planning agent?"
+              options={["Yes", "No"]}
+            />
+          </div>
+
+          {usesPlanningAgent && (
+            <div className="md:col-span-2 grid gap-6 animate-in fade-in duration-300">
+              <div className="grid gap-6 md:grid-cols-2">
+                <Input label="Agent Name" />
+                <Input label="Agent Address" />
+              </div>
+              <Input label="Agent Contact" />
+            </div>
+          )}
+        </div> */}
       </div>
 
       <SectionHeading>Pre-Application Check</SectionHeading>
