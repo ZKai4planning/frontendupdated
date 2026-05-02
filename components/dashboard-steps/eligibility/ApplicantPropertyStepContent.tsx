@@ -663,7 +663,7 @@ export function ApplicantPropertyStepContent({
           options={["Yes", "No", "Don't know / Ask Agent Z"]}
         />
         <RadioGroupField
-          label="b. Will rooms be rented individually?"
+          label="Will rooms be rented individually?"
           options={["Yes", "No", "Don't know / Ask Agent Z"]}
         />
       </div>

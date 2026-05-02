@@ -52,13 +52,6 @@ const RIGHTS_OF_WAY_ENDPOINT =
   process.env.NEXT_PUBLIC_ZYNAPSIS_RIGHTS_OF_WAY_ENDPOINT ??
   "http://localhost:8000/api/v1/ds03/rights-of-way"
 const DEFAULT_RIGHTS_OF_WAY_RADIUS_METERS = "150"
-const DUMMY_REQUEST_BUTTONS = [
-  { label: "Overview", accent: "bg-blue-400", active: true },
-  { label: "Recent", accent: "bg-emerald-400" },
-  { label: "Pending", accent: "bg-amber-400" },
-  { label: "Resolved", accent: "bg-violet-400" },
-  { label: "Flagged", accent: "bg-rose-400" },
-]
 
 type FloatingAgentWidgetProps = {
   requestId: string
@@ -89,11 +82,38 @@ export function FloatingAgentWidget({
   const currentMessage =
     message ??
     `You selected an unsure option for ${fieldLabel}. Agent Z can help guide the next step.`
+  const savedCouncilName =
+    typeof data.eligibility?.formData?.["Council"] === "string"
+      ? data.eligibility.formData["Council"].trim()
+      : ""
+  const councilName = data.eligibility?.location?.lpaName?.trim() || savedCouncilName || "your council area"
+  const statusMeta =
+    agentStatus === "working" || agentStatus === "thinking"
+      ? {
+          label: "Working",
+          className: "bg-cyan-400/15 text-cyan-100 ring-1 ring-cyan-300/20",
+        }
+      : agentStatus === "done"
+        ? {
+            label: "Ready",
+            className: "bg-emerald-400/15 text-emerald-100 ring-1 ring-emerald-300/20",
+          }
+        : {
+            label: "Standby",
+            className: "bg-emerald-400/15 text-emerald-100 ring-1 ring-emerald-300/20",
+          }
+  const supportHighlights = [
+    "Takes only a few minutes",
+    `Tailored to ${councilName}`,
+    responseMode === "yes-no"
+      ? "Can update the answer directly in your form"
+      : "Helps avoid delays or missing details",
+  ]
 
   const confidenceColor: Record<"high" | "medium" | "low", string> = {
-    high: "text-emerald-700 bg-emerald-50",
-    medium: "text-amber-700 bg-amber-50",
-    low: "text-rose-700 bg-rose-50",
+    high: "bg-emerald-400/15 text-emerald-100 ring-1 ring-emerald-300/20",
+    medium: "bg-amber-400/15 text-amber-100 ring-1 ring-amber-300/20",
+    low: "bg-rose-400/15 text-rose-100 ring-1 ring-rose-300/20",
   }
 
   const isRunning = agentStatus === "thinking" || agentStatus === "working"
@@ -685,7 +705,7 @@ export function FloatingAgentWidget({
             insights: finalInsights,
           })
           setAgentStatus("done")
-        } catch (error) {
+        } catch {
           if (isCancelled) return
 
           const finalTasks: AgentTask[] = [
@@ -817,149 +837,165 @@ export function FloatingAgentWidget({
 
   return (
     <div className="sticky top-6">
-      <div className="h-[calc(100vh-3rem)] min-h-[560px] bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-4 pt-4 pb-2 flex-shrink-0">
-          <div className="flex items-center gap-1.5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-400/10 ring-1 ring-white/10 overflow-hidden">
-                    <video
-                      className="h-8 w-8 object-cover rounded-xl"
-                      autoPlay
-                      loop
-                      muted
-                      playsInline
-                    >
-                      <source src="/video-logo-animation.mp4" type="video/mp4" />
-                      Your browser does not support the video tag.
-                    </video>
-                  </div>
-            {/* <span className="w-[7px] h-[7px] rounded-full bg-slate-800" />
-            <span className="w-[7px] h-[7px] rounded-full bg-slate-800" /> */}
+      <div className="flex h-[calc(100vh-3rem)] min-h-[620px] flex-col overflow-hidden rounded-[28px] border border-[#1f2d63] bg-[#060b1d] shadow-[0_24px_80px_rgba(2,6,23,0.45)]">
+        <div className="shrink-0 bg-gradient-to-b from-[#253b8e] via-[#25357b] to-[#1d2758] px-5 pt-5 pb-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-cyan-400/10 ring-1 ring-white/10 shadow-[0_0_0_1px_rgba(103,232,249,0.08)]">
+                <video
+                  className="h-8 w-8 rounded-xl object-cover"
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                >
+                  <source src="/video-logo-animation.mp4" type="video/mp4" />
+                  Your browser does not support the video tag.
+                </video>
+              </div>
 
-            <div className="px-4 pb-3 flex-shrink-0 mt-5">
-          <p className="text-[15px] font-semibold text-slate-900">Agent Z</p>
-          <p className="mt-1 text-[11px] text-slate-500">
-            AI4Planning intelligence for eligibility requests
-          </p>
-        </div>
+              <div>
+                <p className="text-base font-semibold text-white">Agent Z</p>
+                <p className="text-xs text-slate-200">AI4Planning Intelligence</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className={`rounded-full px-3 py-1 text-[11px] font-medium ${statusMeta.className}`}>
+                {statusMeta.label}
+              </span>
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-slate-200 transition-colors hover:bg-white/15 hover:text-white"
+                aria-label="Close agent sidebar"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
-          
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-6 h-6 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 transition-colors"
-            aria-label="Close agent sidebar"
-          >
-            <X className="w-3.5 h-3.5 text-slate-400" />
-          </button>
+          <div className="mt-5 rounded-[24px] border border-white/10 bg-white/5 px-4 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <p className="text-[28px] leading-none text-white/10">&ldquo;</p>
+            <h3 className="mt-1 text-[22px] font-semibold leading-tight text-white">
+              Welcome to your Eligibility Dashboard
+            </h3>
+            <p className="mt-4 text-sm leading-7 text-slate-100">
+              We&apos;re here to help you manage this planning and eligibility check smoothly and
+              confidently.
+            </p>
+            <p className="mt-3 text-sm leading-7 text-cyan-100">
+              Your selected council authority is {councilName}.
+            </p>
+            <p className="mt-3 text-sm leading-7 text-slate-200">
+              To guide you accurately through the planning requirements, regulations, and next
+              steps, Agent Z is reviewing the current question and available supporting data.
+            </p>
+            <p className="mt-3 text-sm leading-7 text-slate-200">
+              This helps us assess your property, identify any planning constraints, and create
+              the clearest route for your application.
+            </p>
+          </div>
         </div>
 
-        
-
-        <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4 min-h-0">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-[#050919] px-5 py-5">
           {!isRunning && orderedHistoryEntries.length === 0 && tasks.length === 0 && insights.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 gap-2">
-              <Sparkles className="w-8 h-8 text-slate-300" />
-              <p className="text-[11px] text-slate-400">Ready to assist</p>
+            <div className="rounded-[22px] border border-dashed border-white/12 bg-white/[0.03] px-4 py-8 text-center">
+              <Sparkles className="mx-auto h-8 w-8 text-slate-500" />
+              <p className="mt-3 text-sm text-slate-300">Agent Z is ready to assist.</p>
             </div>
           )}
 
-          <div className="space-y-2">
-            <div className="rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-50 via-white to-slate-50 p-2 shadow-sm">
-              <div className="flex gap-2 overflow-x-auto pb-1">
-                {DUMMY_REQUEST_BUTTONS.map((button) => (
-                  <button
-                    key={button.label}
-                    type="button"
-                    aria-pressed={button.active ? "true" : "false"}
-                    className={`group shrink-0 rounded-xl border px-3 py-2 text-[11px] font-medium transition-all duration-200 ${
-                      button.active
-                        ? "border-slate-900 bg-slate-900 text-white shadow-md shadow-slate-200"
-                        : "border-slate-200 bg-white text-slate-600 shadow-sm hover:-translate-y-0.5 hover:border-slate-300 hover:text-slate-900"
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <span
-                        className={`h-2 w-2 rounded-full ${button.accent} ${
-                          button.active ? "ring-2 ring-white/30" : ""
-                        }`}
-                      />
-                      <span>{button.label}</span>
-                    </span>
-                  </button>
+          <div className="space-y-4">
+            <div className="rounded-[22px] border border-white/10 bg-white/[0.06] p-4">
+              <div className="space-y-3">
+                {supportHighlights.map((highlight) => (
+                  <div key={highlight} className="flex items-start gap-3">
+                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+                    <p className="text-sm leading-6 text-slate-100">{highlight}</p>
+                  </div>
                 ))}
               </div>
             </div>
 
             {orderedHistoryEntries.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+              <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
                   Previous Requests
                 </p>
-                {orderedHistoryEntries.map((entry) => (
-                  <div
-                    key={entry.id}
-                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3"
-                  >
-                    <p className="text-[11px] font-semibold text-slate-900">{entry.fieldLabel}</p>
-                    <p className="mt-1 text-[11px] text-slate-500 leading-relaxed">{entry.question}</p>
-                    <p className="mt-2 text-[12px] text-slate-700">{getHistoryResult(entry)}</p>
-                  </div>
-                ))}
+                <div className="mt-3 space-y-3">
+                  {orderedHistoryEntries.map((entry) => (
+                    <div
+                      key={entry.id}
+                      className="rounded-2xl border border-white/8 bg-[#0b1125] px-3 py-3"
+                    >
+                      <p className="text-sm font-semibold text-white">{entry.fieldLabel}</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-300">{entry.question}</p>
+                      <p className="mt-2 text-sm text-cyan-100">{getHistoryResult(entry)}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
-          </div>
 
-          {(messages.length > 0 || tasks.length > 0 || insights.length > 0) && (
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 shadow-sm">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                Planning Intelligence is at work ...
-              </p>
-              <p className="mt-2 text-[13px] text-slate-700 leading-relaxed">{currentMessage}</p>
+            {(messages.length > 0 || tasks.length > 0 || insights.length > 0) && (
+              <div className="rounded-[22px] border border-cyan-400/25 bg-[#071a33] p-4 shadow-[inset_0_1px_0_rgba(34,211,238,0.08)]">
+                <div className="flex items-start gap-3">
+                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-cyan-200" />
+                  <div>
+                    <p className="text-sm font-medium text-cyan-50">
+                      Agent Z is supporting this request
+                    </p>
+                    <p className="mt-3 text-sm leading-7 text-slate-100">{currentMessage}</p>
+                  </div>
+                </div>
 
-              {tasks.length > 0 && (
-                <div className="mt-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                    Agent Activity
-                  </p>
-                  <div className="space-y-2">
+                {tasks.length > 0 && (
+                  <div className="mt-5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                      Agent Activity
+                    </p>
+                    <div className="mt-3 space-y-2">
                     {tasks.map((task) => {
                       const Icon = task.icon
 
                       return (
-                        <div key={task.id} className="flex items-center gap-2.5">
+                        <div
+                          key={task.id}
+                          className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-3"
+                        >
                           {task.status === "done" ? (
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-300" />
                           ) : task.status === "running" ? (
-                            <Loader2 className="w-3.5 h-3.5 text-blue-500 shrink-0 animate-spin" />
+                            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-cyan-300" />
                           ) : (
-                            <span className="w-3.5 h-3.5 rounded-full border border-slate-300 shrink-0" />
+                            <span className="h-4 w-4 shrink-0 rounded-full border border-slate-500" />
                           )}
 
                           <Icon
-                            className={`w-3 h-3 shrink-0 ${
+                            className={`h-3.5 w-3.5 shrink-0 ${
                               task.status === "done"
-                                ? "text-emerald-500"
+                                ? "text-emerald-300"
                                 : task.status === "running"
-                                  ? "text-blue-500"
-                                  : "text-slate-300"
+                                  ? "text-cyan-200"
+                                  : "text-slate-500"
                             }`}
                           />
 
                           <span
-                            className={`text-[11px] leading-none ${
+                            className={`text-sm ${
                               task.status === "done"
-                                ? "text-slate-600"
+                                ? "text-slate-100"
                                 : task.status === "running"
-                                  ? "text-blue-700 font-medium"
-                                  : "text-slate-300"
+                                  ? "font-medium text-cyan-50"
+                                  : "text-slate-400"
                             }`}
                           >
                             {task.label}
                           </span>
 
                           {task.status === "running" && task.detail && (
-                            <span className="ml-auto text-[10px] text-blue-400">
+                            <span className="ml-auto rounded-full bg-cyan-400/10 px-2.5 py-1 text-[11px] text-cyan-100">
                               {task.detail}
                             </span>
                           )}
@@ -970,52 +1006,51 @@ export function FloatingAgentWidget({
                 </div>
               )}
 
-              {insights.length > 0 && (
-                <div className="mt-4">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                    Drafting Intelligence
-                  </p>
-                  <div className="space-y-2">
-                    {insights.map((insight, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center justify-between rounded-lg bg-white px-3 py-2"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <PenLine className="w-3 h-3 text-blue-500 shrink-0" />
-                          <span className="text-[11px] text-slate-700 truncate">
-                            {insight.label}
-                          </span>
-                        </div>
+                {insights.length > 0 && (
+                  <div className="mt-5">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                      Drafting Intelligence
+                    </p>
+                    <div className="mt-3 space-y-2">
+                      {insights.map((insight, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-3"
+                        >
+                          <div className="flex min-w-0 items-center gap-2">
+                            <PenLine className="h-3.5 w-3.5 shrink-0 text-cyan-200" />
+                            <span className="truncate text-sm text-slate-200">
+                              {insight.label}
+                            </span>
+                          </div>
 
-                        <div className="flex items-center gap-2 shrink-0 ml-2">
-                          <span className="text-[11px] font-semibold text-slate-900">
-                            {insight.value}
-                          </span>
+                          <div className="ml-2 flex shrink-0 items-center gap-2">
+                            <span className="max-w-[180px] truncate text-sm font-semibold text-white">
+                              {insight.value}
+                            </span>
 
-                          <span
-                            className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md ${
-                              confidenceColor[insight.confidence]
-                            }`}
-                          >
-                            {insight.confidence}
-                          </span>
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                                confidenceColor[insight.confidence]
+                              }`}
+                            >
+                              {insight.confidence}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
                 </div>
               )}
             </div>
           )}
         </div>
+      </div>
 
-        <div className="px-4 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-1.5">
-            <Zap className="w-3 h-3 text-blue-500" />
-            <span className="text-[10px] text-slate-500">
-              Powered by Agent Z · Zynapse
-            </span>
+        <div className="flex shrink-0 items-center justify-between border-t border-white/10 bg-[#081127] px-5 py-4">
+          <div className="flex items-center gap-2 text-slate-300">
+            <Zap className="h-3.5 w-3.5 text-cyan-300" />
+            <span className="text-[11px]">Powered by Agent Z / AI4Planning</span>
           </div>
         </div>
       </div>

@@ -861,15 +861,17 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
       ],
     },
     {
-      label: "Proposed Extension Depth (m)",
+      label: "Proposed Extension Width (m)",
       paths: [
         ["worksAndMaterials", "descriptionOfWorks", "proposedExtensionWidthM"],
-        ["worksAndMaterials", "descriptionOfWorks", "proposedExtensionDepthM"],
       ],
     },
     {
-      label: "Proposed Extension Height (m)",
-      paths: [["worksAndMaterials", "descriptionOfWorks", "proposedExtensionHeightM"]],
+      label: "Proposed Extension Depth (m)",
+      paths: [
+        ["worksAndMaterials", "descriptionOfWorks", "proposedExtensionDepthM"],
+        ["worksAndMaterials", "descriptionOfWorks", "proposedExtensionHeightM"],
+      ],
     },
     {
       label: "Ridge / Eaves Height (m)",
@@ -878,6 +880,51 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
     {
       label: "Distance from Boundary (m)",
       paths: [["worksAndMaterials", "descriptionOfWorks", "distanceFromBoundaryM"]],
+    },
+    {
+      label: "Total internal floor area (m²)",
+      paths: [
+        ["worksAndMaterials", "propertyOverview", "totalInternalFloorAreaM2"],
+        ["worksAndMaterials", "propertyOverview", "totalInternalFloorArea"],
+      ],
+    },
+    {
+      label: "Number of floors (G / 1st / Loft / Basement)",
+      paths: [["worksAndMaterials", "propertyOverview", "numberOfFloors"]],
+    },
+    {
+      label: "Property footprint (approx length × width in metres)",
+      paths: [["worksAndMaterials", "propertyOverview", "propertyFootprint"]],
+    },
+    {
+      label: "Garden depth (metres)",
+      paths: [
+        ["worksAndMaterials", "propertyOverview", "gardenDepthM"],
+        ["worksAndMaterials", "propertyOverview", "gardenDepth"],
+      ],
+    },
+    {
+      label: "Plot width (metres)",
+      paths: [
+        ["worksAndMaterials", "propertyOverview", "plotWidthM"],
+        ["worksAndMaterials", "propertyOverview", "plotWidth"],
+      ],
+    },
+    {
+      label: "Kitchen Room Length (metres)",
+      paths: [["worksAndMaterials", "roomDimensions", "kitchenRoomLengthM"]],
+    },
+    {
+      label: "Kitchen Room Width (metres)",
+      paths: [["worksAndMaterials", "roomDimensions", "kitchenRoomWidthM"]],
+    },
+    {
+      label: "Bathroom Room Length (metres)",
+      paths: [["worksAndMaterials", "roomDimensions", "bathroomRoomLengthM"]],
+    },
+    {
+      label: "Bathroom Room Width (metres)",
+      paths: [["worksAndMaterials", "roomDimensions", "bathroomRoomWidthM"]],
     },
     {
       label: "Wall Materials",
@@ -1569,10 +1616,25 @@ const buildEligibilityStepPayload = (
             propsedWorksDescription: getValue("Description of Proposed Works"),
             existingPropertyWidthM: getValue("Existing Property Width (m)"),
             existingPropertyHeightM: getValue("Existing Property Depth (m)"),
-            proposedExtensionWidthM: getValue("Proposed Extension Depth (m)"),
-            proposedExtensionHeightM: getValue("Proposed Extension Height (m)"),
+            proposedExtensionWidthM: getValue("Proposed Extension Width (m)"),
+            proposedExtensionDepthM: getValue("Proposed Extension Depth (m)"),
             ridgeOrEavesHeightM: getValue("Ridge / Eaves Height (m)"),
             distanceFromBoundaryM: getValue("Distance from Boundary (m)"),
+          },
+          propertyOverview: {
+            totalInternalFloorAreaM2: getValue("Total internal floor area (m²)"),
+            numberOfFloors: getValue("Number of floors (G / 1st / Loft / Basement)"),
+            propertyFootprint: getValue(
+              "Property footprint (approx length × width in metres)"
+            ),
+            gardenDepthM: getValue("Garden depth (metres)"),
+            plotWidthM: getValue("Plot width (metres)"),
+          },
+          roomDimensions: {
+            kitchenRoomLengthM: getValue("Kitchen Room Length (metres)"),
+            kitchenRoomWidthM: getValue("Kitchen Room Width (metres)"),
+            bathroomRoomLengthM: getValue("Bathroom Room Length (metres)"),
+            bathroomRoomWidthM: getValue("Bathroom Room Width (metres)"),
           },
           materials: {
             wallMaterials: getValue("Wall Materials"),
@@ -1862,11 +1924,24 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
   "Description of Proposed Works": "Brief summary of the project scope, size, and location on site.",
   "Existing Property Width (m)": "External width of the existing property in meters.",
   "Existing Property Depth (m)": "External depth of the existing property in meters.",
+  "Proposed Extension Width (m)":
+    "External width of the proposed extension measured in meters.",
   "Proposed Extension Depth (m)":
     "How far the extension projects from the existing rear wall, in meters.",
-  "Proposed Extension Height (m)": "Overall height of the proposed extension in meters.",
   "Ridge / Eaves Height (m)": "Provide ridge and eaves height in meters where relevant.",
   "Distance from Boundary (m)": "Minimum distance from the works to the nearest boundary.",
+  "Total internal floor area (m²)":
+    "Total internal floor space of the property measured in square meters.",
+  "Number of floors (G / 1st / Loft / Basement)":
+    "List the storeys included in the property, such as ground, first, loft, or basement.",
+  "Property footprint (approx length × width in metres)":
+    "Approximate overall building footprint using length by width in meters.",
+  "Garden depth (metres)": "Depth of the rear garden or external amenity space in meters.",
+  "Plot width (metres)": "Approximate width of the overall plot in meters.",
+  "Kitchen Room Length (metres)": "Length of the kitchen room measured in meters.",
+  "Kitchen Room Width (metres)": "Width of the kitchen room measured in meters.",
+  "Bathroom Room Length (metres)": "Length of the bathroom room measured in meters.",
+  "Bathroom Room Width (metres)": "Width of the bathroom room measured in meters.",
   "Wall Materials": "Primary material or finish for new external walls.",
   "Roof Materials": "Primary material or finish for the proposed roof.",
   "Colour / Finish Notes (optional)":
@@ -1983,10 +2058,19 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Description of Proposed Works",
   "Existing Property Width (m)",
   "Existing Property Depth (m)",
+  "Proposed Extension Width (m)",
   "Proposed Extension Depth (m)",
-  "Proposed Extension Height (m)",
   "Ridge / Eaves Height (m)",
   "Distance from Boundary (m)",
+  "Total internal floor area (m²)",
+  "Number of floors (G / 1st / Loft / Basement)",
+  "Property footprint (approx length × width in metres)",
+  "Garden depth (metres)",
+  "Plot width (metres)",
+  "Kitchen Room Length (metres)",
+  "Kitchen Room Width (metres)",
+  "Bathroom Room Length (metres)",
+  "Bathroom Room Width (metres)",
   "Wall Materials",
   "Roof Materials",
   "Colour / Finish Notes (optional)",

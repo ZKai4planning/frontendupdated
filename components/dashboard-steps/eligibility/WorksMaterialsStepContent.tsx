@@ -144,6 +144,41 @@ export function WorksMaterialsStepContent({
 
       <SectionHeading>Dimensions</SectionHeading>
       <div className="mb-6 grid grid-cols-2 gap-6">
+
+        <Input
+          label="Total internal floor area (m²)"
+          placeholder="Enter total internal floor area (m²) "
+        />
+        <Input
+          label="Number of floors (G / 1st / Loft / Basement)"
+          placeholder="For example: G + 1st + Loft"
+        />
+        <Input label="Existing Property Width (m)" />
+        <Input label="Existing Property Depth (m)" />
+        <Input label="Proposed Extension Width (m)" />
+        <Input label="Proposed Extension Depth (m)" />
+        <Input
+          label="Garden depth (metres)"
+          placeholder="Enter garden depth"
+        />
+        <Input label="Ridge / Eaves Height (m)" />
+        <Input label="Distance from Boundary (m)" />
+        <Input
+          label="Kitchen Room Length (metres)"
+          placeholder="Enter kitchen room length"
+        />
+        <Input
+          label="Kitchen Room Width (metres)"
+          placeholder="Enter kitchen room width"
+        />
+        <Input
+          label="Bathroom Room Length (metres)"
+          placeholder="Enter bathroom room length"
+        />
+        <Input
+          label="Bathroom Room Width (metres)"
+          placeholder="Enter bathroom room width"
+        />
         <div className="col-span-2">
           <div className="space-y-4">
             <RadioGroupField
@@ -152,12 +187,6 @@ export function WorksMaterialsStepContent({
             />
           </div>
         </div>
-        <Input label="Existing Property Width (m)" />
-        <Input label="Existing Property Depth (m)" />
-        <Input label="Proposed Extension Width (m)" />
-        <Input label="Proposed Extension Depth (m)" />
-        <Input label="Ridge / Eaves Height (m)" />
-        <Input label="Distance from Boundary (m)" />
       </div>
 
       <SectionHeading>Current Materials Used</SectionHeading>
