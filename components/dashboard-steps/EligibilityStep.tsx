@@ -79,6 +79,11 @@ const SAFETY_COMPLIANCE_SLOT_LABELS = [
   "Electrical Report (EICR)",
   "EPC Certificate",
 ] as const
+const SAFETY_COMPLIANCE_MULTIPART_FIELD_KEYS = [
+  "gasSafetyCertificateUpload",
+  "electricalReportEicrUpload",
+  "epcCertificateUpload",
+] as const
 const ELIGIBILITY_CREATE_ENDPOINT =
   process.env.NEXT_PUBLIC_ELIGIBILITY_CREATE_ENDPOINT ?? "/eligibility"
 const SELECTED_PROJECT_STORAGE_KEY = "selectedProjectId"
@@ -1512,6 +1517,8 @@ const normalizeEligibilityUploadsFromApi = (payload: unknown): EligibilityFileMa
         ["utilitiesAndConsents", "safetyAndCompliance", "gasSafetyCertificateUpload"],
         ["utilitesAndConsents", "safetyAndCompliance", "gasSafetyCertificateDocument"],
         ["utilitiesAndConsents", "safetyAndCompliance", "gasSafetyCertificateDocument"],
+        ["gasSafetyCertificateUpload"],
+        ["gasSafetyCertificateDocument"],
         ["gasSafetyCertificateFile"],
       ]),
       SAFETY_COMPLIANCE_SLOT_LABELS[0],
@@ -1525,6 +1532,8 @@ const normalizeEligibilityUploadsFromApi = (payload: unknown): EligibilityFileMa
         ["utilitiesAndConsents", "safetyAndCompliance", "electricalReportEicrUpload"],
         ["utilitesAndConsents", "safetyAndCompliance", "electricalReportEicrDocument"],
         ["utilitiesAndConsents", "safetyAndCompliance", "electricalReportEicrDocument"],
+        ["electricalReportEicrUpload"],
+        ["electricalReportEicrDocument"],
         ["electricalReportEicrFile"],
       ]),
       SAFETY_COMPLIANCE_SLOT_LABELS[1],
@@ -1538,6 +1547,8 @@ const normalizeEligibilityUploadsFromApi = (payload: unknown): EligibilityFileMa
         ["utilitiesAndConsents", "safetyAndCompliance", "epcCertificateUpload"],
         ["utilitesAndConsents", "safetyAndCompliance", "epcCertificateDocument"],
         ["utilitiesAndConsents", "safetyAndCompliance", "epcCertificateDocument"],
+        ["epcCertificateUpload"],
+        ["epcCertificateDocument"],
         ["epcCertificate"],
       ]),
       SAFETY_COMPLIANCE_SLOT_LABELS[2],
@@ -1928,17 +1939,17 @@ const buildEligibilityMultipartFormData = ({
   )
   appendSingleFile(
     formData,
-    "gasSafetyCertificateFile",
+    SAFETY_COMPLIANCE_MULTIPART_FIELD_KEYS[0],
     [getFileAt(SAFETY_COMPLIANCE_UPLOAD_LABEL, 0)].filter((file): file is File => Boolean(file))
   )
   appendSingleFile(
     formData,
-    "electricalReportEicrFile",
+    SAFETY_COMPLIANCE_MULTIPART_FIELD_KEYS[1],
     [getFileAt(SAFETY_COMPLIANCE_UPLOAD_LABEL, 1)].filter((file): file is File => Boolean(file))
   )
   appendSingleFile(
     formData,
-    "epcCertificate",
+    SAFETY_COMPLIANCE_MULTIPART_FIELD_KEYS[2],
     [getFileAt(SAFETY_COMPLIANCE_UPLOAD_LABEL, 2)].filter((file): file is File => Boolean(file))
   )
   appendUploadFileNames("photographsOfSiteFileNames", "Photographs of Site")
@@ -2007,8 +2018,6 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
     "Confirm whether a shared kitchen exists already or is proposed.",
   "Is any lounge/dining room proposed as a bedroom?":
     "Tell us if a lounge or dining room is being used or converted into a bedroom.",
-  "Approx smallest bedroom size?":
-    "Choose the approximate size band for the smallest bedroom in the proposal.",
   "Description of Proposed Works": "Brief summary of the project scope, size, and location on site.",
   "Existing Property Width (m)": "External width of the existing property in meters.",
   "Existing Property Depth (m)": "External depth of the existing property in meters.",
@@ -2026,10 +2035,16 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
     "Approximate overall building footprint using length by width in meters.",
   "Garden depth (metres)": "Depth of the rear garden or external amenity space in meters.",
   "Plot width (metres)": "Approximate width of the overall plot in meters.",
+  "Kitchen Room Dimensions (metres)":
+    "Enter the kitchen room length and width measured in meters.",
   "Kitchen Room Length (metres)": "Length of the kitchen room measured in meters.",
   "Kitchen Room Width (metres)": "Width of the kitchen room measured in meters.",
+  "Bathroom Room Dimensions (metres)":
+    "Enter the bathroom room length and width measured in meters.",
   "Bathroom Room Length (metres)": "Length of the bathroom room measured in meters.",
   "Bathroom Room Width (metres)": "Width of the bathroom room measured in meters.",
+  "Approx smallest bedroom size?":
+    "Choose the approximate size band for the smallest bedroom in the proposal.",
   "Wall Materials": "Primary material or finish for new external walls.",
   "Roof Materials": "Primary material or finish for the proposed roof.",
   "Colour / Finish Notes (optional)":
@@ -2142,7 +2157,6 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Number of bathrooms / shower rooms?",
   "Is there a communal kitchen?",
   "Is any lounge/dining room proposed as a bedroom?",
-  "Approx smallest bedroom size?",
   "Description of Proposed Works",
   "Total internal floor area (m²)",
   "Number of floors (G / 1st / Loft / Basement)",
@@ -2153,12 +2167,9 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Garden depth (metres)",
   "Ridge / Eaves Height (m)",
   "Distance from Boundary (m)",
-  "Property footprint (approx length × width in metres)",
-  "Plot width (metres)",
-  "Kitchen Room Length (metres)",
-  "Kitchen Room Width (metres)",
-  "Bathroom Room Length (metres)",
-  "Bathroom Room Width (metres)",
+  "Kitchen Room Dimensions (metres)",
+  "Bathroom Room Dimensions (metres)",
+  "Approx smallest bedroom size?",
   "Wall Materials",
   "Roof Materials",
   "Colour / Finish Notes (optional)",

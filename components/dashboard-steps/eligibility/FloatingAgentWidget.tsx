@@ -52,6 +52,13 @@ const RIGHTS_OF_WAY_ENDPOINT =
   process.env.NEXT_PUBLIC_ZYNAPSIS_RIGHTS_OF_WAY_ENDPOINT ??
   "http://localhost:8000/api/v1/ds03/rights-of-way"
 const DEFAULT_RIGHTS_OF_WAY_RADIUS_METERS = "150"
+const DUMMY_REQUEST_BUTTONS = [
+  { label: "Overview", accent: "bg-blue-400", active: true },
+  { label: "Recent", accent: "bg-emerald-400" },
+  { label: "Pending", accent: "bg-amber-400" },
+  { label: "Resolved", accent: "bg-violet-400" },
+  { label: "Flagged", accent: "bg-rose-400" },
+]
 
 type FloatingAgentWidgetProps = {
   requestId: string
@@ -91,16 +98,16 @@ export function FloatingAgentWidget({
     agentStatus === "working" || agentStatus === "thinking"
       ? {
           label: "Working",
-          className: "bg-cyan-400/15 text-cyan-100 ring-1 ring-cyan-300/20",
+          className: "bg-sky-100 text-sky-700 ring-1 ring-sky-200",
         }
       : agentStatus === "done"
         ? {
             label: "Ready",
-            className: "bg-emerald-400/15 text-emerald-100 ring-1 ring-emerald-300/20",
+            className: "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200",
           }
         : {
             label: "Standby",
-            className: "bg-emerald-400/15 text-emerald-100 ring-1 ring-emerald-300/20",
+            className: "bg-slate-100 text-slate-600 ring-1 ring-slate-200",
           }
   const supportHighlights = [
     "Takes only a few minutes",
@@ -111,9 +118,9 @@ export function FloatingAgentWidget({
   ]
 
   const confidenceColor: Record<"high" | "medium" | "low", string> = {
-    high: "bg-emerald-400/15 text-emerald-100 ring-1 ring-emerald-300/20",
-    medium: "bg-amber-400/15 text-amber-100 ring-1 ring-amber-300/20",
-    low: "bg-rose-400/15 text-rose-100 ring-1 ring-rose-300/20",
+    high: "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200",
+    medium: "bg-amber-100 text-amber-700 ring-1 ring-amber-200",
+    low: "bg-rose-100 text-rose-700 ring-1 ring-rose-200",
   }
 
   const isRunning = agentStatus === "thinking" || agentStatus === "working"
@@ -837,11 +844,11 @@ export function FloatingAgentWidget({
 
   return (
     <div className="sticky top-6">
-      <div className="flex h-[calc(100vh-3rem)] min-h-[620px] flex-col overflow-hidden rounded-[28px] border border-[#1f2d63] bg-[#060b1d] shadow-[0_24px_80px_rgba(2,6,23,0.45)]">
-        <div className="shrink-0 bg-gradient-to-b from-[#253b8e] via-[#25357b] to-[#1d2758] px-5 pt-5 pb-6">
+      <div className="flex h-[calc(100vh-3rem)] min-h-[620px] flex-col overflow-hidden rounded-[28px] border border-[#d9e7fb] bg-gradient-to-b from-[#f5faff] via-[#ffffff] to-[#eef6ff] shadow-[0_24px_70px_rgba(148,163,184,0.18)]">
+        <div className="shrink-0 border-b border-[#dbe7f7] bg-gradient-to-br from-[#edf5ff] via-[#f9fbff] to-[#e5f1ff] px-5 pt-5 pb-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-cyan-400/10 ring-1 ring-white/10 shadow-[0_0_0_1px_rgba(103,232,249,0.08)]">
+              <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-white ring-1 ring-[#d7e7fb] shadow-[0_10px_24px_rgba(59,130,246,0.12)]">
                 <video
                   className="h-8 w-8 rounded-xl object-cover"
                   autoPlay
@@ -855,8 +862,8 @@ export function FloatingAgentWidget({
               </div>
 
               <div>
-                <p className="text-base font-semibold text-white">Agent Z</p>
-                <p className="text-xs text-slate-200">AI4Planning Intelligence</p>
+                <p className="text-base font-semibold text-slate-900">Agent Z</p>
+                <p className="text-xs text-slate-500">AI4Planning Intelligence</p>
               </div>
             </div>
 
@@ -867,127 +874,127 @@ export function FloatingAgentWidget({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-slate-200 transition-colors hover:bg-white/15 hover:text-white"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-[#d7e4f5] bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900"
                 aria-label="Close agent sidebar"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
           </div>
-
-          <div className="mt-5 rounded-[24px] border border-white/10 bg-white/5 px-4 py-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
-            <p className="text-[28px] leading-none text-white/10">&ldquo;</p>
-            <h3 className="mt-1 text-[22px] font-semibold leading-tight text-white">
-              Welcome to your Eligibility Dashboard
-            </h3>
-            <p className="mt-4 text-sm leading-7 text-slate-100">
-              We&apos;re here to help you manage this planning and eligibility check smoothly and
-              confidently.
+          <div className="mt-4 rounded-2xl border border-[#dbe7f7] bg-white/85 p-4 backdrop-blur-sm">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-sky-600/80">
+              Active request
             </p>
-            <p className="mt-3 text-sm leading-7 text-cyan-100">
-              Your selected council authority is {councilName}.
-            </p>
-            <p className="mt-3 text-sm leading-7 text-slate-200">
-              To guide you accurately through the planning requirements, regulations, and next
-              steps, Agent Z is reviewing the current question and available supporting data.
-            </p>
-            <p className="mt-3 text-sm leading-7 text-slate-200">
-              This helps us assess your property, identify any planning constraints, and create
-              the clearest route for your application.
-            </p>
+            <p className="mt-2 text-sm leading-6 text-slate-700">{currentMessage}</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {supportHighlights.map((highlight) => (
+                <span
+                  key={highlight}
+                  className="rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-[11px] font-medium text-sky-700"
+                >
+                  {highlight}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-[#050919] px-5 py-5">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
           {!isRunning && orderedHistoryEntries.length === 0 && tasks.length === 0 && insights.length === 0 && (
-            <div className="rounded-[22px] border border-dashed border-white/12 bg-white/[0.03] px-4 py-8 text-center">
-              <Sparkles className="mx-auto h-8 w-8 text-slate-500" />
-              <p className="mt-3 text-sm text-slate-300">Agent Z is ready to assist.</p>
+            <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[#dbe7f7] bg-white/80 py-12">
+              <Sparkles className="h-8 w-8 text-sky-500" />
+              <p className="text-[11px] text-slate-500">Ready to assist</p>
             </div>
           )}
 
-          <div className="space-y-4">
-            <div className="rounded-[22px] border border-white/10 bg-white/[0.06] p-4">
-              <div className="space-y-3">
-                {supportHighlights.map((highlight) => (
-                  <div key={highlight} className="flex items-start gap-3">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
-                    <p className="text-sm leading-6 text-slate-100">{highlight}</p>
-                  </div>
+          <div className="space-y-2">
+            <div className="rounded-2xl border border-[#dbe7f7] bg-white/85 p-2 shadow-sm backdrop-blur-sm">
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {DUMMY_REQUEST_BUTTONS.map((button) => (
+                  <button
+                    key={button.label}
+                    type="button"
+                    aria-pressed={button.active ? "true" : "false"}
+                    className={`group shrink-0 rounded-xl border px-3 py-2 text-[11px] font-medium transition-all duration-200 ${
+                      button.active
+                        ? "border-blue-600 bg-blue-600 text-white shadow-[0_12px_28px_rgba(37,99,235,0.22)]"
+                        : "border-slate-200 bg-white text-slate-600 hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span
+                        className={`h-2 w-2 rounded-full ${button.accent} ${
+                          button.active ? "ring-2 ring-white/50" : ""
+                        }`}
+                      />
+                      <span>{button.label}</span>
+                    </span>
+                  </button>
                 ))}
               </div>
             </div>
 
             {orderedHistoryEntries.length > 0 && (
-              <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                   Previous Requests
                 </p>
-                <div className="mt-3 space-y-3">
-                  {orderedHistoryEntries.map((entry) => (
-                    <div
-                      key={entry.id}
-                      className="rounded-2xl border border-white/8 bg-[#0b1125] px-3 py-3"
-                    >
-                      <p className="text-sm font-semibold text-white">{entry.fieldLabel}</p>
-                      <p className="mt-1 text-sm leading-6 text-slate-300">{entry.question}</p>
-                      <p className="mt-2 text-sm text-cyan-100">{getHistoryResult(entry)}</p>
-                    </div>
-                  ))}
-                </div>
+                {orderedHistoryEntries.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm"
+                  >
+                    <p className="text-[11px] font-semibold text-slate-900">{entry.fieldLabel}</p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-slate-500">{entry.question}</p>
+                    <p className="mt-2 text-[12px] text-slate-700">{getHistoryResult(entry)}</p>
+                  </div>
+                ))}
               </div>
             )}
+          </div>
 
-            {(messages.length > 0 || tasks.length > 0 || insights.length > 0) && (
-              <div className="rounded-[22px] border border-cyan-400/25 bg-[#071a33] p-4 shadow-[inset_0_1px_0_rgba(34,211,238,0.08)]">
-                <div className="flex items-start gap-3">
-                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-cyan-200" />
-                  <div>
-                    <p className="text-sm font-medium text-cyan-50">
-                      Agent Z is supporting this request
-                    </p>
-                    <p className="mt-3 text-sm leading-7 text-slate-100">{currentMessage}</p>
-                  </div>
-                </div>
+          {(messages.length > 0 || tasks.length > 0 || insights.length > 0) && (
+            <div className="rounded-2xl border border-[#dbe7f7] bg-white/90 px-4 py-4 shadow-[0_18px_40px_rgba(148,163,184,0.16)] backdrop-blur-sm">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                Planning Intelligence is at work...
+              </p>
+              <p className="mt-2 text-[13px] leading-relaxed text-slate-700">{currentMessage}</p>
 
-                {tasks.length > 0 && (
-                  <div className="mt-5">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
-                      Agent Activity
-                    </p>
-                    <div className="mt-3 space-y-2">
+              {tasks.length > 0 && (
+                <div className="mt-4">
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    Agent Activity
+                  </p>
+                  <div className="space-y-2">
                     {tasks.map((task) => {
                       const Icon = task.icon
 
                       return (
-                        <div
-                          key={task.id}
-                          className="flex items-center gap-3 rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-3"
-                        >
+                        <div key={task.id} className="flex items-center gap-2.5">
                           {task.status === "done" ? (
-                            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-300" />
+                            <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
                           ) : task.status === "running" ? (
-                            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-cyan-300" />
+                            <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-sky-500" />
                           ) : (
-                            <span className="h-4 w-4 shrink-0 rounded-full border border-slate-500" />
+                            <span className="h-3.5 w-3.5 shrink-0 rounded-full border border-slate-300" />
                           )}
 
                           <Icon
-                            className={`h-3.5 w-3.5 shrink-0 ${
+                            className={`h-3 w-3 shrink-0 ${
                               task.status === "done"
-                                ? "text-emerald-300"
+                                ? "text-emerald-400"
                                 : task.status === "running"
-                                  ? "text-cyan-200"
-                                  : "text-slate-500"
+                                  ? "text-sky-500"
+                                  : "text-slate-400"
                             }`}
                           />
 
                           <span
-                            className={`text-sm ${
+                            className={`text-[11px] leading-none ${
                               task.status === "done"
-                                ? "text-slate-100"
+                                ? "text-slate-700"
                                 : task.status === "running"
-                                  ? "font-medium text-cyan-50"
+                                  ? "font-medium text-sky-700"
                                   : "text-slate-400"
                             }`}
                           >
@@ -995,7 +1002,7 @@ export function FloatingAgentWidget({
                           </span>
 
                           {task.status === "running" && task.detail && (
-                            <span className="ml-auto rounded-full bg-cyan-400/10 px-2.5 py-1 text-[11px] text-cyan-100">
+                            <span className="ml-auto text-[10px] text-sky-500">
                               {task.detail}
                             </span>
                           )}
@@ -1006,51 +1013,52 @@ export function FloatingAgentWidget({
                 </div>
               )}
 
-                {insights.length > 0 && (
-                  <div className="mt-5">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
-                      Drafting Intelligence
-                    </p>
-                    <div className="mt-3 space-y-2">
-                      {insights.map((insight, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center justify-between gap-3 rounded-2xl border border-white/8 bg-white/[0.04] px-3 py-3"
-                        >
-                          <div className="flex min-w-0 items-center gap-2">
-                            <PenLine className="h-3.5 w-3.5 shrink-0 text-cyan-200" />
-                            <span className="truncate text-sm text-slate-200">
-                              {insight.label}
-                            </span>
-                          </div>
-
-                          <div className="ml-2 flex shrink-0 items-center gap-2">
-                            <span className="max-w-[180px] truncate text-sm font-semibold text-white">
-                              {insight.value}
-                            </span>
-
-                            <span
-                              className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
-                                confidenceColor[insight.confidence]
-                              }`}
-                            >
-                              {insight.confidence}
-                            </span>
-                          </div>
+              {insights.length > 0 && (
+                <div className="mt-4">
+                  <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    Drafting Intelligence
+                  </p>
+                  <div className="space-y-2">
+                    {insights.map((insight, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <PenLine className="h-3 w-3 shrink-0 text-sky-500" />
+                          <span className="truncate text-[11px] text-slate-700">
+                            {insight.label}
+                          </span>
                         </div>
-                      ))}
-                    </div>
+
+                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                          <span className="text-[11px] font-semibold text-slate-900">
+                            {insight.value}
+                          </span>
+
+                          <span
+                            className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md ${
+                              confidenceColor[insight.confidence]
+                            }`}
+                          >
+                            {insight.confidence}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
           )}
         </div>
-      </div>
 
-        <div className="flex shrink-0 items-center justify-between border-t border-white/10 bg-[#081127] px-5 py-4">
-          <div className="flex items-center gap-2 text-slate-300">
-            <Zap className="h-3.5 w-3.5 text-cyan-300" />
-            <span className="text-[11px]">Powered by Agent Z / AI4Planning</span>
+        <div className="flex shrink-0 items-center justify-between border-t border-[#dbe7f7] bg-white/70 px-4 py-3">
+          <div className="flex items-center gap-1.5">
+            <Zap className="h-3 w-3 text-sky-500" />
+            <span className="text-[10px] text-slate-500">
+              Powered by Agent Z - Zynapse
+            </span>
           </div>
         </div>
       </div>
@@ -1059,3 +1067,4 @@ export function FloatingAgentWidget({
 }
 
 export default FloatingAgentWidget
+
