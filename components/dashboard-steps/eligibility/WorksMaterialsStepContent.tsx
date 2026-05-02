@@ -147,11 +147,11 @@ export function WorksMaterialsStepContent({
       <div className="mb-6 grid grid-cols-2 gap-6">
  
         <Input
-          label="Total internal floor area (m²)"
+          label="Total internal floor area"
           placeholder="Enter total internal floor area (m²) "
         />
         <Input
-          label="Number of floors (G / 1st / Loft / Basement)"
+          label="Number of floors"
           placeholder="For example: G + 1st + Loft"
         />
         <Input label="Existing Property Width (m)" />

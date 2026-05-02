@@ -30,6 +30,7 @@ import { useUserIdentity } from "@/lib/use-user-identity"
 import { useUserProfile } from "@/lib/use-user-profile"
 import { useResolvedServiceSelection } from "@/lib/use-service-selection"
 import axiosInstance from "@/lib/axiosinstance"
+import { BorderBeam } from "@/components/ui/border-beam"
 import { ApplicantPropertyStepContent } from "@/components/dashboard-steps/eligibility/ApplicantPropertyStepContent"
 import { WorksMaterialsStepContent } from "@/components/dashboard-steps/eligibility/WorksMaterialsStepContent"
 import { SiteConstraintsStepContent } from "@/components/dashboard-steps/eligibility/SiteConstraintsStepContent"
@@ -901,14 +902,14 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
       paths: [["worksAndMaterials", "descriptionOfWorks", "distanceFromBoundaryM"]],
     },
     {
-      label: "Total internal floor area (m²)",
+      label: "Total internal floor area",
       paths: [
         ["worksAndMaterials", "propertyOverview", "totalInternalFloorAreaM2"],
         ["worksAndMaterials", "propertyOverview", "totalInternalFloorArea"],
       ],
     },
     {
-      label: "Number of floors (G / 1st / Loft / Basement)",
+      label: "Number of floors",
       paths: [["worksAndMaterials", "propertyOverview", "numberOfFloors"]],
     },
     {
@@ -1694,8 +1695,8 @@ const buildEligibilityStepPayload = (
             distanceFromBoundaryM: getValue("Distance from Boundary (m)"),
           },
           propertyOverview: {
-            totalInternalFloorAreaM2: getValue("Total internal floor area (m²)"),
-            numberOfFloors: getValue("Number of floors (G / 1st / Loft / Basement)"),
+            totalInternalFloorAreaM2: getValue("Total internal floor area"),
+            numberOfFloors: getValue("Number of floors"),
             propertyFootprint: getValue(
               "Property footprint (approx length × width in metres)"
             ),
@@ -2027,9 +2028,9 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
     "How far the extension projects from the existing rear wall, in meters.",
   "Ridge / Eaves Height (m)": "Provide ridge and eaves height in meters where relevant.",
   "Distance from Boundary (m)": "Minimum distance from the works to the nearest boundary.",
-  "Total internal floor area (m²)":
+  "Total internal floor area":
     "Total internal floor space of the property measured in square meters.",
-  "Number of floors (G / 1st / Loft / Basement)":
+  "Number of floors":
     "List the storeys included in the property, such as ground, first, loft, or basement.",
   "Property footprint (approx length × width in metres)":
     "Approximate overall building footprint using length by width in meters.",
@@ -2158,8 +2159,8 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Is there a communal kitchen?",
   "Is any lounge/dining room proposed as a bedroom?",
   "Description of Proposed Works",
-  "Total internal floor area (m²)",
-  "Number of floors (G / 1st / Loft / Basement)",
+  "Total internal floor area",
+  "Number of floors",
   "Existing Property Width (m)",
   "Existing Property Depth (m)",
   "Proposed Extension Width (m)",
@@ -2416,9 +2417,19 @@ function AgentActionButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center justify-center rounded-xl border border-blue-700 bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 ${className}`}
+      className={`eligibility-agent-button inline-flex items-center justify-center rounded-xl border border-blue-900/60 bg-gradient-to-r from-slate-800/92 via-[#1f3d9a]/86 to-blue-800/84 px-3 py-2 text-xs font-semibold text-white transition-all hover:from-slate-800 hover:via-[#1d388f]/92 hover:to-blue-800/90 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-none disabled:bg-slate-100 disabled:text-slate-400 ${className}`}
     >
-      {label}
+      <span className="relative z-10">{label}</span>
+      {!disabled && (
+        <BorderBeam
+          size={38}
+          duration={2.8}
+          initialOffset={18}
+          borderWidth={2.5}
+          colorFrom="#f59e0b"
+          colorTo="#60a5fa"
+        />
+      )}
     </button>
   )
 }
@@ -3098,38 +3109,52 @@ function CheckboxGroup({
               key={o}
               type="button"
               onClick={() => toggle(o)}
-              className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm text-left transition-all ${
+              className={`${
+                isAgentOption ? "eligibility-agent-button" : ""
+              } flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm text-left transition-all ${
                 isSelected
                   ? isAgentOption
-                    ? "border-blue-700 bg-blue-600 text-white"
+                    ? "border-blue-900/60 bg-gradient-to-r from-slate-800/92 via-[#1f3d9a]/86 to-blue-800/84 text-white"
                     : "bg-blue-600 text-white border-blue-600"
                   : isAgentOption
-                    ? "border-blue-500 bg-blue-100 text-blue-900 hover:bg-blue-200"
+                    ? "border-blue-900/60 bg-gradient-to-r from-slate-800/84 via-[#1f3d9a]/78 to-blue-800/76 text-white hover:from-slate-800/92 hover:via-[#1d388f]/86 hover:to-blue-800/84"
                     : "hover:bg-blue-50 border-slate-200 text-slate-700"
               }`}
             >
-              <span
-                className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                  isSelected
-                    ? isAgentOption
-                      ? "bg-white border-white"
-                      : "bg-white border-white"
-                    : isAgentOption
-                      ? "border-blue-500"
-                      : "border-slate-300"
-                }`}
-              >
-                {isSelected && (
-                  <svg
-                    className="w-3 h-3 text-blue-600"
-                    viewBox="0 0 12 12"
-                    fill="none"
-                  >
-                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )}
+              <span className="relative z-10 flex items-center gap-2">
+                <span
+                  className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                    isSelected
+                      ? isAgentOption
+                        ? "bg-white border-white"
+                        : "bg-white border-white"
+                      : isAgentOption
+                        ? "border-blue-500"
+                        : "border-slate-300"
+                  }`}
+                >
+                  {isSelected && (
+                    <svg
+                      className="w-3 h-3 text-blue-600"
+                      viewBox="0 0 12 12"
+                      fill="none"
+                    >
+                      <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  )}
+                </span>
+                {renderAgentOptionLabel(o)}
               </span>
-              {renderAgentOptionLabel(o)}
+              {isAgentOption && (
+                <BorderBeam
+                  size={42}
+                  duration={3.1}
+                  initialOffset={24}
+                  borderWidth={2.5}
+                  colorFrom="#f59e0b"
+                  colorTo="#60a5fa"
+                />
+              )}
             </button>
           )
         })}
@@ -4865,17 +4890,29 @@ function RadioGroupField({
                   )
                 }
               }}
-              className={`flex-1 min-w-fit rounded-xl border px-4 py-2 text-sm transition-all ${
+              className={`${
+                isAgentOption ? "eligibility-agent-button" : ""
+              } flex-1 min-w-fit rounded-xl border px-4 py-2 text-sm transition-all ${
                 selected === o
                   ? isAgentOption
-                    ? "border-blue-700 bg-blue-600 text-white"
+                    ? "border-blue-900/60 bg-gradient-to-r from-slate-800/92 via-[#1f3d9a]/86 to-blue-800/84 text-white"
                     : "bg-blue-600 text-white border-blue-600"
                   : isAgentOption
-                    ? "border-blue-500 bg-blue-100 text-blue-900 hover:bg-blue-200"
+                    ? "border-blue-900/60 bg-gradient-to-r from-slate-800/84 via-[#1f3d9a]/78 to-blue-800/76 text-white hover:from-slate-800/92 hover:via-[#1d388f]/86 hover:to-blue-800/84"
                     : "hover:bg-blue-50 border-slate-200"
               }`}
             >
-              {renderAgentOptionLabel(o)}
+              <span className="relative z-10">{renderAgentOptionLabel(o)}</span>
+              {isAgentOption && (
+                <BorderBeam
+                  size={42}
+                  duration={3.1}
+                  initialOffset={24}
+                  borderWidth={2.5}
+                  colorFrom="#f59e0b"
+                  colorTo="#60a5fa"
+                />
+              )}
             </button>
           )
         })}

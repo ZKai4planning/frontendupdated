@@ -346,6 +346,12 @@
     transform: translateY(0);
   }
 }
+
+.eligibility-agent-button {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
  
 .animate-scaleIn {
   animation: scaleIn 0.25s ease-out forwards;
