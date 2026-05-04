@@ -1,7 +1,7 @@
 "use client"
 
 import type { ElementType, InputHTMLAttributes, ReactNode } from "react"
-import { Info, Loader2, Mail, MapPin, Phone, User } from "lucide-react"
+import { Info, Mail, MapPin, Phone, User } from "lucide-react"
 
 import {
   COUNTRY_CODES,
@@ -28,8 +28,6 @@ type ClientDetailsCardProps = {
   customerDetails: CustomerDetailsForm
   isReadOnly: boolean
   isSavingProfile: boolean
-  isFetchingAddress: boolean
-  canUseRandomUkAddress: boolean
   isSaveEnabled: boolean
   phonePlaceholder: string
   phoneHelperText: string
@@ -43,8 +41,6 @@ type ClientDetailsCardProps = {
   ) => void
   onPhoneCountryCodeChange: (value: string) => void
   onPhoneNumberChange: (value: string) => void
-  onUseRandomUkAddress: () => void
-  onAutoFetchAddress: () => void
   onSave: () => void
 }
 
@@ -52,8 +48,6 @@ export function ClientDetailsCard({
   customerDetails,
   isReadOnly,
   isSavingProfile,
-  isFetchingAddress,
-  canUseRandomUkAddress,
   isSaveEnabled,
   phonePlaceholder,
   phoneHelperText,
@@ -61,8 +55,6 @@ export function ClientDetailsCard({
   onFieldChange,
   onPhoneCountryCodeChange,
   onPhoneNumberChange,
-  onUseRandomUkAddress,
-  onAutoFetchAddress,
   onSave,
 }: ClientDetailsCardProps) {
   return (
@@ -163,32 +155,6 @@ export function ClientDetailsCard({
           className="sm:col-span-2"
           optional
         />
-        {!isReadOnly ? (
-          <div className="-mt-1 flex flex-wrap gap-2 sm:col-span-2">
-            <button
-              type="button"
-              onClick={onUseRandomUkAddress}
-              disabled={!canUseRandomUkAddress}
-              className="inline-flex items-center gap-2 rounded-lg border border-amber-300/40 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-100 transition hover:bg-amber-500/15 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <MapPin className="h-3.5 w-3.5" />
-              Use random UK address
-            </button>
-            <button
-              type="button"
-              onClick={onAutoFetchAddress}
-              disabled={isFetchingAddress}
-              className="inline-flex items-center gap-2 rounded-lg border border-blue-300/40 bg-blue-500/10 px-3 py-2 text-xs font-medium text-blue-100 transition hover:bg-blue-500/15 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isFetchingAddress ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <MapPin className="h-3.5 w-3.5" />
-              )}
-              {isFetchingAddress ? "Fetching address..." : "Use device location"}
-            </button>
-          </div>
-        ) : null}
 
         <div>
           <FormField

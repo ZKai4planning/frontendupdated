@@ -7,8 +7,10 @@ import Image from "next/image";
 import { BorderBeam } from "@/components/ui/border-beam";
 import { Service } from "@/types"; // Import Service type
 import { useProject } from "@/app/context/ProjectContext";
-import { useServiceSelectionStore } from "@/lib/zustand";
+import { useAuthStore, useServiceSelectionStore } from "@/lib/zustand";
 import { useRouter } from "next/navigation";
+
+const PLANS_STAGE_ROUTE = "/dashboard?stage=plans";
 
 interface ServiceExpandPanelProps {
   service: Service;
@@ -102,6 +104,7 @@ export default function ServiceExpandPanel({
   const panelRef = useRef<HTMLDivElement>(null);
   const { updateSection } = useProject();
   const setServiceSelection = useServiceSelectionStore((state) => state.setSelection);
+  const userId = useAuthStore((state) => state.userId);
   const router = useRouter();
   const [selectedFeatureIndex, setSelectedFeatureIndex] = useState(
     firstActiveFeatureIndex >= 0 ? firstActiveFeatureIndex : 0
@@ -202,8 +205,8 @@ export default function ServiceExpandPanel({
 
     persistSelectedService();
 
-    if (applyAction === "next-step") {
-      router.push("/dashboard?stage=plans");
+    if (applyAction === "next-step" || userId) {
+      router.push(PLANS_STAGE_ROUTE);
       return;
     }
 
@@ -483,9 +486,13 @@ export default function ServiceExpandPanel({
 
       {/* Login Modal */}
       {showLogin && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowLogin(false)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => {
+          setShowLogin(false);
+        }}>
           <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3 }} onClick={(e) => e.stopPropagation()} className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden">
-            <button onClick={() => setShowLogin(false)} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white">
+            <button onClick={() => {
+              setShowLogin(false);
+            }} className="absolute top-4 right-4 text-slate-400 hover:text-slate-600 dark:hover:text-white">
               <span className="material-symbols-outlined">close</span>
             </button>
             <ClientLogin />

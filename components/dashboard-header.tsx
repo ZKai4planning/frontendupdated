@@ -98,7 +98,7 @@ import { useUserIdentity } from "@/lib/use-user-identity"
 import { useProject } from "@/app/context/ProjectContext"
 import axiosInstance from "@/lib/axiosinstance"
 import { extractProjectFromResponse, extractProjectsFromResponse } from "@/lib/project-api"
-import { useServiceSelectionStore } from "@/lib/zustand"
+import { useAuthStore, useServiceSelectionStore, useUserProfileStore } from "@/lib/zustand"
 import { useResolvedServiceSelection } from "@/lib/use-service-selection"
 import { resolveProjectServiceName, useServiceCatalog } from "@/lib/use-service-catalog"
 
@@ -139,6 +139,8 @@ type ProjectsApiResponse = {
 
 const SELECTED_PROJECT_STORAGE_KEY = "selectedProjectId"
 const SELECTED_PROJECT_STAGE_STORAGE_KEY = "selectedProjectStageId"
+const PLANS_STAGE_ROUTE = "/dashboard?stage=plans"
+const IDENTITY_STORAGE_KEY = "currentProfileIdentity"
 
 const getPrimaryProjectService = (project?: UserProject | null) =>
   project?.subServices?.[0] ?? project?.services?.[0]
@@ -160,7 +162,7 @@ const buildProjectServiceSelection = (
     price: undefined,
     initialCharge: undefined,
     subsequentCharge: undefined,
-    category: service.serviceName || resolvedServiceName,
+    category: service.serviceName || resolvedServiceName || undefined,
     description: service.description,
     image: service.image,
   }
@@ -203,10 +205,12 @@ export default function DashboardHeader({
   const profileRef = useRef<HTMLDivElement | null>(null)
   const projectRef = useRef<HTMLDivElement | null>(null)
   const { fullName, email, profilePictureUrl, userId } = useUserIdentity()
-  const { data, updateSection } = useProject()
+  const { data, updateSection, resetProject } = useProject()
   const serviceSelection = useResolvedServiceSelection(data.service)
   const setServiceSelection = useServiceSelectionStore((state) => state.setSelection)
   const clearServiceSelection = useServiceSelectionStore((state) => state.clearSelection)
+  const clearAuth = useAuthStore((state) => state.clearAuth)
+  const clearProfile = useUserProfileStore((state) => state.clearProfile)
   const serviceLabelMap = useServiceCatalog()
   const displayName = fullName || userName || "User"
   const displayEmail = email || "No email available"
@@ -405,9 +409,33 @@ export default function DashboardHeader({
   }
 
   const handleStartNewProject = () => {
+    const preservedServiceSelection =
+      serviceSelection &&
+      (serviceSelection.serviceId ||
+        serviceSelection.subServiceId ||
+        serviceSelection.serviceTitle ||
+        serviceSelection.plan)
+        ? {
+            serviceId: serviceSelection.serviceId,
+            parentServiceId: serviceSelection.parentServiceId,
+            subServiceId: serviceSelection.subServiceId,
+            serviceTitle: serviceSelection.serviceTitle,
+            plan: serviceSelection.plan,
+            pricingPlan: undefined,
+            pricingPlanDescription: undefined,
+            price: undefined,
+            initialCharge: undefined,
+            subsequentCharge: undefined,
+            category: serviceSelection.category,
+            description: serviceSelection.description,
+            image: serviceSelection.image,
+          }
+        : null
+
     updateSection("eligibility", {
       formData: undefined,
       projectId: undefined,
+      projectStageId: undefined,
       isDraft: undefined,
       draftSavedAt: undefined,
       propertyDetails: undefined,
@@ -417,22 +445,30 @@ export default function DashboardHeader({
       completedAt: undefined,
     })
 
-    updateSection("service", {
-      serviceId: undefined,
-      parentServiceId: undefined,
-      subServiceId: undefined,
-      serviceTitle: undefined,
-      plan: undefined,
-      pricingPlan: undefined,
-      pricingPlanDescription: undefined,
-      price: undefined,
-      initialCharge: undefined,
-      subsequentCharge: undefined,
-      category: undefined,
-      description: undefined,
-      image: undefined,
-    })
-    clearServiceSelection()
+    updateSection(
+      "service",
+      preservedServiceSelection ?? {
+        serviceId: undefined,
+        parentServiceId: undefined,
+        subServiceId: undefined,
+        serviceTitle: undefined,
+        plan: undefined,
+        pricingPlan: undefined,
+        pricingPlanDescription: undefined,
+        price: undefined,
+        initialCharge: undefined,
+        subsequentCharge: undefined,
+        category: undefined,
+        description: undefined,
+        image: undefined,
+      }
+    )
+
+    if (preservedServiceSelection) {
+      setServiceSelection(preservedServiceSelection)
+    } else {
+      clearServiceSelection()
+    }
 
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(SELECTED_PROJECT_STORAGE_KEY)
@@ -441,7 +477,27 @@ export default function DashboardHeader({
       window.sessionStorage.removeItem(SELECTED_PROJECT_STAGE_STORAGE_KEY)
     }
 
-    router.push("/services")
+    router.push(preservedServiceSelection ? PLANS_STAGE_ROUTE : "/services")
+  }
+
+  const handleLogout = () => {
+    clearAuth()
+    clearProfile()
+    clearServiceSelection()
+    resetProject()
+    setProjects([])
+    setIsProfileOpen(false)
+    setIsProjectOpen(false)
+
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(SELECTED_PROJECT_STORAGE_KEY)
+      window.sessionStorage.removeItem(SELECTED_PROJECT_STORAGE_KEY)
+      window.localStorage.removeItem(SELECTED_PROJECT_STAGE_STORAGE_KEY)
+      window.sessionStorage.removeItem(SELECTED_PROJECT_STAGE_STORAGE_KEY)
+      window.sessionStorage.removeItem(IDENTITY_STORAGE_KEY)
+    }
+
+    router.push("/")
   }
 
   return (
@@ -645,15 +701,15 @@ export default function DashboardHeader({
                   </div>
 
                   <div className="border-t border-slate-100 py-2">
-                    <Link
+                    <button
+                      type="button"
                       role="menuitem"
-                      href="/"
-                      onClick={() => setIsProfileOpen(false)}
-                      className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                      onClick={handleLogout}
+                      className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50"
                     >
                       <LogOut className="h-4 w-4 text-red-500" />
                       Logout
-                    </Link>
+                    </button>
                   </div>
                 </div>
               )}

@@ -352,6 +352,30 @@
   isolation: isolate;
   overflow: hidden;
 }
+
+.eligibility-agent-scroll {
+  scrollbar-width: auto;
+  scrollbar-color: rgba(125, 211, 252, 0.7) rgba(15, 23, 42, 0.65);
+}
+
+.eligibility-agent-scroll::-webkit-scrollbar {
+  width: 12px;
+}
+
+.eligibility-agent-scroll::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.7);
+  border-radius: 9999px;
+}
+
+.eligibility-agent-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.95), rgba(37, 99, 235, 0.95));
+  border-radius: 9999px;
+  border: 2px solid rgba(15, 23, 42, 0.7);
+}
+
+.eligibility-agent-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(103, 232, 249, 0.98), rgba(59, 130, 246, 0.98));
+}
  
 .animate-scaleIn {
   animation: scaleIn 0.25s ease-out forwards;

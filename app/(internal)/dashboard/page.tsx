@@ -67,6 +67,7 @@ type ProjectDetailApiResponse = {
 
 const SELECTED_PROJECT_STORAGE_KEY = "selectedProjectId"
 const SELECTED_PROJECT_STAGE_STORAGE_KEY = "selectedProjectStageId"
+const PLANS_STAGE_ROUTE = "/dashboard?stage=plans"
 
 const STAGE_COMPONENTS = {
   plans: PlansStep,
@@ -120,7 +121,7 @@ const buildProjectServiceSelection = (
     price: undefined,
     initialCharge: undefined,
     subsequentCharge: undefined,
-    category: service.serviceName || resolvedServiceName,
+    category: service.serviceName || resolvedServiceName || undefined,
     description: service.description,
     image: service.image,
   }
@@ -319,6 +320,29 @@ function DashboardOverview() {
   )
 
   const handleStartNewProject = useCallback(() => {
+    const preservedServiceSelection =
+      serviceSelection &&
+      (serviceSelection.serviceId ||
+        serviceSelection.subServiceId ||
+        serviceSelection.serviceTitle ||
+        serviceSelection.plan)
+        ? {
+            serviceId: serviceSelection.serviceId,
+            parentServiceId: serviceSelection.parentServiceId,
+            subServiceId: serviceSelection.subServiceId,
+            serviceTitle: serviceSelection.serviceTitle,
+            plan: serviceSelection.plan,
+            category: serviceSelection.category,
+            description: serviceSelection.description,
+            image: serviceSelection.image,
+            pricingPlan: undefined,
+            pricingPlanDescription: undefined,
+            price: undefined,
+            initialCharge: undefined,
+            subsequentCharge: undefined,
+          }
+        : null
+
     updateSection("eligibility", {
       formData: undefined,
       projectId: undefined,
@@ -332,23 +356,30 @@ function DashboardOverview() {
       completedAt: undefined,
     })
 
-    updateSection("service", {
-      serviceId: undefined,
-      parentServiceId: undefined,
-      subServiceId: undefined,
-      serviceTitle: undefined,
-      plan: undefined,
-      pricingPlan: undefined,
-      pricingPlanDescription: undefined,
-      price: undefined,
-      initialCharge: undefined,
-      subsequentCharge: undefined,
-      category: undefined,
-      description: undefined,
-      image: undefined,
-    })
+    updateSection(
+      "service",
+      preservedServiceSelection ?? {
+        serviceId: undefined,
+        parentServiceId: undefined,
+        subServiceId: undefined,
+        serviceTitle: undefined,
+        plan: undefined,
+        pricingPlan: undefined,
+        pricingPlanDescription: undefined,
+        price: undefined,
+        initialCharge: undefined,
+        subsequentCharge: undefined,
+        category: undefined,
+        description: undefined,
+        image: undefined,
+      }
+    )
 
-    clearServiceSelection()
+    if (preservedServiceSelection) {
+      setServiceSelection(preservedServiceSelection)
+    } else {
+      clearServiceSelection()
+    }
 
     if (typeof window !== "undefined") {
       window.localStorage.removeItem(SELECTED_PROJECT_STORAGE_KEY)
@@ -357,8 +388,8 @@ function DashboardOverview() {
       window.sessionStorage.removeItem(SELECTED_PROJECT_STAGE_STORAGE_KEY)
     }
 
-    router.push("/services")
-  }, [clearServiceSelection, router, updateSection])
+    router.push(preservedServiceSelection ? PLANS_STAGE_ROUTE : "/services")
+  }, [clearServiceSelection, router, serviceSelection, setServiceSelection, updateSection])
 
   const selectedProject = useMemo(
     () => projects.find((project) => project.projectId === selectedProjectId) ?? null,

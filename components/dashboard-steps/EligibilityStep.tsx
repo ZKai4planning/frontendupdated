@@ -62,8 +62,9 @@ type EligibilityAgentSidebarState = {
   id: string
   fieldLabel: string
   message?: string
-  requestType: "ask-agent" | "action"
+  requestType: "ask-agent" | "action" | "completion-review"
   responseMode: "info" | "yes-no"
+  missingFields?: string[]
 } | null
 
 type EligibilityAgentContextValue = {
@@ -1487,7 +1488,7 @@ const normalizeEligibilityUploadsFromApi = (payload: unknown): EligibilityFileMa
     ["sitePlan"],
   ])
   setUploadsFromPaths(
-    "Existing & Proposed Elevations",
+    "Existing & Proposed Plans",
     [
       ["worksAndMaterials", "plansDrawingsPhotographs", "existingAndProposedElevations"],
       ["existingAndProposedElevations"],
@@ -1921,7 +1922,7 @@ const buildEligibilityMultipartFormData = ({
   appendRepeatedFiles(
     formData,
     "existingAndProposedElevations",
-    getFiles("Existing & Proposed Elevations", 2)
+    getFiles("Existing & Proposed Plans", 2)
   )
   appendRepeatedFiles(
     formData,
@@ -2058,7 +2059,7 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
   "Materials match existing?": "Tell us if new materials match the existing property.",
   "Location Plan (1:1250 or 1:2500)": "Scaled plan showing the site in its wider context.",
   "Site Plan (1:200 or 1:500)": "Scaled block plan showing the site and proposed works.",
-  "Existing & Proposed Elevations": "Drawings showing current and proposed elevations.",
+  "Existing & Proposed Plans": "Drawings showing current and Proposed Plans.",
   "Photographs of Site": "Current photos of the site and surrounding context.",
   "Additional Drawings (floor plans, sections etc.)":
     "Any extra plans, sections, or supporting drawings.",
@@ -2182,7 +2183,7 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Materials match existing?",
   "Location Plan (1:1250 or 1:2500)",
   "Site Plan (1:200 or 1:500)",
-  "Existing & Proposed Elevations",
+  "Existing & Proposed Plans",
   "Photographs of Site",
   "Additional Drawings (floor plans, sections etc.)",
   // "Is the property a Listed Building?",
@@ -2234,6 +2235,198 @@ const ELIGIBILITY_QUESTION_ORDER = [
 const ELIGIBILITY_QUESTION_NUMBER = Object.fromEntries(
   ELIGIBILITY_QUESTION_ORDER.map((label, index) => [label, index + 1])
 ) as Record<string, number>
+
+const ELIGIBILITY_DECLARATION_FIELDS = [
+  {
+    label: "The information given in this application is correct and accurate to the best of my knowledge.",
+    fieldKey: "declaration_0",
+  },
+  {
+    label: "I am the owner/occupier of the application site, or I have the authority of the owner/occupier to make this application.",
+    fieldKey: "declaration_1",
+  },
+  {
+    label: "I understand that planning permission, if granted, does not authorise any infringement of private rights.",
+    fieldKey: "declaration_2",
+  },
+  {
+    label: "I consent to the information in this application being used for planning purposes and being made publicly available.",
+    fieldKey: "declaration_3",
+  },
+  {
+    label: "I understand that a fee may be payable and I agree to pay any fees required.",
+    fieldKey: "declaration_4",
+  },
+] as const
+
+const ELIGIBILITY_DECLARATION_FIELD_KEY_BY_LABEL = Object.fromEntries(
+  ELIGIBILITY_DECLARATION_FIELDS.map(({ label, fieldKey }) => [label, fieldKey])
+) as Record<string, string>
+
+const ELIGIBILITY_OPTIONAL_COMPLETION_LABELS = new Set<string>([
+  "Applicant Middle Name",
+  "Site Address Line 2",
+  "Correspondence Address Line 2",
+  "Colour / Finish Notes (optional)",
+  "Tree Species (if known)",
+  "Approximate Tree Height (m)",
+  "Arboriculture Report / BS5837 Report (if available)",
+  "Flood Risk Assessment (if available)",
+  "Upload safety & compliance documents",
+  "Additional Drawings (floor plans, sections etc.)",
+])
+
+const ELIGIBILITY_REQUIRED_UPLOAD_MIN_COUNTS: Record<string, number> = {
+  "Location Plan (1:1250 or 1:2500)": 1,
+  "Site Plan (1:200 or 1:500)": 1,
+  "Existing & Proposed Plans": 2,
+  "Photographs of Site": 1,
+}
+
+const STATIC_AGENT_Z_COMPLETION_REVIEW_FIELDS = [
+  "Location Plan (1:1250 or 1:2500)",
+  "Site Plan (1:200 or 1:500)",
+  "Existing & Proposed Plans - Existing elevation",
+  "Existing & Proposed Plans - Proposed elevation",
+  "Photographs of Site",
+  "Additional Drawings (floor plans, sections etc.)",
+  "Arboriculture Report / BS5837 Report (if available)",
+  "Flood Risk Assessment (if available)",
+]
+
+const hasCompletedEligibilityValue = (value: EligibilityFormValue) => {
+  if (Array.isArray(value)) {
+    return value.some((item) => item.trim().length > 0)
+  }
+
+  return typeof value === "string" && value.trim().length > 0
+}
+
+const isYesLikeValue = (value: EligibilityFormValue) =>
+  typeof value === "string" && value.trim().toLowerCase() === "yes"
+
+const isCompletionCheckRelevant = (
+  label: string,
+  formData: EligibilityFormValues
+) => {
+  if (ELIGIBILITY_OPTIONAL_COMPLETION_LABELS.has(label)) {
+    return false
+  }
+
+  if (
+    [
+      "Correspondence Address Line 1",
+      "Correspondence Address Line 2",
+      "Correspondence Postcode",
+    ].includes(label)
+  ) {
+    return isYesLikeValue(formData["Alternate address for correspondence?"])
+  }
+
+  if (
+    [
+      "What was previously proposed, and was it approved, refused, or withdrawn?",
+      "Planning Reference Number *",
+      "Type of Application *",
+      "Type of Development Previously Proposed",
+      "Is this project similar to the previous application or different this time?",
+    ].includes(label)
+  ) {
+    return isYesLikeValue(formData["Have you previously applied to the council?"])
+  }
+
+  if (label === "Details of Renewable / Energy Measures (if applicable)") {
+    return isYesLikeValue(formData["Renewable energy installations proposed?"])
+  }
+
+  if (label === "Names & Addresses of Other Owners (if Certificate B, C or D)") {
+    const certificateValue = typeof formData["Which Ownership Certificate applies?"] === "string"
+      ? formData["Which Ownership Certificate applies?"].toLowerCase()
+      : ""
+
+    return ["certificate b", "certificate c", "certificate d"].some((token) =>
+      certificateValue.includes(token)
+    )
+  }
+
+  if (label === "Details of Access / Parking Changes") {
+    return isYesLikeValue(formData["New or altered vehicle access?"])
+  }
+
+  return true
+}
+
+const isCompletionCheckSatisfied = ({
+  label,
+  formData,
+  uploadedFiles,
+  signatureFile,
+}: {
+  label: string
+  formData: EligibilityFormValues
+  uploadedFiles: EligibilityFileMap
+  signatureFile: File | null
+}) => {
+  if (label === "Phone Number") {
+    return (
+      hasCompletedEligibilityValue(formData["Country Code"]) &&
+      hasCompletedEligibilityValue(formData["Phone Number"])
+    )
+  }
+
+  if (label === "Kitchen Room Dimensions (metres)") {
+    return (
+      hasCompletedEligibilityValue(formData["Kitchen Room Length (metres)"]) &&
+      hasCompletedEligibilityValue(formData["Kitchen Room Width (metres)"])
+    )
+  }
+
+  if (label === "Bathroom Room Dimensions (metres)") {
+    return (
+      hasCompletedEligibilityValue(formData["Bathroom Room Length (metres)"]) &&
+      hasCompletedEligibilityValue(formData["Bathroom Room Width (metres)"])
+    )
+  }
+
+  if (label === "Digital Signature") {
+    return Boolean(signatureFile)
+  }
+
+  if (label in ELIGIBILITY_DECLARATION_FIELD_KEY_BY_LABEL) {
+    return formData[ELIGIBILITY_DECLARATION_FIELD_KEY_BY_LABEL[label]] === "true"
+  }
+
+  if (label in ELIGIBILITY_REQUIRED_UPLOAD_MIN_COUNTS) {
+    const requiredUploadCount = ELIGIBILITY_REQUIRED_UPLOAD_MIN_COUNTS[label]
+    const uploadedCount = (uploadedFiles[label] ?? []).filter((entry) => hasUploadedAsset(entry)).length
+
+    return uploadedCount >= requiredUploadCount
+  }
+
+  return hasCompletedEligibilityValue(formData[label])
+}
+
+const getMissingEligibilityFields = ({
+  formData,
+  uploadedFiles,
+  signatureFile,
+}: {
+  formData: EligibilityFormValues
+  uploadedFiles: EligibilityFileMap
+  signatureFile: File | null
+}) =>
+  ELIGIBILITY_QUESTION_ORDER.filter((label) => {
+    if (!isCompletionCheckRelevant(label, formData)) {
+      return false
+    }
+
+    return !isCompletionCheckSatisfied({
+      label,
+      formData,
+      uploadedFiles,
+      signatureFile,
+    })
+  })
 
 /* ─────────────────────────────────────────────
    CONSULTATION TRIGGER BANNER
@@ -2411,16 +2604,37 @@ function AgentActionButton({
   onClick,
   disabled = false,
   className = "mt-3",
+  agentFieldLabel,
+  agentMessage,
+  agentRequestType = "action",
+  agentResponseMode = "info",
 }: {
   label: string
   onClick: () => void
   disabled?: boolean
   className?: string
+  agentFieldLabel?: string
+  agentMessage?: string
+  agentRequestType?: "ask-agent" | "action"
+  agentResponseMode?: "info" | "yes-no"
 }) {
+  const { showAgentSidebar } = useEligibilityAgent()
+
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() => {
+        onClick()
+
+        if (agentFieldLabel) {
+          showAgentSidebar(
+            createAgentSidebarPayload(agentFieldLabel, agentMessage, {
+              requestType: agentRequestType,
+              responseMode: agentResponseMode,
+            })
+          )
+        }
+      }}
       disabled={disabled}
       className={`eligibility-agent-button inline-flex items-center justify-center rounded-xl border border-blue-900/60 bg-gradient-to-r from-slate-800/92 via-[#1f3d9a]/86 to-blue-800/84 px-3 py-2 text-xs font-semibold text-white transition-all hover:from-slate-800 hover:via-[#1d388f]/92 hover:to-blue-800/90 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-none disabled:bg-slate-100 disabled:text-slate-400 ${className}`}
     >
@@ -3604,9 +3818,21 @@ function EligibilityCheckPage() {
     setIsAnalyzing(true)
 
     try {
+      const missingFields = STATIC_AGENT_Z_COMPLETION_REVIEW_FIELDS
+
       await upsertEligibilityProject("submitted")
 
-      setAgentSidebar(null)
+      setAgentSidebar({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        fieldLabel: "Eligibility Completion Review",
+        message:
+          missingFields.length > 0
+            ? "I can see you are close to completing your eligibility check. We have identified a few remaining items that still need to be completed before everything is fully in place. Please review the outstanding fields below, and if you would like complete support, speak with one of our experts using the consultation calendar below."
+            : "Your eligibility check has been submitted successfully. If you would like a professional review or guidance on the next steps, you can speak with one of our experts using the consultation calendar below.",
+        requestType: "completion-review",
+        responseMode: "info",
+        missingFields,
+      })
       setShowVerification(true)
       updateSection("eligibility", {
         ...(data.eligibility || {}),
@@ -4015,6 +4241,7 @@ function EligibilityCheckPage() {
                     message={agentSidebar.message}
                     requestType={agentSidebar.requestType}
                     responseMode={agentSidebar.responseMode}
+                    missingFields={agentSidebar.missingFields}
                     onClose={() => setAgentSidebar(null)}
                   />
                 )}
@@ -4051,9 +4278,11 @@ function EligibilityEntryCard({
         Start your eligibility review
       </h2>
       <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
-        We will only show the eligibility form after you confirm that you want to
-        start this stage. Your selected service is{" "}
-        <span className="font-medium text-slate-800">{serviceName}</span>.
+        Thank you for choosing AI4Planning. Your selected <b>Bronze</b> plan includes
+        10 Agent Z buttons, and you can use them throughout the application.
+      </p>
+      <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+        Your selected service is <span className="font-bold text-slate-800 ">{serviceName}</span>.
       </p>
 
       <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
@@ -4889,12 +5118,22 @@ function SelectField({
           }}
           className={`w-full rounded-xl border px-4 py-2 text-sm transition-shadow focus:outline-none focus:ring-2 ${
             isAgentValue
-              ? "relative z-10 border-blue-900/60 bg-gradient-to-r from-slate-800/92 via-[#1f3d9a]/86 to-blue-800/84 text-white focus:ring-blue-300"
+              ? "relative z-10 border-blue-200 bg-blue-50 text-slate-900 shadow-[0_12px_28px_rgba(37,99,235,0.12)] focus:ring-blue-200"
               : "focus:ring-blue-200"
           }`}
         >
-          <option value="">Select...</option>
-          {options.map(o => <option key={o}>{o}</option>)}
+          <option value="" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>
+            Select...
+          </option>
+          {options.map(o => (
+            <option
+              key={o}
+              value={o}
+              style={{ color: "#0f172a", backgroundColor: "#ffffff" }}
+            >
+              {o}
+            </option>
+          ))}
         </select>
         {isAgentValue && <EligibilityAgentMovingBorder size={58} />}
       </div>
@@ -4997,8 +5236,8 @@ function VerificationCalendar({ disabled = false }: { disabled?: boolean }) {
   return (
     <div className="rounded-2xl overflow-hidden border bg-white shadow-lg">
       <div className="bg-gradient-to-r from-blue-600 to-blue-500 p-5 text-white">
-        <h3 className="text-sm font-semibold">Verification Session</h3>
-        <p className="text-xs text-blue-100">15 min video call · Senior Planner</p>
+        <h3 className="text-sm font-semibold">Consultation Calendar</h3>
+        <p className="text-xs text-blue-100">15 min planning review with our expert team</p>
       </div>
       <div className="p-5 space-y-6">
         <div className="flex justify-between items-center">
@@ -5035,7 +5274,7 @@ function VerificationCalendar({ disabled = false }: { disabled?: boolean }) {
           onClick={() => router.push("/dashboard?stage=consultant")}
           className="w-full rounded-xl bg-blue-600 text-white py-2.5 font-semibold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
         >
-          Confirm Consultation Booking
+          Confirm Expert Consultation
         </button>
       </div>
     </div>

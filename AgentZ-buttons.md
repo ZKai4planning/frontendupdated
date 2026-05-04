@@ -47,7 +47,7 @@
 
 51. Location Plan (1:1250 or 1:2500) --> Yes / No
 52. Site Plan (1:200 or 1:500) --> Yes / No
-53. Existing & Proposed Elevations --> Yes / No
+53. Existing & Proposed Plans --> Yes / No
 54. Photographs of Site --> Yes / No
 55. Additional Drawings (floor plans, sections etc.) --> Yes / No
 

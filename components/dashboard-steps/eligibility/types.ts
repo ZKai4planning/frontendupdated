@@ -70,6 +70,10 @@ export type EligibilitySharedComponents = {
     onClick: () => void
     disabled?: boolean
     className?: string
+    agentFieldLabel?: string
+    agentMessage?: string
+    agentRequestType?: "ask-agent" | "action"
+    agentResponseMode?: "info" | "yes-no"
   }>
   FileUploadArea?: React.ComponentType<{
     label: string

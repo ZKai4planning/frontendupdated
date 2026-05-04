@@ -1,7 +1,6 @@
 "use client"
 
-import axios from "axios"
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { Check, Info, UploadCloud } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
@@ -145,68 +144,6 @@ const buildFullAddressFromAddress = (address: CustomerAddressDetails) =>
     .filter(Boolean)
     .join(", ")
 
-const buildAddressDetailsFromLocation = (address: Record<string, unknown>) =>
-  buildStructuredAddress({
-    doorNo: typeof address.house_number === "string" ? address.house_number : "",
-    street: typeof address.road === "string" ? address.road : "",
-    locality:
-      typeof address.suburb === "string"
-        ? address.suburb
-        : typeof address.neighbourhood === "string"
-          ? address.neighbourhood
-          : "",
-    city:
-      typeof address.city === "string"
-        ? address.city
-        : typeof address.town === "string"
-          ? address.town
-          : typeof address.village === "string"
-            ? address.village
-            : "",
-    state: typeof address.state === "string" ? address.state : "",
-    country: typeof address.country === "string" ? address.country : "",
-    postalCode: typeof address.postcode === "string" ? address.postcode : "",
-  })
-
-const SAMPLE_UK_ADDRESSES: CustomerAddressDetails[] = [
-  {
-    doorNo: "221B",
-    street: "Baker Street",
-    locality: "Marylebone",
-    city: "London",
-    state: "England",
-    country: "United Kingdom",
-    postalCode: "NW1 6XE",
-  },
-  {
-    doorNo: "10",
-    street: "Downing Street",
-    locality: "Westminster",
-    city: "London",
-    state: "England",
-    country: "United Kingdom",
-    postalCode: "SW1A 2AA",
-  },
-  {
-    doorNo: "47",
-    street: "Deansgate",
-    locality: "City Centre",
-    city: "Manchester",
-    state: "England",
-    country: "United Kingdom",
-    postalCode: "M3 2AY",
-  },
-  {
-    doorNo: "15",
-    street: "George Street",
-    locality: "New Town",
-    city: "Edinburgh",
-    state: "Scotland",
-    country: "United Kingdom",
-    postalCode: "EH2 2PA",
-  },
-]
-
 const mergeCustomerDetailsWithProfile = (
   current: CustomerDetailsForm,
   profile: ProfileModel,
@@ -265,7 +202,6 @@ export default function PaymentUI() {
     createInitialCustomerDetails(storedPayment?.customerDetails, { fullName, email })
   )
   const [isSavingProfile, setIsSavingProfile] = useState(false)
-  const [isFetchingAddress, setIsFetchingAddress] = useState(false)
 
   const serviceCategory =
     serviceSelection?.category || "Residential: Homeowners & landlords"
@@ -325,88 +261,6 @@ export default function PaymentUI() {
       isActive = false
     }
   }, [userId])
-
-  const applyRandomUkAddress = useCallback(() => {
-    const randomAddress =
-      SAMPLE_UK_ADDRESSES[Math.floor(Math.random() * SAMPLE_UK_ADDRESSES.length)]
-
-    setCustomerDetails((current) => ({
-      ...current,
-      fullAddress: buildFullAddressFromAddress(randomAddress),
-      postalCode: randomAddress.postalCode,
-      addressDetails: buildStructuredAddress(randomAddress),
-    }))
-
-    toast.success("Random UK address applied")
-  }, [])
-
-  const fetchAddressFromCurrentLocation = useCallback(
-    async (showSuccessToast = true) => {
-      if (typeof window === "undefined" || !navigator.geolocation) {
-        toast.error("Geolocation is not supported on this device")
-        return false
-      }
-
-      setIsFetchingAddress(true)
-
-      try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 10000,
-          })
-        })
-
-        const { latitude, longitude } = position.coords
-        const reverseGeoUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`
-        const geoResponse = await axios.get(reverseGeoUrl)
-        const address = geoResponse.data?.address
-
-        if (!address || typeof address !== "object") {
-          throw new Error("Address not found")
-        }
-
-        const structuredAddress = buildAddressDetailsFromLocation(
-          address as Record<string, unknown>
-        )
-        const normalizedAddress = buildFullAddressFromAddress(structuredAddress)
-        const normalizedPostalCode = normalizeAddressPart(structuredAddress.postalCode)
-
-        if (!normalizedAddress && !normalizedPostalCode) {
-          throw new Error("Address not found")
-        }
-
-        setCustomerDetails((current) => ({
-          ...current,
-          fullAddress: normalizedAddress || current.fullAddress,
-          postalCode: normalizedPostalCode || current.postalCode,
-          addressDetails: buildStructuredAddress(structuredAddress),
-        }))
-
-        if (showSuccessToast) {
-          toast.success("Address fetched from your current location")
-        }
-
-        return true
-      } catch (error) {
-        if (
-          typeof error === "object" &&
-          error !== null &&
-          "code" in error &&
-          error.code === 1
-        ) {
-          toast.error("Location access was denied")
-          return false
-        }
-
-        toast.error("Unable to fetch address from current location")
-        return false
-      } finally {
-        setIsFetchingAddress(false)
-      }
-    },
-    []
-  )
 
   const effectiveFullName = customerDetails.fullName
   const effectivePhoneCountryCode = customerDetails.phoneCountryCode || "+44"
@@ -705,8 +559,6 @@ export default function PaymentUI() {
                 }}
                 isReadOnly={isReadOnly}
                 isSavingProfile={isSavingProfile}
-                isFetchingAddress={isFetchingAddress}
-                canUseRandomUkAddress
                 isSaveEnabled={isClientDetailsSaveEnabled}
                 phonePlaceholder={getPhoneNumberPlaceholder(effectivePhoneCountryCode)}
                 phoneHelperText={phoneHelperText}
@@ -714,10 +566,6 @@ export default function PaymentUI() {
                 onFieldChange={handleDetailChange}
                 onPhoneCountryCodeChange={handlePhoneCountryCodeChange}
                 onPhoneNumberChange={handlePhoneChange}
-                onUseRandomUkAddress={applyRandomUkAddress}
-                onAutoFetchAddress={() => {
-                  void fetchAddressFromCurrentLocation()
-                }}
                 onSave={() => {
                   void saveClientDetails()
                 }}

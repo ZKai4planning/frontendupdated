@@ -1,4 +1,3 @@
-import React from "react"
 import { EligibilityStepContentProps } from "./types"
 
 export function WorksMaterialsStepContent({
@@ -145,10 +144,19 @@ export function WorksMaterialsStepContent({
 
       <SectionHeading>Dimensions</SectionHeading>
       <div className="mb-6 grid grid-cols-2 gap-6">
+        <div className="col-span-2 flex justify-end">
+          <AgentActionButton
+            label="Need help with dimensions? Ask Agent Z"
+            onClick={() => undefined}
+            agentFieldLabel="Need help with dimensions?"
+            agentRequestType="ask-agent"
+            className="mt-0"
+          />
+        </div>
 
         <Input
           label="Total internal floor area"
-          placeholder="Enter total internal floor area (m²) "
+          placeholder="Enter total internal floor area (mÂ²) "
         />
         <Input
           label="Number of floors"
@@ -242,12 +250,11 @@ export function WorksMaterialsStepContent({
           <div className="space-y-4">
             <RadioGroupField
               label="Approx smallest bedroom size?"
-              options={["Under 6.5 m²", "6.5–10 m²", "10+ m²"]}
+              options={["Under 6.5 mÂ²", "6.5â€“10 mÂ²", "10+ mÂ²"]}
             />
           </div>
         </div>
       </div>
-
 
       <SectionHeading>Current Materials Used</SectionHeading>
       <div className="mb-6 grid grid-cols-2 gap-6">
@@ -319,7 +326,7 @@ export function WorksMaterialsStepContent({
           }}
         />
         <StructuredFileUploadArea
-          label="Existing & Proposed Elevations"
+          label="Existing & Proposed Plans"
           accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf"
           hint="All affected elevations at 1:50 or 1:100"
           slotLabels={["Existing elevation", "Proposed elevation"]}
@@ -328,9 +335,9 @@ export function WorksMaterialsStepContent({
             message: "No elevations uploaded - our architects can prepare these drawings.",
             decision: {
               fieldLabel: "Need help with elevations?",
-              prompt: "Would you like Agent Z to help prepare the existing and proposed elevations?",
+              prompt: "Would you like Agent Z to help prepare the existing and Proposed Plans?",
               yesMessage:
-                "Agent Z is preparing guidance and support for the missing existing and proposed elevations.",
+                "Agent Z is preparing guidance and support for the missing existing and Proposed Plans.",
               noMessage:
                 "Agent Z has noted that you do not need help with elevations right now.",
             },

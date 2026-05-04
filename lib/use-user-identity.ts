@@ -55,6 +55,12 @@ const getStorage = (): Storage | null => {
   return window.sessionStorage;
 };
 
+const clearStoredIdentity = () => {
+  const storage = getStorage();
+  if (!storage) return;
+  storage.removeItem(IDENTITY_STORAGE_KEY);
+};
+
 const readStoredAuthUserId = (): string | null => {
   if (typeof window === "undefined") return null;
 
@@ -182,12 +188,22 @@ export const useUserIdentity = (): UserIdentityResult => {
   }, [resolvedUserId]);
 
   useEffect(() => {
+    if (!resolvedUserId) {
+      clearStoredIdentity();
+      setIdentity({
+        userId: null,
+        fullName: "User",
+        email: "",
+        profilePictureUrl: DEFAULT_AVATAR,
+      });
+      return;
+    }
+
     setIdentity((prev) => ({
       ...prev,
       userId: resolvedUserId,
     }));
 
-    if (!resolvedUserId) return;
     void loadIdentity();
   }, [resolvedUserId, loadIdentity]);
 
