@@ -1,7 +1,11 @@
 import axios from "axios"
 
 import axiosInstance from "@/lib/axiosinstance"
-import { mergeProfileData, type ProfileModel } from "@/lib/profile-validation"
+import {
+  mergeProfileData,
+  sanitizeProfileInput,
+  type ProfileModel,
+} from "@/lib/profile-validation"
 
 const asRecord = (value: unknown): Record<string, unknown> => {
   if (typeof value === "object" && value !== null) {
@@ -80,6 +84,28 @@ const shouldTryNextMethod = (error: unknown) => {
   return status === 404 || status === 405 || status === 415
 }
 
+const hasValue = (value: string) => value.trim().length > 0
+
+const buildProfileApiPayload = (profilePayload: ProfileModel) => {
+  const sanitized = sanitizeProfileInput(profilePayload)
+  const payload: Record<string, unknown> = {
+    ...sanitized,
+    phone: sanitized.phone,
+    address: sanitized.address,
+  }
+
+  const hasLandlineNumber = hasValue(sanitized.landline.number)
+
+  if (hasLandlineNumber) {
+    payload.landline = {
+      countryCode: sanitized.landline.countryCode || "+44",
+      number: sanitized.landline.number,
+    }
+  }
+
+  return payload
+}
+
 export const getProfile = async (userId: string) => {
   const response = await axiosInstance.get(`/profile/${encodeURIComponent(userId)}`)
   return {
@@ -94,17 +120,18 @@ export const updateProfile = async (
   profilePayload: ProfileModel
 ) => {
   const endpoint = `/profile/${encodeURIComponent(userId)}`
+  const apiPayload = buildProfileApiPayload(profilePayload)
 
   try {
-    return await axiosInstance.put(endpoint, profilePayload)
+    return await axiosInstance.put(endpoint, apiPayload)
   } catch (error) {
     if (!shouldTryNextMethod(error)) throw error
 
     try {
-      return await axiosInstance.patch(endpoint, profilePayload)
+      return await axiosInstance.patch(endpoint, apiPayload)
     } catch (patchError) {
       if (!shouldTryNextMethod(patchError)) throw patchError
-      return axiosInstance.post(endpoint, profilePayload)
+      return axiosInstance.post(endpoint, apiPayload)
     }
   }
 }

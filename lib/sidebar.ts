@@ -43,12 +43,12 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
 
 
   /* ================= PROJECTS ================= */
-  {
-    id: "Menu",
-    label: "Menu",
-    icon: FiGrid,
+  // {
+  //   id: "Menu",
+  //   label: "Menu",
+  //   icon: FiGrid,
 
-  },
+  // },
 
   /* ================= AI ================= */
   // {

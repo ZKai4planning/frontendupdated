@@ -9,8 +9,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import axiosInstance from "@/lib/axiosinstance";
 import {
   COUNTRY_CODES,
-  MOBILE_NUMBER_LENGTH,
   UK_LANDLINE_MAX_LENGTH,
+  getPhoneNumberHelperText,
+  getPhoneNumberMaxLength,
+  getPhoneNumberPlaceholder,
   mergeProfileData,
   type ProfileFieldErrors,
   type ProfileFieldPath,
@@ -20,6 +22,7 @@ import {
 import { PROFILE_COMPLETION_UPDATED_EVENT } from "@/lib/use-profile-completion-status";
 import { USER_IDENTITY_UPDATED_EVENT } from "@/lib/use-user-identity";
 import { useAuthStore } from "@/lib/zustand";
+import { updateProfile } from "@/lib/profile-api";
 import {
   Camera,
   Check,
@@ -542,7 +545,7 @@ export default function ProfileSectionPage() {
                 .slice(
                   0,
                   type === "phone"
-                    ? MOBILE_NUMBER_LENGTH
+                    ? getPhoneNumberMaxLength(prev.phone.countryCode)
                     : getLandlineMaxLength(prev.landline.countryCode)
                 ),
             }
@@ -552,11 +555,14 @@ export default function ProfileSectionPage() {
               number:
                 type === "landline"
                   ? prev.landline.number.slice(0, getLandlineMaxLength(value))
-                  : prev.phone.number,
+                  : prev.phone.number.slice(0, getPhoneNumberMaxLength(value)),
             },
     }));
 
     clearFieldError(`${type}.${key}` as ProfileFieldPath);
+    if (type === "phone" && key === "countryCode") {
+      clearFieldError("phone.number");
+    }
     if (type === "landline" && key === "countryCode") {
       clearFieldError("landline.number");
     }
@@ -589,20 +595,7 @@ export default function ProfileSectionPage() {
     setIsSaving(true);
 
     try {
-      const endpoint = `/profile/${encodeURIComponent(resolvedUserId)}`;
-
-      try {
-        await axiosInstance.put(endpoint, result.sanitizedProfile);
-      } catch (error) {
-        if (!shouldTryNextMethod(error)) throw error;
-
-        try {
-          await axiosInstance.patch(endpoint, result.sanitizedProfile);
-        } catch (patchError) {
-          if (!shouldTryNextMethod(patchError)) throw patchError;
-          await axiosInstance.post(endpoint, result.sanitizedProfile);
-        }
-      }
+      await updateProfile(resolvedUserId, result.sanitizedProfile);
 
       toast.success("Profile updated!");
       setSavedProfile(result.sanitizedProfile);
@@ -633,6 +626,12 @@ export default function ProfileSectionPage() {
       </div>
     );
   }
+
+  const mobilePhoneHelpText = getPhoneNumberHelperText(formProfile.phone.countryCode);
+  const mobilePhonePlaceholder = getPhoneNumberPlaceholder(formProfile.phone.countryCode);
+  const mobilePhoneMaxLength = getPhoneNumberMaxLength(formProfile.phone.countryCode);
+  const mobilePhoneError =
+    fieldErrors["phone.number"] || fieldErrors["phone.countryCode"] || "";
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 px-4 py-10">
@@ -782,17 +781,17 @@ export default function ProfileSectionPage() {
                       }`}
                       value={formProfile.phone.number}
                       onChange={(event) => handlePhoneChange("phone", "number", event.target.value)}
-                      placeholder="7123456789"
+                      placeholder={mobilePhonePlaceholder}
                       type="tel"
                       autoComplete="tel"
                       inputMode="numeric"
-                      maxLength={MOBILE_NUMBER_LENGTH}
+                      maxLength={mobilePhoneMaxLength}
                       disabled={!isEditMode}
                     />
                   </div>
-                  {fieldErrors["phone.number"] ? (
-                    <p className="text-xs text-red-500">{fieldErrors["phone.number"]}</p>
-                  ) : null}
+                  <p className={`text-xs ${mobilePhoneError ? "text-red-500" : "text-gray-500"}`}>
+                    {mobilePhoneError || mobilePhoneHelpText}
+                  </p>
                 </div>
 
                 <div className="space-y-1">

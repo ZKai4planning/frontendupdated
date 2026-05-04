@@ -613,7 +613,13 @@ import { FormEvent, ChangeEvent, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import axiosInstance from "@/lib/axiosinstance";
-import { COUNTRY_CODES, MOBILE_NUMBER_LENGTH } from "@/lib/profile-validation";
+import {
+  COUNTRY_CODES,
+  getPhoneNumberHelperText,
+  getPhoneNumberMaxLength,
+  getPhoneNumberPlaceholder,
+  validateMobilePhone,
+} from "@/lib/profile-validation";
 import { PROFILE_COMPLETION_UPDATED_EVENT } from "@/lib/use-profile-completion-status";
 import {
   USER_IDENTITY_UPDATED_EVENT,
@@ -651,9 +657,20 @@ export default function ProfileSetupPage() {
   }, [storeUserId]);
 
   const handlePhoneNumberChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const digitsOnly = event.target.value.replace(/\D/g, "").slice(0, MOBILE_NUMBER_LENGTH);
+    const digitsOnly = event.target.value
+      .replace(/\D/g, "")
+      .slice(0, getPhoneNumberMaxLength(phoneCountryCode));
     setPhoneNumber(digitsOnly);
   };
+
+  const handlePhoneCountryCodeChange = (value: string) => {
+    setPhoneCountryCode(value);
+    setPhoneNumber((current) => current.slice(0, getPhoneNumberMaxLength(value)));
+  };
+
+  const selectedPhoneMaxLength = getPhoneNumberMaxLength(phoneCountryCode);
+  const selectedPhonePlaceholder = getPhoneNumberPlaceholder(phoneCountryCode);
+  const selectedPhoneHelperText = getPhoneNumberHelperText(phoneCountryCode);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -663,18 +680,16 @@ export default function ProfileSetupPage() {
       return;
     }
 
-    if (!phoneNumber.trim()) {
-      toast.error("Phone number is required");
-      return;
-    }
+    const phoneValidation = validateMobilePhone(phoneCountryCode, phoneNumber, {
+      label: "Phone number",
+    });
 
-    if (phoneNumber.length !== MOBILE_NUMBER_LENGTH) {
-      toast.error(`Phone number must be exactly ${MOBILE_NUMBER_LENGTH} digits`);
-      return;
-    }
-
-    if (!phoneCountryCode.trim()) {
-      toast.error("Country code is required");
+    if (!phoneValidation.isValid) {
+      toast.error(
+        phoneValidation.numberError ||
+          phoneValidation.countryCodeError ||
+          "Please enter a valid phone number"
+      );
       return;
     }
 
@@ -689,8 +704,8 @@ export default function ProfileSetupPage() {
       await axiosInstance.put(`/profile/${resolvedUserId}`, {
         fullName,
         phone: {
-          countryCode: phoneCountryCode,
-          number: phoneNumber,
+          countryCode: phoneValidation.sanitizedCountryCode,
+          number: phoneValidation.sanitizedNumber,
         },
       });
 
@@ -761,7 +776,7 @@ export default function ProfileSetupPage() {
                 <select
                   value={phoneCountryCode}
                   onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-                    setPhoneCountryCode(e.target.value)
+                    handlePhoneCountryCodeChange(e.target.value)
                   }
                   className="w-28 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ring-blue-100 focus:border-blue-500 transition bg-white"
                 >
@@ -781,17 +796,16 @@ export default function ProfileSetupPage() {
                   <input
                     value={phoneNumber}
                     onChange={handlePhoneNumberChange}
-                    placeholder="7123456789"
+                    placeholder={selectedPhonePlaceholder}
                     type="tel"
                     inputMode="numeric"
-                    maxLength={MOBILE_NUMBER_LENGTH}
-                    pattern={`\\d{${MOBILE_NUMBER_LENGTH}}`}
+                    maxLength={selectedPhoneMaxLength}
                     className="w-full pl-10 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ring-blue-100 focus:border-blue-500 transition"
                   />
                 </div>
               </div>
               <p className="text-xs text-gray-500">
-                Enter exactly {MOBILE_NUMBER_LENGTH} digits.
+                {selectedPhoneHelperText}
               </p>
             </div>
 

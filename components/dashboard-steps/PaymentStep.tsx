@@ -16,9 +16,12 @@ import {
 } from "@/components/dashboard-steps/payment/ClientDetailsCard"
 import { plans as pricingPlans } from "@/components/pricingcards-landing"
 import {
+  getPhoneNumberHelperText,
+  getPhoneNumberMaxLength,
+  getPhoneNumberPlaceholder,
   mergeProfileData,
-  MOBILE_NUMBER_LENGTH,
   type ProfileModel,
+  validateMobilePhone,
 } from "@/lib/profile-validation"
 import {
   getProfile,
@@ -463,21 +466,32 @@ export default function PaymentUI() {
     setCustomerDetails((current) => ({
       ...current,
       phoneCountryCode: value,
+      phoneNumber: current.phoneNumber.slice(0, getPhoneNumberMaxLength(value)),
     }))
   }
 
   const handlePhoneChange = (value: string) => {
     setCustomerDetails((current) => ({
       ...current,
-      phoneNumber: value,
+      phoneNumber: value.replace(/\D/g, "").slice(0, getPhoneNumberMaxLength(current.phoneCountryCode)),
     }))
   }
 
   const trimmedTransactionRef = transactionRef.trim()
+  const phoneValidation = validateMobilePhone(
+    effectivePhoneCountryCode,
+    effectivePhoneNumber,
+    { label: "Phone number" }
+  )
+  const phoneHasError = Boolean(effectivePhoneNumber.trim()) && !phoneValidation.isValid
+  const phoneHelperText = phoneHasError
+    ? phoneValidation.numberError ||
+      phoneValidation.countryCodeError ||
+      getPhoneNumberHelperText(effectivePhoneCountryCode)
+    : getPhoneNumberHelperText(effectivePhoneCountryCode)
   const isCustomerDetailsComplete =
     effectiveFullName.trim() &&
-    effectivePhoneCountryCode.trim() &&
-    effectivePhoneNumber.trim().length === MOBILE_NUMBER_LENGTH &&
+    phoneValidation.isValid &&
     effectiveEmail.trim() &&
     effectivePostCode.trim() &&
     (effectiveServiceLocationType === "same" ||
@@ -510,6 +524,26 @@ export default function PaymentUI() {
     const normalizedPostCode = effectivePostCode.trim()
     const normalizedServicePostCode = effectiveServicePostCode.trim()
 
+    if (!normalizedFullName) {
+      toast.error("Full name is required")
+      return false
+    }
+
+    const validatedPhone = validateMobilePhone(
+      normalizedPhoneCountryCode,
+      normalizedPhoneNumber,
+      { label: "Phone number" }
+    )
+
+    if (!validatedPhone.isValid) {
+      toast.error(
+        validatedPhone.numberError ||
+          validatedPhone.countryCodeError ||
+          "Please enter a valid phone number"
+      )
+      return false
+    }
+
     setIsSavingProfile(true)
 
     try {
@@ -529,8 +563,8 @@ export default function PaymentUI() {
         ...mergedProfile,
         fullName: normalizedFullName,
         phone: {
-          countryCode: normalizedPhoneCountryCode,
-          number: normalizedPhoneNumber,
+          countryCode: validatedPhone.sanitizedCountryCode,
+          number: validatedPhone.sanitizedNumber,
         },
         address: applyPaymentAddressToProfile(
           mergedProfile.address,
@@ -545,8 +579,8 @@ export default function PaymentUI() {
       let nextCustomerDetails: CustomerDetailsForm = {
         ...customerDetails,
         fullName: normalizedFullName,
-        phoneCountryCode: normalizedPhoneCountryCode,
-        phoneNumber: normalizedPhoneNumber,
+        phoneCountryCode: validatedPhone.sanitizedCountryCode,
+        phoneNumber: validatedPhone.sanitizedNumber,
         email: normalizedEmail,
         fullAddress: normalizedFullAddress,
         postalCode: normalizedPostCode,
@@ -674,6 +708,9 @@ export default function PaymentUI() {
                 isFetchingAddress={isFetchingAddress}
                 canUseRandomUkAddress
                 isSaveEnabled={isClientDetailsSaveEnabled}
+                phonePlaceholder={getPhoneNumberPlaceholder(effectivePhoneCountryCode)}
+                phoneHelperText={phoneHelperText}
+                phoneHasError={phoneHasError}
                 onFieldChange={handleDetailChange}
                 onPhoneCountryCodeChange={handlePhoneCountryCodeChange}
                 onPhoneNumberChange={handlePhoneChange}
@@ -839,8 +876,8 @@ export default function PaymentUI() {
           {!isReadOnly && !isSubmitEnabled && (
             <p className="text-xs text-slate-500">
               Fill in the required contact details, postal code confirmation,
-              a valid {MOBILE_NUMBER_LENGTH}-digit phone number, and transaction
-              reference to enable submission.
+              a valid phone number for the selected country code, and
+              transaction reference to enable submission.
             </p>
           )}
 

@@ -5,7 +5,7 @@ import { Info, Loader2, Mail, MapPin, Phone, User } from "lucide-react"
 
 import {
   COUNTRY_CODES,
-  MOBILE_NUMBER_LENGTH,
+  getPhoneNumberMaxLength,
   type ProfileModel,
 } from "@/lib/profile-validation"
 
@@ -31,6 +31,9 @@ type ClientDetailsCardProps = {
   isFetchingAddress: boolean
   canUseRandomUkAddress: boolean
   isSaveEnabled: boolean
+  phonePlaceholder: string
+  phoneHelperText: string
+  phoneHasError: boolean
   onFieldChange: (
     field: keyof Pick<
       CustomerDetailsForm,
@@ -52,6 +55,9 @@ export function ClientDetailsCard({
   isFetchingAddress,
   canUseRandomUkAddress,
   isSaveEnabled,
+  phonePlaceholder,
+  phoneHelperText,
+  phoneHasError,
   onFieldChange,
   onPhoneCountryCodeChange,
   onPhoneNumberChange,
@@ -108,18 +114,27 @@ export function ClientDetailsCard({
                 value={customerDetails.phoneNumber}
                 onChange={(event) =>
                   onPhoneNumberChange(
-                    event.target.value.replace(/\D/g, "").slice(0, MOBILE_NUMBER_LENGTH)
+                    event.target.value
+                      .replace(/\D/g, "")
+                      .slice(0, getPhoneNumberMaxLength(customerDetails.phoneCountryCode))
                   )
                 }
                 disabled={isReadOnly}
-                placeholder="Enter your phone number"
+                placeholder={phonePlaceholder}
                 autoComplete="tel-national"
                 inputMode="numeric"
-                maxLength={MOBILE_NUMBER_LENGTH}
-                className="w-full rounded-xl border border-white/10 bg-white/10 px-4 py-3 pl-11 text-sm text-white placeholder:text-slate-400 outline-none transition focus:border-blue-400 focus:bg-white/15 focus:ring-2 focus:ring-blue-400/30 disabled:cursor-not-allowed disabled:opacity-70"
+                maxLength={getPhoneNumberMaxLength(customerDetails.phoneCountryCode)}
+                className={`w-full rounded-xl border bg-white/10 px-4 py-3 pl-11 text-sm text-white placeholder:text-slate-400 outline-none transition focus:bg-white/15 focus:ring-2 disabled:cursor-not-allowed disabled:opacity-70 ${
+                  phoneHasError
+                    ? "border-rose-300/70 focus:border-rose-300 focus:ring-rose-300/30"
+                    : "border-white/10 focus:border-blue-400 focus:ring-blue-400/30"
+                }`}
               />
             </div>
           </div>
+          <p className={`mt-2 text-xs ${phoneHasError ? "text-rose-200" : "text-slate-300"}`}>
+            {phoneHelperText}
+          </p>
         </div>
 
         <FormField

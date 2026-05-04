@@ -6,7 +6,13 @@ import toast from "react-hot-toast"
 import { useRouter } from "next/navigation"
 import axios from "axios"
 import axiosInstance from "@/lib/axiosinstance"
-import { COUNTRY_CODES, MOBILE_NUMBER_LENGTH } from "@/lib/profile-validation"
+import {
+  COUNTRY_CODES,
+  getPhoneNumberHelperText,
+  getPhoneNumberMaxLength,
+  getPhoneNumberPlaceholder,
+  validateMobilePhone,
+} from "@/lib/profile-validation"
 import { useAuthStore } from "@/lib/zustand"
 
 export function ClientLogin() {
@@ -41,21 +47,6 @@ export function ClientLogin() {
     "text.com",
   ])
 
-  const isDisallowedPhoneNumber = (value: string) => {
-    const trimmed = value.trim()
-    if (!/^\+44\d{10}$/.test(trimmed)) return false
-
-    const digits = trimmed.slice(3)
-    if (/^(\d)\1{9}$/.test(digits)) return true
-
-    const ascending = "0123456789"
-    const descending = "9876543210"
-    if (digits === ascending || digits === ascending.slice(1) + "0") return true
-    if (digits === descending) return true
-
-    return false
-  }
-
   const getRouteForNextStep = (nextStep?: string) => {
     switch ((nextStep ?? "").toUpperCase()) {
       case "DASHBOARD":
@@ -88,8 +79,15 @@ export function ClientLogin() {
   ) => {
     const digitsOnly = event.target.value
       .replace(/\D/g, "")
-      .slice(0, MOBILE_NUMBER_LENGTH)
+      .slice(0, getPhoneNumberMaxLength(phoneCountryCode))
     setPhoneNumber(digitsOnly)
+  }
+
+  const handlePhoneCountryCodeChange = (value: string) => {
+    setPhoneCountryCode(value)
+    setPhoneNumber((current) =>
+      current.slice(0, getPhoneNumberMaxLength(value))
+    )
   }
 
   const resetOtpStep = () => {
@@ -121,21 +119,41 @@ export function ClientLogin() {
   // }
 
   const getOtpRequestPayload = () => {
-  const payload: any = {
-    email: normalizedEmail,
-  }
+    const phoneValidation = validateMobilePhone(phoneCountryCode, phoneNumber, {
+      required: false,
+      label: "Phone number",
+    })
 
-  if (authMode === "SIGN_UP") {
-    payload.fullName = fullName.trim()
-
-    if (phoneNumber.trim()) {
-      payload.countryCode = phoneCountryCode
-      payload.phoneNumber = phoneNumber.trim()
+    const payload: {
+      identifier: string
+      email: string
+      fullName?: string
+      countryCode?: string
+      phoneNumber?: string
+      phone?: {
+        countryCode: string
+        number: string
+      }
+    } = {
+      identifier: normalizedEmail,
+      email: normalizedEmail,
     }
-  }
 
-  return payload
-}
+    if (authMode === "SIGN_UP") {
+      payload.fullName = fullName.trim()
+
+      if (phoneValidation.sanitizedNumber) {
+        payload.countryCode = phoneValidation.sanitizedCountryCode
+        payload.phoneNumber = phoneValidation.sanitizedNumber
+        payload.phone = {
+          countryCode: phoneValidation.sanitizedCountryCode,
+          number: phoneValidation.sanitizedNumber,
+        }
+      }
+    }
+
+    return payload
+  }
 
   const applyOtpValue = (value: string, startIndex = 0) => {
     const digits = value.replace(/\D/g, "").slice(0, otp.length - startIndex)
@@ -194,15 +212,21 @@ export function ClientLogin() {
       }
 
       if (authMode === "SIGN_UP" && phoneNumber.trim()) {
-        if (phoneNumber.length !== MOBILE_NUMBER_LENGTH) {
-          toast.error(
-            `Phone number must be exactly ${MOBILE_NUMBER_LENGTH} digits`
-          )
-          return
-        }
+        const phoneValidation = validateMobilePhone(
+          phoneCountryCode,
+          phoneNumber,
+          {
+            required: false,
+            label: "Phone number",
+          }
+        )
 
-        if (isDisallowedPhoneNumber(`${phoneCountryCode}${phoneNumber}`)) {
-          toast.error("Please enter a valid phone number")
+        if (!phoneValidation.isValid) {
+          toast.error(
+            phoneValidation.numberError ||
+              phoneValidation.countryCodeError ||
+              "Please enter a valid phone number"
+          )
           return
         }
       }
@@ -307,6 +331,10 @@ export function ClientLogin() {
     }
   }
 
+  const selectedPhoneMaxLength = getPhoneNumberMaxLength(phoneCountryCode)
+  const selectedPhonePlaceholder = getPhoneNumberPlaceholder(phoneCountryCode)
+  const selectedPhoneHelperText = getPhoneNumberHelperText(phoneCountryCode)
+
   useEffect(() => {
     if (typeof window === "undefined") return
 
@@ -372,7 +400,7 @@ export function ClientLogin() {
                 <select
                   value={phoneCountryCode}
                   disabled={isInputsDisabled}
-                  onChange={(e) => setPhoneCountryCode(e.target.value)}
+                  onChange={(e) => handlePhoneCountryCodeChange(e.target.value)}
                   className="h-12 w-28 rounded-lg border bg-white px-3 text-sm text-black focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 sm:h-14"
                 >
                   {COUNTRY_CODES.map((country) => (
@@ -390,16 +418,15 @@ export function ClientLogin() {
                   value={phoneNumber}
                   disabled={isInputsDisabled}
                   onChange={handlePhoneNumberChange}
-                  placeholder="7123456789"
+                  placeholder={selectedPhonePlaceholder}
                   inputMode="numeric"
-                  maxLength={MOBILE_NUMBER_LENGTH}
-                  pattern={`\\d{${MOBILE_NUMBER_LENGTH}}`}
+                  maxLength={selectedPhoneMaxLength}
                   autoComplete="tel-national"
                   className="h-12 w-full rounded-lg border px-4 text-black focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-slate-100 sm:h-14"
                 />
               </div>
               <p className="mt-1 text-xs text-slate-500">
-                Optional. If entered, use exactly {MOBILE_NUMBER_LENGTH} digits.
+                Optional. {selectedPhoneHelperText}
               </p>
             </div>
           </>

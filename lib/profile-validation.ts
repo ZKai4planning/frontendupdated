@@ -71,6 +71,61 @@ export type ProfileValidationResult = {
 
 export const MOBILE_NUMBER_LENGTH = 10;
 export const UK_LANDLINE_MAX_LENGTH = 11;
+const GENERIC_MOBILE_MIN_LENGTH = 6;
+const GENERIC_MOBILE_MAX_LENGTH = 15;
+
+type MobilePhoneRule = {
+  minLength: number;
+  maxLength: number;
+  pattern?: RegExp;
+  placeholder: string;
+  helperText: string;
+  invalidMessage: string;
+};
+
+export type MobilePhoneValidationResult = {
+  isValid: boolean;
+  sanitizedCountryCode: string;
+  sanitizedNumber: string;
+  countryCodeError: string | null;
+  numberError: string | null;
+};
+
+const DEFAULT_MOBILE_PHONE_RULE: MobilePhoneRule = {
+  minLength: GENERIC_MOBILE_MIN_LENGTH,
+  maxLength: GENERIC_MOBILE_MAX_LENGTH,
+  placeholder: "123456789",
+  helperText: "Use digits only, without the country code.",
+  invalidMessage: "Enter a valid phone number for the selected country code.",
+};
+
+const MOBILE_PHONE_RULES: Record<string, MobilePhoneRule> = {
+  "+44": {
+    minLength: MOBILE_NUMBER_LENGTH,
+    maxLength: MOBILE_NUMBER_LENGTH,
+    pattern: /^7\d{9}$/,
+    placeholder: "7123456789",
+    helperText: "Use 10 digits starting with 7, for example 7123456789.",
+    invalidMessage: "With +44, enter 10 digits starting with 7.",
+  },
+  "+1": {
+    minLength: MOBILE_NUMBER_LENGTH,
+    maxLength: MOBILE_NUMBER_LENGTH,
+    pattern: /^[2-9]\d{2}[2-9]\d{6}$/,
+    placeholder: "2125551234",
+    helperText: "Use a 10-digit number. The area code and prefix cannot start with 0 or 1.",
+    invalidMessage:
+      "With +1, enter a 10-digit number whose area code and prefix do not start with 0 or 1.",
+  },
+  "+91": {
+    minLength: MOBILE_NUMBER_LENGTH,
+    maxLength: MOBILE_NUMBER_LENGTH,
+    pattern: /^[6-9]\d{9}$/,
+    placeholder: "9876543210",
+    helperText: "Use 10 digits starting with 6, 7, 8, or 9.",
+    invalidMessage: "With +91, enter 10 digits starting with 6, 7, 8, or 9.",
+  },
+};
 
 /**
  * Helper to create a guaranteed safe default state.
@@ -108,7 +163,6 @@ const NAME_PATTERN = /^[\p{L}\p{M}' .-]+$/u;
 // Text (Address/Council): Allows Letters, Numbers, Spaces, and safe punctuation (# , . - /). Blocks @ $ % & * etc.
 const TEXT_PATTERN = /^[\p{L}\p{M}\p{N}#.,'/\- ]+$/u;
 const COUNTRY_CODE_PATTERN = /^\+\d{1,4}$/;
-const PHONE_PATTERN = new RegExp(`^\\d{${MOBILE_NUMBER_LENGTH}}$`);
 const LANDLINE_PATTERN = /^\d{6,15}$/;
 const UK_LANDLINE_WITH_TRUNK_PATTERN = /^0[12]\d{8,9}$/;
 const UK_LANDLINE_WITHOUT_TRUNK_PATTERN = /^[12]\d{8,9}$/;
@@ -143,6 +197,78 @@ const normalizeCountryCode = (value: string | undefined | null): string => {
   if (compact.startsWith("+")) return compact;
   if (/^\d+$/.test(compact)) return `+${compact}`;
   return compact;
+};
+
+const getMobilePhoneRule = (countryCode: string): MobilePhoneRule =>
+  MOBILE_PHONE_RULES[countryCode] ?? DEFAULT_MOBILE_PHONE_RULE;
+
+const getPhoneLengthMessage = (label: string, rule: MobilePhoneRule): string =>
+  rule.minLength === rule.maxLength
+    ? `${label} must contain exactly ${rule.maxLength} digits.`
+    : `${label} must contain ${rule.minLength}-${rule.maxLength} digits.`;
+
+const isLikelyPlaceholderPhoneNumber = (digits: string): boolean =>
+  /^(\d)\1+$/.test(digits) ||
+  digits === "0123456789" ||
+  digits === "1234567890" ||
+  digits === "9876543210";
+
+export const getPhoneNumberMaxLength = (countryCode: string): number =>
+  getMobilePhoneRule(normalizeCountryCode(countryCode)).maxLength;
+
+export const getPhoneNumberPlaceholder = (countryCode: string): string =>
+  getMobilePhoneRule(normalizeCountryCode(countryCode)).placeholder;
+
+export const getPhoneNumberHelperText = (countryCode: string): string =>
+  getMobilePhoneRule(normalizeCountryCode(countryCode)).helperText;
+
+export const validateMobilePhone = (
+  countryCode: string | undefined | null,
+  number: string | undefined | null,
+  options?: {
+    required?: boolean;
+    label?: string;
+  }
+): MobilePhoneValidationResult => {
+  const required = options?.required ?? true;
+  const label = options?.label ?? "Mobile number";
+  const sanitizedCountryCode = normalizeCountryCode(countryCode);
+  const sanitizedNumber = normalizePhoneNumber(number).replace(/\D/g, "");
+  const rule = getMobilePhoneRule(sanitizedCountryCode);
+
+  let countryCodeError: string | null = null;
+  let numberError: string | null = null;
+
+  if (required || sanitizedNumber) {
+    if (!sanitizedCountryCode) {
+      countryCodeError = "Country code is required.";
+    } else if (!COUNTRY_CODE_PATTERN.test(sanitizedCountryCode)) {
+      countryCodeError = "Invalid country code format (e.g., +44).";
+    }
+  }
+
+  if (!sanitizedNumber) {
+    if (required) {
+      numberError = `${label} is required.`;
+    }
+  } else if (
+    sanitizedNumber.length < rule.minLength ||
+    sanitizedNumber.length > rule.maxLength
+  ) {
+    numberError = getPhoneLengthMessage(label, rule);
+  } else if (rule.pattern && !rule.pattern.test(sanitizedNumber)) {
+    numberError = rule.invalidMessage;
+  } else if (isLikelyPlaceholderPhoneNumber(sanitizedNumber)) {
+    numberError = `${label} looks invalid. Please check the digits and try again.`;
+  }
+
+  return {
+    isValid: !countryCodeError && !numberError,
+    sanitizedCountryCode,
+    sanitizedNumber,
+    countryCodeError,
+    numberError,
+  };
 };
 
 /**
@@ -223,16 +349,17 @@ export const validateProfileInput = (profile: ProfileModel): ProfileValidationRe
   }
 
   // 2. Mandatory: Mobile Phone
-  if (!hasValue(sanitized.phone.number)) {
-    errors["phone.number"] = "Mobile number is required.";
-  } else if (!PHONE_PATTERN.test(sanitized.phone.number)) {
-    errors["phone.number"] = `Mobile number must contain exactly ${MOBILE_NUMBER_LENGTH} digits.`;
+  const mobilePhoneValidation = validateMobilePhone(
+    sanitized.phone.countryCode,
+    sanitized.phone.number
+  );
+
+  if (mobilePhoneValidation.numberError) {
+    errors["phone.number"] = mobilePhoneValidation.numberError;
   }
 
-  if (!hasValue(sanitized.phone.countryCode)) {
-    errors["phone.countryCode"] = "Country code is required.";
-  } else if (!COUNTRY_CODE_PATTERN.test(sanitized.phone.countryCode)) {
-    errors["phone.countryCode"] = "Invalid country code format (e.g., +44).";
+  if (mobilePhoneValidation.countryCodeError) {
+    errors["phone.countryCode"] = mobilePhoneValidation.countryCodeError;
   }
 
   // 3. Optional: Council
