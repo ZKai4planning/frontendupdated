@@ -6,11 +6,15 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import {
   ArrowRight,
-  ExternalLink,
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
   FileText,
   FolderOpen,
   MessageSquare,
   Plus,
+  Ruler,
+  ShoppingCart,
   Wallet,
 } from "lucide-react"
 
@@ -73,9 +77,260 @@ type ProjectDetailApiResponse = {
   data?: UserProject
 }
 
+type DashboardEligibilitySummary = {
+  projectId: string
+  formData: Record<string, string | string[]>
+  completedAt?: string
+  isEligible?: boolean
+}
+
 const SELECTED_PROJECT_STORAGE_KEY = "selectedProjectId"
 const SELECTED_PROJECT_STAGE_STORAGE_KEY = "selectedProjectStageId"
+const DASHBOARD_ELIGIBILITY_SUMMARY_STORAGE_PREFIX = "dashboardEligibilitySummary:"
 const PLANS_STAGE_ROUTE = "/dashboard?stage=plans"
+const ELIGIBILITY_REVIEW_ROUTE = "/dashboard?stage=eligibility&readonly=1"
+const ENERGY_PERFORMANCE_CERTIFICATE_LABEL = "Energy Performance Certificate (EPC) available?"
+const LEGACY_ENERGY_PERFORMANCE_CERTIFICATE_LABEL = "EPC available?"
+const DASHBOARD_CART_PREVIEW_ITEMS = [
+  "Location Plan",
+  "Smoke Alarms Compliance",
+  "Energy Performance Certificate (EPC)",
+] as const
+
+const DASHBOARD_CART_SUPPORT_CONFIG = [
+  { fieldLabels: ["Need help with dimensions?"], cartLabel: "Site Measurement Survey", activeValue: "Yes" },
+  { fieldLabels: ["Need help with location plan?"], cartLabel: "Location Plan", activeValue: "Yes" },
+  { fieldLabels: ["Need help with site plan?"], cartLabel: "Site Plan", activeValue: "Yes" },
+  { fieldLabels: ["Need help with elevations?"], cartLabel: "Existing & Proposed Plans", activeValue: "Yes" },
+  { fieldLabels: ["Need help with site photographs?"], cartLabel: "Photographs of Site", activeValue: "Yes" },
+  { fieldLabels: ["Need help with additional drawings?"], cartLabel: "Additional Drawings", activeValue: "Yes" },
+  {
+    fieldLabels: ["Need help with arboriculture report?"],
+    cartLabel: "Arboriculture / BS5837 Report",
+    activeValue: "Yes",
+  },
+  {
+    fieldLabels: ["Need help with flood risk assessment?"],
+    cartLabel: "Flood Risk Assessment",
+    activeValue: "Yes",
+  },
+  {
+    fieldLabels: ["Need help with safety & compliance documents?"],
+    cartLabel: "Safety & Compliance Documents",
+    activeValue: "Yes",
+  },
+  {
+    fieldLabels: ["Do you currently have smoke alarms installed?"],
+    cartLabel: "Smoke Alarms Compliance",
+    activeValue: "No",
+  },
+  {
+    fieldLabels: ["Do you have a valid Gas Safety Certificate?"],
+    cartLabel: "Gas Safety Certificate",
+    activeValue: "No",
+  },
+  {
+    fieldLabels: ["Do you have a valid Electrical Report (EICR)?"],
+    cartLabel: "Electrical Report (EICR)",
+    activeValue: "No",
+  },
+  {
+    fieldLabels: [ENERGY_PERFORMANCE_CERTIFICATE_LABEL, LEGACY_ENERGY_PERFORMANCE_CERTIFICATE_LABEL],
+    cartLabel: "Energy Performance Certificate (EPC)",
+    activeValue: "No",
+  },
+] as const
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value)
+
+const unwrapEligibilityRecord = (payload: unknown): Record<string, unknown> | null => {
+  if (Array.isArray(payload)) {
+    for (const item of payload) {
+      const record = unwrapEligibilityRecord(item)
+      if (record) return record
+    }
+    return null
+  }
+
+  if (!isRecord(payload)) return null
+
+  if (
+    "formData" in payload ||
+    "applicantAndProperty" in payload ||
+    "worksAndMaterials" in payload ||
+    "siteConstratints" in payload ||
+    "siteConstraints" in payload ||
+    "utilitesAndConsents" in payload ||
+    "utilitiesAndConsents" in payload ||
+    "declarations" in payload
+  ) {
+    return payload
+  }
+
+  for (const key of ["data", "eligibility", "project", "result", "payload"]) {
+    const nested = unwrapEligibilityRecord(payload[key])
+    if (nested) return nested
+  }
+
+  return payload
+}
+
+const getPathValue = (record: Record<string, unknown>, path: string[]) => {
+  let current: unknown = record
+
+  for (const key of path) {
+    if (!isRecord(current) || !(key in current)) {
+      return undefined
+    }
+
+    current = current[key]
+  }
+
+  return current
+}
+
+const getFirstPathValue = (record: Record<string, unknown>, paths: string[][]) => {
+  for (const path of paths) {
+    const value = getPathValue(record, path)
+    if (value !== undefined && value !== null) {
+      return value
+    }
+  }
+
+  return undefined
+}
+
+const normalizeBooleanLike = (value: unknown): boolean | null => {
+  if (typeof value === "boolean") return value
+  if (typeof value === "number") return value !== 0
+  if (typeof value !== "string") return null
+
+  const normalized = value.trim().toLowerCase()
+  if (["true", "yes", "y", "1"].includes(normalized)) return true
+  if (["false", "no", "n", "0"].includes(normalized)) return false
+  return null
+}
+
+const extractProjectId = (payload: unknown): string | null => {
+  if (!payload || typeof payload !== "object") return null
+
+  const record = payload as Record<string, unknown>
+  const directValues = [record.projectId, record.id, record._id]
+
+  for (const value of directValues) {
+    if (typeof value === "string" && value.trim()) return value
+    if (typeof value === "number") return String(value)
+  }
+
+  for (const key of ["data", "eligibility", "project", "result", "payload"]) {
+    const nested = extractProjectId(record[key])
+    if (nested) return nested
+  }
+
+  return null
+}
+
+const toDashboardFormValue = (value: unknown): string | string[] | undefined => {
+  if (value === undefined || value === null) return undefined
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (item === undefined || item === null ? "" : String(item).trim()))
+      .filter(Boolean)
+  }
+
+  if (typeof value === "boolean") return value ? "Yes" : "No"
+  if (typeof value === "number") return String(value)
+  if (typeof value === "string") return value
+
+  return undefined
+}
+
+const normalizeDashboardEligibilitySummary = (
+  payload: unknown,
+  fallbackProjectId: string
+): DashboardEligibilitySummary => {
+  const record = unwrapEligibilityRecord(payload)
+  const normalizedFormData: Record<string, string | string[]> = {}
+
+  if (record) {
+    const rawFormData = getFirstPathValue(record, [["formData"]])
+    if (isRecord(rawFormData)) {
+      for (const [key, value] of Object.entries(rawFormData)) {
+        const normalizedValue = toDashboardFormValue(value)
+        if (normalizedValue !== undefined) {
+          normalizedFormData[key] = normalizedValue
+        }
+      }
+    }
+  }
+
+  if (
+    typeof normalizedFormData[LEGACY_ENERGY_PERFORMANCE_CERTIFICATE_LABEL] === "string" &&
+    normalizedFormData[ENERGY_PERFORMANCE_CERTIFICATE_LABEL] === undefined
+  ) {
+    normalizedFormData[ENERGY_PERFORMANCE_CERTIFICATE_LABEL] =
+      normalizedFormData[LEGACY_ENERGY_PERFORMANCE_CERTIFICATE_LABEL]
+  }
+
+  delete normalizedFormData[LEGACY_ENERGY_PERFORMANCE_CERTIFICATE_LABEL]
+
+  const completedAtValue = record
+    ? getFirstPathValue(record, [["completedAt"], ["submittedAt"]])
+    : undefined
+  const isEligibleValue = record
+    ? getFirstPathValue(record, [["isEligible"], ["eligible"], ["completionStatus", "isCompleted"]])
+    : undefined
+
+  return {
+    projectId: extractProjectId(payload) ?? fallbackProjectId,
+    formData: normalizedFormData,
+    completedAt: typeof completedAtValue === "string" ? completedAtValue : undefined,
+    isEligible: normalizeBooleanLike(isEligibleValue) ?? undefined,
+  }
+}
+
+const getDashboardCartItems = (formData: Record<string, string | string[]>) =>
+  DASHBOARD_CART_SUPPORT_CONFIG.flatMap((item) => {
+    const matches = item.fieldLabels.some((fieldLabel) => formData[fieldLabel] === item.activeValue)
+    return matches ? [item.cartLabel] : []
+  })
+
+const formatDashboardDate = (value?: string) => {
+  if (!value?.trim()) return "Not scheduled"
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })
+}
+
+const getEligibilityFormFieldCount = (summary?: DashboardEligibilitySummary | null) =>
+  summary ? Object.keys(summary.formData).length : 0
+
+const readStoredDashboardEligibilitySummary = (projectId: string): DashboardEligibilitySummary | null => {
+  if (typeof window === "undefined" || !projectId.trim()) return null
+
+  const summaryKey = `${DASHBOARD_ELIGIBILITY_SUMMARY_STORAGE_PREFIX}${projectId}`
+  const rawValue =
+    window.localStorage.getItem(summaryKey) || window.sessionStorage.getItem(summaryKey)
+
+  if (!rawValue) return null
+
+  try {
+    const parsed = JSON.parse(rawValue) as DashboardEligibilitySummary
+    return parsed?.projectId ? parsed : null
+  } catch {
+    return null
+  }
+}
 
 const DASHBOARD_PENDING_DOCUMENTS = [
   "Location plan",
@@ -207,6 +462,10 @@ function DashboardOverview() {
   const [projects, setProjects] = useState<UserProject[]>([])
   const [isLoadingProjects, setIsLoadingProjects] = useState(false)
   const [projectsError, setProjectsError] = useState<string | null>(null)
+  const [eligibilitySummary, setEligibilitySummary] = useState<DashboardEligibilitySummary | null>(
+    null
+  )
+  const [isLoadingEligibilitySummary, setIsLoadingEligibilitySummary] = useState(false)
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -322,6 +581,76 @@ function DashboardOverview() {
     updateSection("service", nextSelection)
     setServiceSelection(nextSelection)
   }, [projects, selectedProjectId, serviceLabelMap, setServiceSelection, updateSection])
+
+  useEffect(() => {
+    if (!selectedProjectId) {
+      setEligibilitySummary(null)
+      return
+    }
+
+    let isCancelled = false
+
+    const fetchEligibilitySummary = async () => {
+      setIsLoadingEligibilitySummary(true)
+
+      const localFallbackSummary =
+        data.eligibility?.projectId === selectedProjectId && data.eligibility?.formData
+          ? {
+              projectId: selectedProjectId,
+              formData: data.eligibility.formData,
+              completedAt: data.eligibility?.completedAt,
+              isEligible: data.eligibility?.isEligible,
+            }
+          : null
+      const storedFallbackSummary = readStoredDashboardEligibilitySummary(selectedProjectId)
+
+      try {
+        const response = await axiosInstance.get(`/eligibility/${encodeURIComponent(selectedProjectId)}`)
+
+        if (isCancelled) return
+
+        const normalized = normalizeDashboardEligibilitySummary(response.data, selectedProjectId)
+        const fallbackSummary =
+          getEligibilityFormFieldCount(localFallbackSummary) >=
+          getEligibilityFormFieldCount(storedFallbackSummary)
+            ? localFallbackSummary
+            : storedFallbackSummary
+        const resolvedSummary =
+          getEligibilityFormFieldCount(fallbackSummary) > getEligibilityFormFieldCount(normalized)
+            ? {
+                ...normalized,
+                formData: {
+                  ...fallbackSummary?.formData,
+                  ...normalized.formData,
+                },
+                completedAt: normalized.completedAt ?? fallbackSummary?.completedAt,
+                isEligible: normalized.isEligible ?? fallbackSummary?.isEligible,
+              }
+            : normalized
+
+        setEligibilitySummary(resolvedSummary)
+      } catch {
+        if (isCancelled) return
+
+        setEligibilitySummary(
+          getEligibilityFormFieldCount(localFallbackSummary) >=
+          getEligibilityFormFieldCount(storedFallbackSummary)
+            ? localFallbackSummary
+            : storedFallbackSummary
+        )
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingEligibilitySummary(false)
+        }
+      }
+    }
+
+    void fetchEligibilitySummary()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [data.eligibility, selectedProjectId])
 
   const handleProjectSelect = useCallback(
     async (project: UserProject) => {
@@ -447,19 +776,46 @@ function DashboardOverview() {
   const planSelectedDate = "05/05/2026"
   const paymentReference = "PAY-AI4P-050526-7842"
   const quotationPageHref = "/dashboard?stage=initial-quotation&readonly=1"
+  const paymentPageHref = "/dashboard?stage=payment"
   const quotationPdfLabel = "initial-quotation.pdf"
-  const initialQuotationSummary = `Your initial quotation for ${selectedProjectLabel} starts the ${selectedPlanName} plan and covers the first activation stage, including early review, planning checks, and guided preparation for the next steps in your service.`
   const dashboardPaymentItems = [
-    { label: "Selected plan", value: selectedPlanName },
     { label: "Plan selected date", value: planSelectedDate },
     { label: "Payment reference", value: paymentReference },
     { label: "Initial deposit", value: formatCurrency(initialCharge) },
     { label: "Subsequent charges", value: formatCurrency(subsequentCharge) },
     {
-      label: "Next payment",
-      value: data.payment?.status === "submitted" ? "No dues" : "Awaiting payment",
+      label: "Payment status",
+      value: "Paid",
     },
   ]
+  const submittedEligibilitySummary = useMemo(
+    () =>
+      eligibilitySummary?.projectId === selectedProjectId
+        ? eligibilitySummary
+        : data.eligibility?.projectId === selectedProjectId && data.eligibility?.formData
+          ? {
+              projectId: selectedProjectId,
+              formData: data.eligibility.formData,
+              completedAt: data.eligibility.completedAt,
+              isEligible: data.eligibility.isEligible,
+            }
+          : null,
+    [data.eligibility, eligibilitySummary, selectedProjectId]
+  )
+  const submittedCartItems = useMemo(
+    () => getDashboardCartItems(submittedEligibilitySummary?.formData ?? {}),
+    [submittedEligibilitySummary]
+  )
+  const dimensionSurveyBookingDate =
+    typeof submittedEligibilitySummary?.formData["Dimension Survey Booking Date"] === "string"
+      ? submittedEligibilitySummary.formData["Dimension Survey Booking Date"]
+      : ""
+  const dimensionSurveyBookingTime =
+    typeof submittedEligibilitySummary?.formData["Dimension Survey Booking Time"] === "string"
+      ? submittedEligibilitySummary.formData["Dimension Survey Booking Time"]
+      : ""
+  const hasSubmittedCartItems = submittedCartItems.length > 0
+  const hasDimensionSurveyBooking = Boolean(dimensionSurveyBookingDate && dimensionSurveyBookingTime)
 
   const handleAgentAction = () => {
     if (selectedProject) {
@@ -715,6 +1071,253 @@ function DashboardOverview() {
       </div>
 
       <div className="mt-6 rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+              Eligibility Requests
+            </p>
+            <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+              Submitted support requests and survey bookings
+            </h3>
+          </div>
+
+          <p className="max-w-2xl text-sm leading-6 text-slate-600">
+            This section shows the support items and survey booking details captured from your
+            eligibility flow for <span className="font-semibold text-slate-900">{selectedProjectLabel}</span>.
+          </p>
+        </div>
+
+        {isLoadingEligibilitySummary ? (
+          <div className="mt-6 flex gap-4 overflow-x-auto pb-2">
+            {[0, 1].map((item) => (
+              <div
+                key={item}
+                className="min-w-[320px] flex-1 animate-pulse rounded-[28px] border border-slate-200 bg-slate-50 p-6"
+              >
+                <div className="h-5 w-32 rounded bg-slate-200" />
+                <div className="mt-6 h-8 w-40 rounded bg-slate-200" />
+                <div className="mt-6 space-y-3">
+                  <div className="h-12 rounded-2xl bg-slate-200" />
+                  <div className="h-12 rounded-2xl bg-slate-200" />
+                  <div className="h-12 rounded-2xl bg-slate-200" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="-mx-1 mt-6 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2">
+            {hasSubmittedCartItems ? (
+              <article className="min-w-[340px] flex-1 snap-start rounded-[28px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-blue-50 p-6 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
+                    <ShoppingCart className="h-5 w-5" />
+                  </div>
+                  <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+                    {submittedCartItems.length} item{submittedCartItems.length === 1 ? "" : "s"}
+                  </span>
+                </div>
+
+                <div className="mt-6">
+                  <p className="text-3xl font-semibold tracking-tight text-slate-900">
+                    Cart requests
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Agent Z support requests captured from your submitted eligibility answers.
+                  </p>
+                </div>
+
+                <div className="mt-6 space-y-3">
+                  {submittedCartItems.map((item) => (
+                    <div
+                      key={item}
+                      className="flex items-center justify-between rounded-2xl bg-white/90 px-4 py-3 ring-1 ring-slate-200"
+                    >
+                      <span className="text-sm font-medium text-slate-800">{item}</span>
+                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                        Requested
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 flex items-center justify-between rounded-2xl border border-blue-100 bg-blue-50/80 px-4 py-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
+                      Submitted
+                    </p>
+                    <p className="mt-1 text-sm text-slate-700">
+                      {formatDashboardDate(submittedEligibilitySummary?.completedAt)}
+                    </p>
+                  </div>
+                  <a
+                    href={ELIGIBILITY_REVIEW_ROUTE}
+                    className="inline-flex items-center gap-2 text-sm font-semibold text-blue-700 hover:text-blue-800"
+                  >
+                    Review
+                    <ArrowRight className="h-4 w-4" />
+                  </a>
+                </div>
+              </article>
+            ) : (
+              <article className="min-w-[340px] flex-1 snap-start rounded-[28px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-blue-50 p-6 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
+                    <ShoppingCart className="h-5 w-5" />
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                    Preview
+                  </span>
+                </div>
+
+                <div className="mt-6">
+                  <p className="text-3xl font-semibold tracking-tight text-slate-900">
+                    Cart requests
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    This preview shows how submitted support requests will appear here.
+                  </p>
+                </div>
+
+                <div className="mt-6 space-y-3">
+                  {DASHBOARD_CART_PREVIEW_ITEMS.map((item) => (
+                    <div
+                      key={item}
+                      className="flex items-center justify-between rounded-2xl bg-white/90 px-4 py-3 ring-1 ring-slate-200"
+                    >
+                      <span className="text-sm font-medium text-slate-800">{item}</span>
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                        Example
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-6 rounded-2xl border border-dashed border-blue-200 bg-blue-50/70 px-4 py-3">
+                  <p className="text-sm text-blue-800">
+                    Submit step 5 of eligibility to replace this preview with live cart request data.
+                  </p>
+                </div>
+              </article>
+            )}
+
+            {hasDimensionSurveyBooking ? (
+              <article className="min-w-[340px] flex-1 snap-start rounded-[28px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-emerald-50 p-6 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+                    <Ruler className="h-5 w-5" />
+                  </div>
+                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                    Survey booked
+                  </span>
+                </div>
+
+                <div className="mt-6">
+                  <p className="text-3xl font-semibold tracking-tight text-slate-900">
+                    Site measurement survey
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Your booked Agent Z survey slot is recorded below.
+                  </p>
+                </div>
+
+                <div className="mt-6 grid gap-3">
+                  <div className="flex items-center gap-3 rounded-2xl bg-white/90 px-4 py-4 ring-1 ring-slate-200">
+                    <CalendarDays className="h-5 w-5 text-emerald-700" />
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        Survey date
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">
+                        {dimensionSurveyBookingDate}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 rounded-2xl bg-white/90 px-4 py-4 ring-1 ring-slate-200">
+                    <Clock3 className="h-5 w-5 text-emerald-700" />
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        Survey time
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">
+                        {dimensionSurveyBookingTime}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 flex items-center justify-between rounded-2xl border border-emerald-100 bg-emerald-50/80 px-4 py-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-emerald-800">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Confirmed from your eligibility submission
+                  </div>
+                  <a
+                    href={ELIGIBILITY_REVIEW_ROUTE}
+                    className="inline-flex items-center gap-2 text-sm font-semibold text-emerald-700 hover:text-emerald-800"
+                  >
+                    Open
+                    <ArrowRight className="h-4 w-4" />
+                  </a>
+                </div>
+              </article>
+            ) : (
+              <article className="min-w-[340px] flex-1 snap-start rounded-[28px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-emerald-50 p-6 shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+                    <Ruler className="h-5 w-5" />
+                  </div>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                    Preview
+                  </span>
+                </div>
+
+                <div className="mt-6">
+                  <p className="text-3xl font-semibold tracking-tight text-slate-900">
+                    Site measurement survey
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    This preview shows how a confirmed dimensions survey booking will appear here.
+                  </p>
+                </div>
+
+                <div className="mt-6 grid gap-3">
+                  <div className="flex items-center gap-3 rounded-2xl bg-white/90 px-4 py-4 ring-1 ring-slate-200">
+                    <CalendarDays className="h-5 w-5 text-emerald-700" />
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        Survey date
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">
+                        14 May 2026
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 rounded-2xl bg-white/90 px-4 py-4 ring-1 ring-slate-200">
+                    <Clock3 className="h-5 w-5 text-emerald-700" />
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        Survey time
+                      </p>
+                      <p className="mt-1 text-sm font-semibold text-slate-900">
+                        11:00 AM
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-6 rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/70 px-4 py-3">
+                  <p className="text-sm text-emerald-800">
+                    Book a dimensions survey in eligibility to replace this preview with live booking details.
+                  </p>
+                </div>
+              </article>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-6 rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
@@ -740,30 +1343,17 @@ function DashboardOverview() {
                 <Wallet className="h-5 w-5" />
               </div>
               <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
-                No dues
+                Paid
               </span>
             </div>
 
             <div className="mt-6">
               <p className="text-4xl font-semibold tracking-tight text-slate-900">
-                {formatCurrency(paymentAmount)}
+                {selectedPlanName}
               </p>
               <p className="mt-1 text-sm text-slate-600">
-                {data.payment?.status === "submitted" ? "Paid" : "Due"} - {formatCurrency(totalCharge)} total due
+                Amount paid - {formatCurrency(paymentAmount)}
               </p>
-            </div>
-
-            <div className="mt-6">
-              <div className="flex items-center justify-between text-sm font-medium text-slate-700">
-                <span>Payment progress</span>
-                <span>{data.payment?.status === "submitted" ? "100%" : "70%"}</span>
-              </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className={`h-full rounded-full bg-blue-600 ${data.payment?.status === "submitted" ? "w-full" : "w-[70%]"
-                    }`}
-                />
-              </div>
             </div>
 
             <div className="mt-6 space-y-3">
@@ -774,7 +1364,7 @@ function DashboardOverview() {
                 >
                   <span className="text-sm text-slate-600">{item.label}</span>
                   <span
-                    className={`text-sm font-semibold ${item.value === "No dues"
+                    className={`text-sm font-semibold ${item.value === "Paid"
                       ? "rounded-full bg-emerald-100 px-3 py-1 text-emerald-700"
                       : "text-slate-900"
                       }`}
@@ -799,6 +1389,12 @@ function DashboardOverview() {
                 className="mt-3 inline-flex text-sm font-medium text-blue-700 underline underline-offset-4 hover:text-blue-800"
               >
                 {quotationPdfLabel}
+              </a>
+              <a
+                href={paymentPageHref}
+                className="mt-4 ml-6 inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+              >
+                Make Payment
               </a>
             </div>
           </article>
@@ -895,6 +1491,8 @@ function DashboardOverview() {
         </div>
 
       </div>
+
+      
     </section>
   )
 }

@@ -76,10 +76,12 @@ type EligibilityAgentContextValue = {
 const DEFAULT_ELIGIBILITY_TOOLTIP = ""
 const ELIGIBILITY_SERVICE_ID = "grexnb"
 const SAFETY_COMPLIANCE_UPLOAD_LABEL = "Upload safety & compliance documents"
+const ENERGY_PERFORMANCE_CERTIFICATE_LABEL = "Energy Performance Certificate (EPC) available?"
+const LEGACY_ENERGY_PERFORMANCE_CERTIFICATE_LABEL = "EPC available?"
 const SAFETY_COMPLIANCE_SLOT_LABELS = [
   "Gas Safety Certificate",
   "Electrical Report (EICR)",
-  "EPC Certificate",
+  "Energy Performance Certificate (EPC)",
 ] as const
 const SAFETY_COMPLIANCE_FILES_FIELD = "safetyComplianceDocuments"
 const SAFETY_COMPLIANCE_FILE_NAMES_FIELD = "safetyComplianceDocumentsFileNames"
@@ -87,6 +89,7 @@ const ELIGIBILITY_CREATE_ENDPOINT =
   process.env.NEXT_PUBLIC_ELIGIBILITY_CREATE_ENDPOINT ?? "/eligibility"
 const SELECTED_PROJECT_STORAGE_KEY = "selectedProjectId"
 const SELECTED_PROJECT_STAGE_STORAGE_KEY = "selectedProjectStageId"
+const DASHBOARD_ELIGIBILITY_SUMMARY_STORAGE_PREFIX = "dashboardEligibilitySummary:"
 const MAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024
 const MAX_UPLOAD_FILE_SIZE_LABEL = "10 MB"
 const POSTCODE_AUTOCOMPLETE_ENDPOINT =
@@ -686,6 +689,16 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
 
   mergeFlatEligibilityFormData(formData, record.formData)
 
+  if (
+    typeof formData[LEGACY_ENERGY_PERFORMANCE_CERTIFICATE_LABEL] === "string" &&
+    formData[ENERGY_PERFORMANCE_CERTIFICATE_LABEL] === undefined
+  ) {
+    formData[ENERGY_PERFORMANCE_CERTIFICATE_LABEL] =
+      formData[LEGACY_ENERGY_PERFORMANCE_CERTIFICATE_LABEL]
+  }
+
+  delete formData[LEGACY_ENERGY_PERFORMANCE_CERTIFICATE_LABEL]
+
   const fieldMappings: Array<{
     label: string
     paths: string[][]
@@ -1113,10 +1126,11 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
       ],
     },
     {
-      label: "EPC available?",
+      label: ENERGY_PERFORMANCE_CERTIFICATE_LABEL,
       paths: [
         ["utilitesAndConsents", "safetyAndCompliance", "epcAvailable"],
         ["utilitiesAndConsents", "safetyAndCompliance", "epcAvailable"],
+        ["formData", LEGACY_ENERGY_PERFORMANCE_CERTIFICATE_LABEL],
       ],
     },
     {
@@ -1815,7 +1829,8 @@ const buildEligibilityStepPayload = (
               getValue("Do you have a valid Electrical Report (EICR)?") ||
               (hasSafetyComplianceUpload(1) ? "Yes" : ""),
             epcAvailable:
-              getValue("EPC available?") ||
+              getValue(ENERGY_PERFORMANCE_CERTIFICATE_LABEL) ||
+              getValue(LEGACY_ENERGY_PERFORMANCE_CERTIFICATE_LABEL) ||
               (hasSafetyComplianceUpload(2) ? "Yes" : ""),
           },
           utilitiesAndWaste: {
@@ -1867,6 +1882,41 @@ const buildSerializableEligibilityFormData = (formValues: EligibilityFormValues)
 
     return accumulator
   }, {})
+
+const persistSelectedEligibilityProject = (projectId?: string | null, projectStageId?: string | null) => {
+  if (typeof window === "undefined" || !projectId?.trim()) return
+
+  window.localStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, projectId)
+  window.sessionStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, projectId)
+
+  if (projectStageId?.trim()) {
+    window.localStorage.setItem(SELECTED_PROJECT_STAGE_STORAGE_KEY, projectStageId)
+    window.sessionStorage.setItem(SELECTED_PROJECT_STAGE_STORAGE_KEY, projectStageId)
+  }
+}
+
+const persistDashboardEligibilitySummary = (
+  projectId: string,
+  formValues: EligibilityFormValues,
+  options?: {
+    completedAt?: string
+    isEligible?: boolean
+  }
+) => {
+  if (typeof window === "undefined" || !projectId.trim()) return
+
+  const summaryKey = `${DASHBOARD_ELIGIBILITY_SUMMARY_STORAGE_PREFIX}${projectId}`
+  const summaryPayload = {
+    projectId,
+    formData: buildSerializableEligibilityFormData(formValues),
+    completedAt: options?.completedAt,
+    isEligible: options?.isEligible,
+  }
+
+  const serialized = JSON.stringify(summaryPayload)
+  window.localStorage.setItem(summaryKey, serialized)
+  window.sessionStorage.setItem(summaryKey, serialized)
+}
 
 const buildSerializableEligibilityLocation = (location?: EligibilityLocation) => {
   if (!location) return undefined
@@ -2125,9 +2175,10 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
     "Tell us whether a current gas safety certificate is available.",
   "Do you have a valid Electrical Report (EICR)?":
     "Tell us whether a valid electrical installation condition report is available.",
-  "EPC available?": "Confirm whether an Energy Performance Certificate is available.",
+  [ENERGY_PERFORMANCE_CERTIFICATE_LABEL]:
+    "Confirm whether an Energy Performance Certificate (EPC) is available.",
   "Upload safety & compliance documents":
-    "Upload the Gas Safety Certificate, Electrical Report (EICR), and EPC documents if they are available.",
+    "Upload the Gas Safety Certificate, Electrical Report (EICR), and Energy Performance Certificate (EPC) documents if they are available.",
   "Water Supply": "Type of water supply serving the property.",
   "Sewage / Drainage": "Type of foul drainage arrangement.",
   "Surface Water Drainage": "How surface water will be drained from the site.",
@@ -2242,7 +2293,7 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Do you currently have smoke alarms installed?",
   "Do you have a valid Gas Safety Certificate?",
   "Do you have a valid Electrical Report (EICR)?",
-  "EPC available?",
+  ENERGY_PERFORMANCE_CERTIFICATE_LABEL,
   "Upload safety & compliance documents",
   "Water Supply",
   "Sewage / Drainage",
@@ -3624,6 +3675,21 @@ function EligibilityCheckPage() {
           completedAt: normalized.completedAt,
           isEligible: normalized.isEligible,
         })
+        persistSelectedEligibilityProject(
+          normalized.projectId || existingProjectId,
+          existingProjectStageId
+        )
+        persistDashboardEligibilitySummary(
+          normalized.projectId || existingProjectId,
+          {
+            ...latestEligibilityFormDataRef.current,
+            ...normalized.formData,
+          },
+          {
+            completedAt: normalized.completedAt,
+            isEligible: normalized.isEligible,
+          }
+        )
         fetchedEligibilityProjectRef.current = normalized.projectId || existingProjectId
         setUploadedFiles(normalizedUploads)
 
@@ -3652,7 +3718,7 @@ function EligibilityCheckPage() {
     return () => {
       isCancelled = true
     }
-  }, [existingProjectId, updateSection])
+  }, [existingProjectId, existingProjectStageId, updateSection])
 
   useEffect(() => {
     if (isLoadingEligibility) return
@@ -3773,6 +3839,7 @@ function EligibilityCheckPage() {
         ...(data.eligibility || {}),
         projectId,
       })
+      persistSelectedEligibilityProject(projectId, existingProjectStageId)
 
       return projectId
     }
@@ -3851,7 +3918,14 @@ function EligibilityCheckPage() {
     try {
       const missingFields = STATIC_AGENT_Z_COMPLETION_REVIEW_FIELDS
 
-      await upsertEligibilityProject("submitted")
+      const submittedProjectId = await upsertEligibilityProject("submitted")
+      const completedAt = new Date().toISOString()
+
+      persistSelectedEligibilityProject(submittedProjectId, existingProjectStageId)
+      persistDashboardEligibilitySummary(submittedProjectId, savedFormData, {
+        completedAt,
+        isEligible: true,
+      })
 
       setAgentSidebar({
         id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -3868,7 +3942,7 @@ function EligibilityCheckPage() {
       updateSection("eligibility", {
         ...(data.eligibility || {}),
         isEligible: true,
-        completedAt: new Date().toISOString(),
+        completedAt,
       })
       window.scrollTo({ top: 0, behavior: "smooth" })
     } catch (error) {
@@ -4163,6 +4237,7 @@ function EligibilityCheckPage() {
                   FieldLabel,
                   StructuredFileUploadArea,
                   CheckboxGroup,
+                  AgentActionButton,
                 }}
               />
             )}

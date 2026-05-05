@@ -36,35 +36,49 @@ export function UtilitiesConsentsStepContent({
       label: "Do you currently have smoke alarms installed?",
       consultTrigger:
         "Agent Z can help confirm smoke alarm compliance requirements for this property.",
+      cartLabel: "Smoke Alarms Compliance",
     },
     {
       label: "Do you have a valid Gas Safety Certificate?",
       consultTrigger:
         "Agent Z can help if you need guidance on gas safety certification or what to provide.",
+      cartLabel: "Gas Safety Certificate",
     },
     {
       label: "Do you have a valid Electrical Report (EICR)?",
       consultTrigger:
         "Agent Z can help with EICR requirements and what counts as acceptable supporting documentation.",
+      cartLabel: "Electrical Report (EICR)",
     },
     {
-      label: "EPC available?",
+      label: "Energy Performance Certificate (EPC) available?",
       consultTrigger:
-        "Agent Z can help if you need support locating or obtaining the EPC for this property.",
+        "Agent Z can help if you need support locating or obtaining the Energy Performance Certificate (EPC) for this property.",
+      cartLabel: "Energy Performance Certificate (EPC)",
     },
   ] as const
 
   return (
     <>
       <SectionHeading>Safety & Compliance</SectionHeading>
+      <p className="mb-4 text-sm text-slate-500">
+        Selecting <span className="font-semibold text-slate-700">No</span> adds the related support
+        item to your cart automatically.
+      </p>
       <div className="mb-6 grid grid-cols-2 gap-6">
         {safetyComplianceFields.map((field) => (
-          <RadioGroupField
-            key={field.label}
-            label={field.label}
-            options={["Yes", "No", "Ask Agent Z"]}
-            consultTrigger={field.consultTrigger}
-          />
+          <div key={field.label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <RadioGroupField
+              label={field.label}
+              options={["Yes", "No", "Ask Agent Z"]}
+              consultTrigger={field.consultTrigger}
+            />
+            {asStringValue(savedFormData[field.label]) === "No" && (
+              <p className="mt-3 text-xs font-medium text-emerald-700">
+                {field.cartLabel} support has been added to your cart.
+              </p>
+            )}
+          </div>
         ))}
       </div>
       <div className="mb-6 space-y-6">
@@ -75,7 +89,7 @@ export function UtilitiesConsentsStepContent({
           slotLabels={[
             "Gas Safety Certificate",
             "Electrical Report (EICR)",
-            "EPC Certificate",
+            "Energy Performance Certificate (EPC)",
           ]}
           showDescriptionInput={false}
           allowAddMore
@@ -86,7 +100,7 @@ export function UtilitiesConsentsStepContent({
           //   decision: {
           //     fieldLabel: "Need help with safety & compliance documents?",
           //     prompt:
-          //       "Do you want help with the Gas Safety Certificate, EICR, or EPC documents?",
+          //       "Do you want help with the Gas Safety Certificate, EICR, or Energy Performance Certificate (EPC) documents?",
           //     yesMessage:
           //       "Agent Z is preparing support for your safety and compliance document requirements.",
           //     noMessage:

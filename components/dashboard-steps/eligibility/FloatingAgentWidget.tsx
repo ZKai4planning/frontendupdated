@@ -481,12 +481,12 @@ const EPC_AGENT_INTRO = "I can help with that."
 const EPC_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "Certificate needed",
-    value: "An EPC is expected for rented properties and HMO applications.",
+    value: "An Energy Performance Certificate (EPC) is expected for rented properties and HMO applications.",
     confidence: "high",
   },
   {
     label: "Validity",
-    value: "The document expects the EPC to be valid for 10 years and at Band E or above.",
+    value: "The document expects the Energy Performance Certificate (EPC) to be valid for 10 years and at Band E or above.",
     confidence: "high",
   },
   {
@@ -642,7 +642,7 @@ const CONVERSATIONAL_AGENT_INTROS: Record<string, string> = {
   "Do you currently have smoke alarms installed?": SMOKE_ALARMS_AGENT_INTRO,
   "Do you have a valid Gas Safety Certificate?": GAS_SAFETY_AGENT_INTRO,
   "Do you have a valid Electrical Report (EICR)?": EICR_AGENT_INTRO,
-  "EPC available?": EPC_AGENT_INTRO,
+  "Energy Performance Certificate (EPC) available?": EPC_AGENT_INTRO,
   "Water Supply": WATER_SUPPLY_AGENT_INTRO,
   "Sewage / Drainage": SEWAGE_DRAINAGE_AGENT_INTRO,
   "Surface Water Drainage": SURFACE_WATER_AGENT_INTRO,
@@ -672,7 +672,7 @@ const CONVERSATIONAL_AGENT_RELATED_ANSWERS: Record<string, AgentInsight[]> = {
   "Do you currently have smoke alarms installed?": SMOKE_ALARMS_RELATED_ANSWERS,
   "Do you have a valid Gas Safety Certificate?": GAS_SAFETY_RELATED_ANSWERS,
   "Do you have a valid Electrical Report (EICR)?": EICR_RELATED_ANSWERS,
-  "EPC available?": EPC_RELATED_ANSWERS,
+  "Energy Performance Certificate (EPC) available?": EPC_RELATED_ANSWERS,
   "Water Supply": WATER_SUPPLY_RELATED_ANSWERS,
   "Sewage / Drainage": SEWAGE_DRAINAGE_RELATED_ANSWERS,
   "Surface Water Drainage": SURFACE_WATER_RELATED_ANSWERS,
@@ -694,8 +694,36 @@ const UPLOAD_HELP_CART_CONFIG = [
   { fieldLabel: "Need help with safety & compliance documents?", cartLabel: "Safety & Compliance Documents" },
 ] as const
 
+const CART_SUPPORT_CONFIG = [
+  { fieldLabel: "Need help with dimensions?", cartLabel: "Site Measurement Survey" },
+  ...UPLOAD_HELP_CART_CONFIG,
+  {
+    fieldLabel: "Do you currently have smoke alarms installed?",
+    cartLabel: "Smoke Alarms Compliance",
+    activeValue: "No",
+  },
+  {
+    fieldLabel: "Do you have a valid Gas Safety Certificate?",
+    cartLabel: "Gas Safety Certificate",
+    activeValue: "No",
+  },
+  {
+    fieldLabel: "Do you have a valid Electrical Report (EICR)?",
+    cartLabel: "Electrical Report (EICR)",
+    activeValue: "No",
+  },
+  {
+    fieldLabel: "Energy Performance Certificate (EPC) available?",
+    cartLabel: "Energy Performance Certificate (EPC)",
+    activeValue: "No",
+  },
+] as const
+
 const isUploadHelpCartField = (fieldLabel: string) =>
   UPLOAD_HELP_CART_CONFIG.some((item) => item.fieldLabel === fieldLabel)
+
+const isCartSupportField = (fieldLabel: string) =>
+  CART_SUPPORT_CONFIG.some((item) => item.fieldLabel === fieldLabel)
 
 const getUploadHelpCartLabel = (fieldLabel: string) =>
   UPLOAD_HELP_CART_CONFIG.find((item) => item.fieldLabel === fieldLabel)?.cartLabel ??
@@ -715,10 +743,11 @@ const buildUploadHelpAgentMessage = (fieldLabel: string, selection?: string) => 
   return `We are reviewing support options for ${cartLabel.toLowerCase()} and preparing the next step for you.`
 }
 
-const getUploadHelpCartItems = (formData: Record<string, unknown>) =>
-  UPLOAD_HELP_CART_CONFIG.filter((item) => formData[item.fieldLabel] === "Yes").map(
-    (item) => item.cartLabel
-  )
+const getCartSupportItems = (formData: Record<string, unknown>) =>
+  CART_SUPPORT_CONFIG.filter((item) => {
+    const selectedValue = typeof formData[item.fieldLabel] === "string" ? formData[item.fieldLabel] : ""
+    return selectedValue === (item.activeValue ?? "Yes")
+  }).map((item) => item.cartLabel)
 
 const getMessageDrivenAgentInsights = (content: string): AgentInsight[] => {
   const normalizedContent = content
@@ -830,6 +859,7 @@ export function FloatingAgentWidget({
       ? data.eligibility?.formData?.[fieldLabel]
       : ""
   const isUploadHelpRequest = requestType === "ask-agent" && isUploadHelpCartField(fieldLabel)
+  const isCartSupportRequest = requestType === "ask-agent" && isCartSupportField(fieldLabel)
   const currentMessage = isCompletionReview
     ? (
         message ??
@@ -876,8 +906,10 @@ export function FloatingAgentWidget({
   const shouldRenderResponseText =
     isConversationalAgentField(fieldLabel) || isMessageDrivenAgentField
   const isDimensionsSurveyField = fieldLabel === "Need help with dimensions?"
-  const uploadHelpCartItems = useMemo(
-    () => getUploadHelpCartItems(data.eligibility?.formData || {}),
+  const shouldShowDimensionsSurveySupport =
+    isDimensionsSurveyField && currentFieldSelection === "Yes"
+  const cartSupportItems = useMemo(
+    () => getCartSupportItems(data.eligibility?.formData || {}),
     [data.eligibility?.formData]
   )
   const [showDimensionSurveyBooking, setShowDimensionSurveyBooking] = useState(false)
@@ -1007,6 +1039,13 @@ export function FloatingAgentWidget({
   }, [currentMessage.length, insights, shouldAnimateConversationalFlow, typedMessageLength])
 
   useEffect(() => {
+    if (!shouldShowDimensionsSurveySupport) {
+      setShowDimensionSurveyBooking(false)
+      setDimensionSurveyConfirmation(null)
+      setSelectedSurveySlot(null)
+      return
+    }
+
     if (!isDimensionsSurveyField) {
       return
     }
@@ -1016,7 +1055,7 @@ export function FloatingAgentWidget({
     setSurveyCalendarDate(new Date())
     setSelectedSurveyDate(new Date().getDate())
     setSelectedSurveySlot(null)
-  }, [isDimensionsSurveyField, requestId])
+  }, [currentFieldSelection, isDimensionsSurveyField, requestId, shouldShowDimensionsSurveySupport])
 
   useEffect(() => {
     if (!showDimensionSurveyBooking) {
@@ -1990,14 +2029,14 @@ export function FloatingAgentWidget({
                 )}
               </p>
 
-              {isUploadHelpRequest && (
+              {isCartSupportRequest && (
                 <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/60 px-3 py-3">
                   <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                     Cart
                   </p>
-                  {uploadHelpCartItems.length > 0 ? (
+                  {cartSupportItems.length > 0 ? (
                     <div className="space-y-2">
-                      {uploadHelpCartItems.map((item) => (
+                      {cartSupportItems.map((item) => (
                         <div
                           key={item}
                           className="flex items-start gap-2 rounded-xl border border-emerald-400/15 bg-emerald-500/10 px-3 py-2 text-[12px] leading-relaxed text-emerald-50"
@@ -2009,7 +2048,7 @@ export function FloatingAgentWidget({
                     </div>
                   ) : (
                     <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-[12px] leading-relaxed text-slate-300">
-                      No document support items have been added to the cart yet.
+                      No support items have been added to the cart yet.
                     </div>
                   )}
                 </div>
@@ -2055,7 +2094,7 @@ export function FloatingAgentWidget({
                 </div>
               )}
 
-              {isDimensionsSurveyField && !isCompletionReview && (
+              {shouldShowDimensionsSurveySupport && !isCompletionReview && (
                 <div className="mt-4">
                   {!showDimensionSurveyBooking ? (
                     <button

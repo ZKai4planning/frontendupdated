@@ -31,8 +31,10 @@ export function WorksMaterialsStepContent({
   }
 
   const proposedWorksRawValue = asStringValue(savedFormData["Description of Proposed Works"])
+  const dimensionsSupportFieldLabel = "Need help with dimensions?"
   const totalInternalFloorAreaLabel = "Total internal floor area (m\u00C2\u00B2)"
   const propertyFootprintLabel = "Property footprint (approx length \u00C3\u00D7 width in metres)"
+  const isDimensionsSupportAdded = asStringValue(savedFormData[dimensionsSupportFieldLabel]) === "Yes"
   const summarizeProposedWorks = (value: string) => {
     const normalized = value.replace(/\s+/g, " ").trim()
     if (!normalized) return ""
@@ -93,6 +95,24 @@ export function WorksMaterialsStepContent({
     })
   }
 
+  const updateDimensionsSupport = (value: "Yes" | "No") => {
+    const nextFormData = {
+      ...savedFormData,
+      [dimensionsSupportFieldLabel]: value,
+    }
+
+    if (value === "No") {
+      delete nextFormData["Dimension Survey Booking Prompt Visible"]
+      delete nextFormData["Dimension Survey Booking Calendar Open"]
+      delete nextFormData["Dimension Survey Booking Date"]
+      delete nextFormData["Dimension Survey Booking Time"]
+    }
+
+    updateSection("eligibility", {
+      formData: nextFormData,
+    })
+  }
+
   return (
     <>
       <SectionHeading>Current Layout</SectionHeading>
@@ -143,18 +163,28 @@ export function WorksMaterialsStepContent({
 
       <SectionHeading>Dimensions</SectionHeading>
       <div className="mb-6 grid grid-cols-2 gap-6">
-        <div className="col-span-2 flex justify-end">
+        <div className="col-span-2 flex flex-wrap items-center justify-end gap-3">
+          {isDimensionsSupportAdded && (
+            <p className="text-xs font-medium text-emerald-700">
+              Dimensions survey support is in your cart.
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={() => updateDimensionsSupport("No")}
+            disabled={!isDimensionsSupportAdded}
+            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Remove from cart
+          </button>
           <AgentActionButton
-            label="Need help with dimensions? Ask Agent Z"
-            onClick={() =>
-              updateSection("eligibility", {
-                formData: {
-                  ...savedFormData,
-                  "Need help with dimensions?": "Yes",
-                },
-              })
+            label={
+              isDimensionsSupportAdded
+                ? "Dimensions survey added - Ask Agent Z"
+                : "Add dimensions survey with Agent Z"
             }
-            agentFieldLabel="Need help with dimensions?"
+            onClick={() => updateDimensionsSupport("Yes")}
+            agentFieldLabel={dimensionsSupportFieldLabel}
             agentRequestType="ask-agent"
             className="mt-0"
           />
@@ -256,7 +286,7 @@ export function WorksMaterialsStepContent({
           <div className="space-y-4">
             <RadioGroupField
               label="Approx smallest bedroom size?"
-              options={["Under 6.5 mÂ²", "6.5â€“10 mÂ²", "10+ mÂ²"]}
+              options={["Under 6.5 mÂ²", "6.5-10 mÂ²", "10+ mÂ²"]}
             />
           </div>
         </div>
