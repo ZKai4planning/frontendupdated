@@ -5,6 +5,16 @@ import { useServiceSelectionStore, type ServiceSelectionValue } from "@/lib/zust
 
 type ProjectServiceSelectionLike = Partial<ServiceSelectionValue> | undefined;
 
+const assignSelectionValue = <K extends keyof ServiceSelectionValue>(
+  selection: ServiceSelectionValue,
+  key: K,
+  value: ServiceSelectionValue[K] | undefined
+) => {
+  if (value !== undefined) {
+    selection[key] = value;
+  }
+};
+
 const mergeDefinedSelection = (
   baseSelection: ServiceSelectionValue | null,
   projectSelection: ProjectServiceSelectionLike
@@ -20,10 +30,7 @@ const mergeDefinedSelection = (
   }
 
   (Object.keys(projectSelection) as Array<keyof ServiceSelectionValue>).forEach((key) => {
-    const value = projectSelection[key];
-    if (value !== undefined) {
-      merged[key] = value;
-    }
+    assignSelectionValue(merged, key, projectSelection[key]);
   });
 
   return merged;

@@ -274,6 +274,353 @@ const DIMENSIONS_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
+const WALL_MATERIALS_AGENT_INTRO = "That's absolutely fine - I can guide you."
+const WALL_MATERIALS_RELATED_ANSWERS: AgentInsight[] = [
+  {
+    label: "Why it matters",
+    value: "Wall choice affects fire safety, sound insulation, and HMO compliance.",
+    confidence: "high",
+  },
+  {
+    label: "Brick or block",
+    value: "Strong and durable, but less flexible for internal layout changes.",
+    confidence: "high",
+  },
+  {
+    label: "Stud walls",
+    value: "Common for internal layouts and quicker to install, but HMO fire performance still needs checking.",
+    confidence: "high",
+  },
+  {
+    label: "Fire-rated walls",
+    value: "Often the safer route for HMO compliance where new rooms or partitions are proposed.",
+    confidence: "high",
+  },
+]
+const ROOF_MATERIALS_AGENT_INTRO = "No problem, I'll guide you."
+const ROOF_MATERIALS_RELATED_ANSWERS: AgentInsight[] = [
+  {
+    label: "Tiles or slate",
+    value: "Usually suited to pitched roofs and helps keep the existing character of the property.",
+    confidence: "high",
+  },
+  {
+    label: "Flat roof",
+    value: "Felt or GRP is commonly used for rear extensions, but height and drainage still need checking.",
+    confidence: "high",
+  },
+  {
+    label: "GRP or fibreglass",
+    value: "A durable low-maintenance option often used on modern extensions.",
+    confidence: "high",
+  },
+]
+const MATERIALS_MATCH_AGENT_INTRO = "That's a great question - I can help."
+const MATERIALS_MATCH_RELATED_ANSWERS: AgentInsight[] = [
+  {
+    label: "Council preference",
+    value: "Councils often prefer new work to match the existing property, especially brickwork, roof tiles, and external finishes.",
+    confidence: "high",
+  },
+  {
+    label: "Why it helps",
+    value: "Matching materials usually helps the extension or alteration blend in with the original building.",
+    confidence: "high",
+  },
+  {
+    label: "If not matching",
+    value: "A contrasting design can still work, but it may need a stronger planning justification.",
+    confidence: "high",
+  },
+]
+const CONSERVATION_AREA_AGENT_INTRO = "No problem - I can help you check this."
+const CONSERVATION_AREA_RELATED_ANSWERS: AgentInsight[] = [
+  {
+    label: "Conservation area",
+    value: "These are areas where the council protects the character and appearance of buildings.",
+    confidence: "high",
+  },
+  {
+    label: "Listed building",
+    value: "Listed buildings are historically important and usually have stricter rules for any changes nearby or to the building itself.",
+    confidence: "high",
+  },
+  {
+    label: "What it means",
+    value: "Even small changes may need planning permission, tighter material matching, or specialist heritage input.",
+    confidence: "high",
+  },
+]
+const TREE_TPO_AGENT_INTRO = "No problem - I'll help you assess this."
+const TREE_TPO_RELATED_ANSWERS: AgentInsight[] = [
+  {
+    label: "Protected trees",
+    value: "Trees covered by a Tree Preservation Order can limit design changes and may need formal review before work starts.",
+    confidence: "high",
+  },
+  {
+    label: "Why proximity matters",
+    value: "Large trees near the works can affect foundations, root protection, and where the extension can go.",
+    confidence: "high",
+  },
+  {
+    label: "Likely next step",
+    value: "If trees are close or protected, an arboricultural assessment or BS5837 report may be required.",
+    confidence: "high",
+  },
+]
+const TREE_FALLING_DISTANCE_AGENT_INTRO = "No problem - I'll help you assess this."
+const TREE_FALLING_DISTANCE_RELATED_ANSWERS: AgentInsight[] = [
+  {
+    label: "Simple rule",
+    value: "If a tree is tall enough to potentially fall onto the proposed works, it may be relevant to planning and design.",
+    confidence: "high",
+  },
+  {
+    label: "Why it matters",
+    value: "Large or mature trees close to an extension can trigger survey requirements, TPO checks, or design changes.",
+    confidence: "high",
+  },
+  {
+    label: "Likely next step",
+    value: "If you are unsure, site photos or an arboricultural review usually help confirm the risk.",
+    confidence: "high",
+  },
+]
+const FLOOD_ZONE_AGENT_INTRO = "No problem - I can check this for you."
+const FLOOD_ZONE_RELATED_ANSWERS: AgentInsight[] = [
+  {
+    label: "Zone 1",
+    value: "Low flood risk.",
+    confidence: "high",
+  },
+  {
+    label: "Zone 2 or 3",
+    value: "Medium to high flood risk, where the council may require a Flood Risk Assessment before approval.",
+    confidence: "high",
+  },
+  {
+    label: "What it means",
+    value: "Flood risk can affect drainage design, submission timing, and whether specialist input is needed.",
+    confidence: "high",
+  },
+]
+const CONTAMINATION_AGENT_INTRO = "No problem - I'll help clarify."
+const CONTAMINATION_RELATED_ANSWERS: AgentInsight[] = [
+  {
+    label: "What contamination means",
+    value: "This usually relates to past land uses that may have left harmful substances in the ground.",
+    confidence: "high",
+  },
+  {
+    label: "Common examples",
+    value: "Old industrial land, petrol stations, landfill, chemical storage, or heavy construction uses.",
+    confidence: "high",
+  },
+  {
+    label: "Residential history",
+    value: "If the site has always been residential, contamination is usually less likely.",
+    confidence: "high",
+  },
+]
+const SMOKE_ALARMS_AGENT_INTRO = "I can help with that."
+const SMOKE_ALARMS_RELATED_ANSWERS: AgentInsight[] = [
+  {
+    label: "Newham standard",
+    value: "Interlinked smoke alarms are typically required on every storey, with a heat alarm in the kitchen.",
+    confidence: "high",
+  },
+  {
+    label: "Installation type",
+    value: "The document expects mains-wired alarms with battery backup to meet the usual compliance standard.",
+    confidence: "high",
+  },
+  {
+    label: "If unsure",
+    value: "Photos of hallways, landings, and kitchen ceilings usually help confirm whether the setup is compliant.",
+    confidence: "high",
+  },
+]
+const GAS_SAFETY_AGENT_INTRO = "I can help with that."
+const GAS_SAFETY_RELATED_ANSWERS: AgentInsight[] = [
+  {
+    label: "Certificate needed",
+    value: "A Gas Safety Certificate (CP12) is expected where the property has gas appliances.",
+    confidence: "high",
+  },
+  {
+    label: "Validity",
+    value: "It should usually be issued within the last 12 months by a Gas Safe registered engineer.",
+    confidence: "high",
+  },
+  {
+    label: "What to check",
+    value: "The issue date, engineer number, and list of appliances covered are the key details.",
+    confidence: "high",
+  },
+]
+const EICR_AGENT_INTRO = "I can help with that."
+const EICR_RELATED_ANSWERS: AgentInsight[] = [
+  {
+    label: "Report needed",
+    value: "A valid Electrical Installation Condition Report is expected for rented or HMO properties.",
+    confidence: "high",
+  },
+  {
+    label: "Validity",
+    value: "The document treats an EICR as current if it was issued within the last 5 years.",
+    confidence: "high",
+  },
+  {
+    label: "What to check",
+    value: "Look for a satisfactory outcome, electrician accreditation, and any remedial actions.",
+    confidence: "high",
+  },
+]
+const EPC_AGENT_INTRO = "I can help with that."
+const EPC_RELATED_ANSWERS: AgentInsight[] = [
+  {
+    label: "Certificate needed",
+    value: "An EPC is expected for rented properties and HMO applications.",
+    confidence: "high",
+  },
+  {
+    label: "Validity",
+    value: "The document expects the EPC to be valid for 10 years and at Band E or above.",
+    confidence: "high",
+  },
+  {
+    label: "What to check",
+    value: "Rating, issue date, and assessor accreditation are the main points to verify.",
+    confidence: "high",
+  },
+]
+const WATER_SUPPLY_AGENT_INTRO = "I can help with that."
+const WATER_SUPPLY_RELATED_ANSWERS: AgentInsight[] = [
+  {
+    label: "What is required",
+    value: "The property should have a constant potable water supply with adequate hot and cold water to all fixtures.",
+    confidence: "high",
+  },
+  {
+    label: "Other checks",
+    value: "Pressure, contamination risks, and Legionella management are all relevant.",
+    confidence: "high",
+  },
+  {
+    label: "If unsure",
+    value: "Photos of taps, the boiler or cylinder, and any cold water tank can help verify the setup.",
+    confidence: "high",
+  },
+]
+const SEWAGE_DRAINAGE_AGENT_INTRO = "I can help with that."
+const SEWAGE_DRAINAGE_RELATED_ANSWERS: AgentInsight[] = [
+  {
+    label: "What is required",
+    value: "The property needs a safe functional connection to the public sewer or an approved private drainage system.",
+    confidence: "high",
+  },
+  {
+    label: "Common issues",
+    value: "Blockages, leaks, backflow, or non-functioning toilets and waste pipes are compliance risks.",
+    confidence: "high",
+  },
+  {
+    label: "If unsure",
+    value: "Photos of drainage runs, manhole covers, and any signs of foul smells or slow drainage help confirm the position.",
+    confidence: "high",
+  },
+]
+const SURFACE_WATER_AGENT_INTRO = "I can help with that."
+const SURFACE_WATER_RELATED_ANSWERS: AgentInsight[] = [
+  {
+    label: "Why it matters",
+    value: "Surface water drainage helps prevent pooling, flooding, damp, and neighbour impact.",
+    confidence: "high",
+  },
+  {
+    label: "Typical routes",
+    value: "The document points to a surface water sewer, soakaway, or SuDS rather than the foul sewer.",
+    confidence: "high",
+  },
+  {
+    label: "If unsure",
+    value: "Photos of gutters, downpipes, and external drainage points usually help confirm the drainage type.",
+    confidence: "high",
+  },
+]
+const WASTE_ARRANGEMENTS_AGENT_INTRO = "I can help with that."
+const WASTE_ARRANGEMENTS_RELATED_ANSWERS: AgentInsight[] = [
+  {
+    label: "What is required",
+    value: "Waste storage should be adequate for occupancy, use the correct bins, and stay secure and pest-proof.",
+    confidence: "high",
+  },
+  {
+    label: "Why it matters",
+    value: "Clear access for collection and no rubbish buildup are part of the compliance picture.",
+    confidence: "high",
+  },
+  {
+    label: "If unsure",
+    value: "Photos of front and rear bin storage areas usually help verify the arrangement.",
+    confidence: "high",
+  },
+]
+const RENEWABLES_AGENT_INTRO = "I can help with that."
+const RENEWABLES_RELATED_ANSWERS: AgentInsight[] = [
+  {
+    label: "Typical systems",
+    value: "This can include solar PV, solar thermal, air source heat pumps, ground source heat pumps, batteries, or EV charging.",
+    confidence: "high",
+  },
+  {
+    label: "Why it matters",
+    value: "Renewable installations can still need planning, structural, fire safety, or noise review depending on the system and location.",
+    confidence: "high",
+  },
+  {
+    label: "Useful details",
+    value: "The type of system, where it will go, and photos of the installation area are the best starting points.",
+    confidence: "high",
+  },
+]
+const ADDITIONAL_CONSENTS_AGENT_INTRO = "I can help with that."
+const ADDITIONAL_CONSENTS_RELATED_ANSWERS: AgentInsight[] = [
+  {
+    label: "What this can include",
+    value: "Additional consents can include freeholder, lender, planning, building control, party wall, conservation, or listed building approvals.",
+    confidence: "high",
+  },
+  {
+    label: "Common triggers",
+    value: "Leasehold ownership, mortgages, structural works, and protected locations often trigger extra checks.",
+    confidence: "high",
+  },
+  {
+    label: "If unsure",
+    value: "The quickest way to narrow this down is to confirm whether the property is leasehold, mortgaged, in a protected area, or undergoing structural works.",
+    confidence: "high",
+  },
+]
+const OWNERSHIP_CERTIFICATE_AGENT_INTRO = "I can help you choose the right ownership certificate."
+const OWNERSHIP_CERTIFICATE_RELATED_ANSWERS: AgentInsight[] = [
+  {
+    label: "Certificate A",
+    value: "Use this when you are the sole owner of all the land and buildings included in the application.",
+    confidence: "high",
+  },
+  {
+    label: "Certificate B",
+    value: "Use this when there are other known owners and the required notices have been served.",
+    confidence: "high",
+  },
+  {
+    label: "Certificate C or D",
+    value: "Certificate C is for agricultural tenants with notices served, and Certificate D is for unknown owners where notice must be published.",
+    confidence: "high",
+  },
+]
 const CONVERSATIONAL_AGENT_INTROS: Record<string, string> = {
   "Property Type": PROPERTY_TYPE_AGENT_INTRO,
   "Ownership Status": OWNERSHIP_STATUS_AGENT_INTRO,
@@ -284,6 +631,25 @@ const CONVERSATIONAL_AGENT_INTROS: Record<string, string> = {
   "Will rooms be rented individually?": INDIVIDUAL_ROOM_RENTAL_AGENT_INTRO,
   "Is there a communal kitchen?": COMMUNAL_KITCHEN_AGENT_INTRO,
   "Need help with dimensions?": DIMENSIONS_AGENT_INTRO,
+  "Wall Materials": WALL_MATERIALS_AGENT_INTRO,
+  "Roof Materials": ROOF_MATERIALS_AGENT_INTRO,
+  "Materials match existing?": MATERIALS_MATCH_AGENT_INTRO,
+  "Conservation Area or Near Listed Building?": CONSERVATION_AREA_AGENT_INTRO,
+  "Trees with TPO on or near site?": TREE_TPO_AGENT_INTRO,
+  "Trees within falling distance of works?": TREE_FALLING_DISTANCE_AGENT_INTRO,
+  "Is the site in Flood Zone 2 or 3?": FLOOD_ZONE_AGENT_INTRO,
+  "Any known contamination on site?": CONTAMINATION_AGENT_INTRO,
+  "Do you currently have smoke alarms installed?": SMOKE_ALARMS_AGENT_INTRO,
+  "Do you have a valid Gas Safety Certificate?": GAS_SAFETY_AGENT_INTRO,
+  "Do you have a valid Electrical Report (EICR)?": EICR_AGENT_INTRO,
+  "EPC available?": EPC_AGENT_INTRO,
+  "Water Supply": WATER_SUPPLY_AGENT_INTRO,
+  "Sewage / Drainage": SEWAGE_DRAINAGE_AGENT_INTRO,
+  "Surface Water Drainage": SURFACE_WATER_AGENT_INTRO,
+  "Existing Waste Arrangements": WASTE_ARRANGEMENTS_AGENT_INTRO,
+  "Renewable energy installations proposed?": RENEWABLES_AGENT_INTRO,
+  "Which Ownership Certificate applies?": OWNERSHIP_CERTIFICATE_AGENT_INTRO,
+  "Additional Consents": ADDITIONAL_CONSENTS_AGENT_INTRO,
 }
 const CONVERSATIONAL_AGENT_RELATED_ANSWERS: Record<string, AgentInsight[]> = {
   "Property Type": PROPERTY_TYPE_RELATED_ANSWERS,
@@ -295,6 +661,25 @@ const CONVERSATIONAL_AGENT_RELATED_ANSWERS: Record<string, AgentInsight[]> = {
   "Will rooms be rented individually?": INDIVIDUAL_ROOM_RENTAL_RELATED_ANSWERS,
   "Is there a communal kitchen?": COMMUNAL_KITCHEN_RELATED_ANSWERS,
   "Need help with dimensions?": DIMENSIONS_RELATED_ANSWERS,
+  "Wall Materials": WALL_MATERIALS_RELATED_ANSWERS,
+  "Roof Materials": ROOF_MATERIALS_RELATED_ANSWERS,
+  "Materials match existing?": MATERIALS_MATCH_RELATED_ANSWERS,
+  "Conservation Area or Near Listed Building?": CONSERVATION_AREA_RELATED_ANSWERS,
+  "Trees with TPO on or near site?": TREE_TPO_RELATED_ANSWERS,
+  "Trees within falling distance of works?": TREE_FALLING_DISTANCE_RELATED_ANSWERS,
+  "Is the site in Flood Zone 2 or 3?": FLOOD_ZONE_RELATED_ANSWERS,
+  "Any known contamination on site?": CONTAMINATION_RELATED_ANSWERS,
+  "Do you currently have smoke alarms installed?": SMOKE_ALARMS_RELATED_ANSWERS,
+  "Do you have a valid Gas Safety Certificate?": GAS_SAFETY_RELATED_ANSWERS,
+  "Do you have a valid Electrical Report (EICR)?": EICR_RELATED_ANSWERS,
+  "EPC available?": EPC_RELATED_ANSWERS,
+  "Water Supply": WATER_SUPPLY_RELATED_ANSWERS,
+  "Sewage / Drainage": SEWAGE_DRAINAGE_RELATED_ANSWERS,
+  "Surface Water Drainage": SURFACE_WATER_RELATED_ANSWERS,
+  "Existing Waste Arrangements": WASTE_ARRANGEMENTS_RELATED_ANSWERS,
+  "Renewable energy installations proposed?": RENEWABLES_RELATED_ANSWERS,
+  "Which Ownership Certificate applies?": OWNERSHIP_CERTIFICATE_RELATED_ANSWERS,
+  "Additional Consents": ADDITIONAL_CONSENTS_RELATED_ANSWERS,
 }
 const isConversationalAgentField = (fieldLabel: string) => fieldLabel in CONVERSATIONAL_AGENT_INTROS
 

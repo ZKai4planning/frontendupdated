@@ -70,6 +70,12 @@ const buildStructuredAddress = (
   ...partial,
 })
 
+type StoredCustomerDetails = Omit<Partial<CustomerDetailsForm>, "addressDetails"> & {
+  postCode?: string
+  servicePostCode?: string
+  addressDetails?: Partial<CustomerAddressDetails> | null
+}
+
 const applyPaymentAddressToProfile = (
   existingAddress: ProfileModel["address"],
   fullAddress: string,
@@ -113,10 +119,7 @@ const applyPaymentAddressToProfile = (
 }
 
 const createInitialCustomerDetails = (
-  storedDetails?: Partial<CustomerDetailsForm> & {
-    postCode?: string
-    servicePostCode?: string
-  },
+  storedDetails?: StoredCustomerDetails,
   defaults?: Partial<Pick<CustomerDetailsForm, "fullName" | "email">>
 ): CustomerDetailsForm => ({
   fullName: storedDetails?.fullName ?? defaults?.fullName ?? "",
