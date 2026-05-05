@@ -683,6 +683,43 @@ const CONVERSATIONAL_AGENT_RELATED_ANSWERS: Record<string, AgentInsight[]> = {
 }
 const isConversationalAgentField = (fieldLabel: string) => fieldLabel in CONVERSATIONAL_AGENT_INTROS
 
+const UPLOAD_HELP_CART_CONFIG = [
+  { fieldLabel: "Need help with location plan?", cartLabel: "Location Plan" },
+  { fieldLabel: "Need help with site plan?", cartLabel: "Site Plan" },
+  { fieldLabel: "Need help with elevations?", cartLabel: "Existing & Proposed Plans" },
+  { fieldLabel: "Need help with site photographs?", cartLabel: "Photographs of Site" },
+  { fieldLabel: "Need help with additional drawings?", cartLabel: "Additional Drawings" },
+  { fieldLabel: "Need help with arboriculture report?", cartLabel: "Arboriculture / BS5837 Report" },
+  { fieldLabel: "Need help with flood risk assessment?", cartLabel: "Flood Risk Assessment" },
+  { fieldLabel: "Need help with safety & compliance documents?", cartLabel: "Safety & Compliance Documents" },
+] as const
+
+const isUploadHelpCartField = (fieldLabel: string) =>
+  UPLOAD_HELP_CART_CONFIG.some((item) => item.fieldLabel === fieldLabel)
+
+const getUploadHelpCartLabel = (fieldLabel: string) =>
+  UPLOAD_HELP_CART_CONFIG.find((item) => item.fieldLabel === fieldLabel)?.cartLabel ??
+  fieldLabel.replace(/^Need help with\s*/i, "").replace(/\?$/, "").trim()
+
+const buildUploadHelpAgentMessage = (fieldLabel: string, selection?: string) => {
+  const cartLabel = getUploadHelpCartLabel(fieldLabel)
+
+  if (selection === "Yes") {
+    return `${cartLabel} support has been added to your request flow. Our team will coordinate the right planning support and reflect it in your cart below.`
+  }
+
+  if (selection === "No") {
+    return `${cartLabel} support has not been added to your cart. You can continue with your own upload and request help later if needed.`
+  }
+
+  return `We are reviewing support options for ${cartLabel.toLowerCase()} and preparing the next step for you.`
+}
+
+const getUploadHelpCartItems = (formData: Record<string, unknown>) =>
+  UPLOAD_HELP_CART_CONFIG.filter((item) => formData[item.fieldLabel] === "Yes").map(
+    (item) => item.cartLabel
+  )
+
 const getMessageDrivenAgentInsights = (content: string): AgentInsight[] => {
   const normalizedContent = content
     .replace(/\r\n/g, "\n")
@@ -788,12 +825,19 @@ export function FloatingAgentWidget({
   const dimensionSurveyCardRef = useRef<HTMLDivElement | null>(null)
 
   const isCompletionReview = requestType === "completion-review"
+  const currentFieldSelection =
+    typeof data.eligibility?.formData?.[fieldLabel] === "string"
+      ? data.eligibility?.formData?.[fieldLabel]
+      : ""
+  const isUploadHelpRequest = requestType === "ask-agent" && isUploadHelpCartField(fieldLabel)
   const currentMessage = isCompletionReview
     ? (
         message ??
         "We have reviewed your eligibility submission and identified a few outstanding items."
       )
-    : getAgentOpeningMessage(fieldLabel, message)
+    : isUploadHelpRequest
+      ? buildUploadHelpAgentMessage(fieldLabel, currentFieldSelection)
+      : getAgentOpeningMessage(fieldLabel, message)
   const statusMeta =
     agentStatus === "working" || agentStatus === "thinking"
       ? {
@@ -832,6 +876,10 @@ export function FloatingAgentWidget({
   const shouldRenderResponseText =
     isConversationalAgentField(fieldLabel) || isMessageDrivenAgentField
   const isDimensionsSurveyField = fieldLabel === "Need help with dimensions?"
+  const uploadHelpCartItems = useMemo(
+    () => getUploadHelpCartItems(data.eligibility?.formData || {}),
+    [data.eligibility?.formData]
+  )
   const [showDimensionSurveyBooking, setShowDimensionSurveyBooking] = useState(false)
   const [surveyCalendarDate, setSurveyCalendarDate] = useState(() => new Date())
   const [selectedSurveyDate, setSelectedSurveyDate] = useState<number | null>(
@@ -1091,7 +1139,9 @@ export function FloatingAgentWidget({
           return
         }
 
-        const finalInsights = getMessageDrivenAgentInsights(currentMessage)
+        const finalInsights = isUploadHelpRequest
+          ? []
+          : getMessageDrivenAgentInsights(currentMessage)
         setInsights(finalInsights)
         appendHistoryEntry({
           id: requestId,
@@ -1856,6 +1906,7 @@ export function FloatingAgentWidget({
     data.eligibility?.location,
     isCompletionReview,
     isMessageDrivenAgentField,
+    isUploadHelpRequest,
     missingFields,
     nextInsight,
     shouldHideAgentActivity,
@@ -1938,6 +1989,31 @@ export function FloatingAgentWidget({
                   <span className="ml-0.5 inline-block h-[1.05em] w-[2px] animate-pulse rounded-full bg-sky-300 align-[-0.15em]" />
                 )}
               </p>
+
+              {isUploadHelpRequest && (
+                <div className="mt-4 rounded-xl border border-white/10 bg-slate-950/60 px-3 py-3">
+                  <p className="mb-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    Cart
+                  </p>
+                  {uploadHelpCartItems.length > 0 ? (
+                    <div className="space-y-2">
+                      {uploadHelpCartItems.map((item) => (
+                        <div
+                          key={item}
+                          className="flex items-start gap-2 rounded-xl border border-emerald-400/15 bg-emerald-500/10 px-3 py-2 text-[12px] leading-relaxed text-emerald-50"
+                        >
+                          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-300" />
+                          <p>{item}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-[12px] leading-relaxed text-slate-300">
+                      No document support items have been added to the cart yet.
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* {tasks.length > 0 && (
                 <div className="mt-4">

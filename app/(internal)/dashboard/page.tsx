@@ -4,7 +4,15 @@ export const dynamic = "force-dynamic"
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { ArrowRight, FolderOpen, Plus, Sparkles } from "lucide-react"
+import {
+  ArrowRight,
+  ExternalLink,
+  FileText,
+  FolderOpen,
+  MessageSquare,
+  Plus,
+  Wallet,
+} from "lucide-react"
 
 import PaymentStep from "@/components/dashboard-steps/PaymentStep"
 import PlansStep from "@/components/dashboard-steps/PlansStep"
@@ -69,6 +77,31 @@ const SELECTED_PROJECT_STORAGE_KEY = "selectedProjectId"
 const SELECTED_PROJECT_STAGE_STORAGE_KEY = "selectedProjectStageId"
 const PLANS_STAGE_ROUTE = "/dashboard?stage=plans"
 
+const DASHBOARD_PENDING_DOCUMENTS = [
+  "Location plan",
+  "Site layout",
+  "Existing & Proposed Plans",
+  "Gas safety report",
+  "EICR certificate",
+] as const
+
+const DASHBOARD_MESSAGES = [
+  {
+    sender: "JD",
+    name: "James D.",
+    role: "Consultant",
+    message: "We will review your plan set and confirm the next step shortly.",
+    time: "2h",
+  },
+  {
+    sender: "AZ",
+    name: "Agent Z",
+    role: "AI Assistant",
+    message: "3 supporting documents are still pending for this project.",
+    time: "5h",
+  },
+] as const
+
 const STAGE_COMPONENTS = {
   plans: PlansStep,
   payment: PaymentStep,
@@ -84,6 +117,9 @@ type StageKey = keyof typeof STAGE_COMPONENTS
 
 const getPrimaryProjectService = (project?: UserProject | null) =>
   project?.subServices?.[0] ?? project?.services?.[0]
+
+const formatCurrency = (amount?: number) =>
+  typeof amount === "number" ? `GBP ${amount.toFixed(2)}` : "Not available"
 
 const formatProjectStatus = (status?: string) =>
   status
@@ -403,6 +439,27 @@ function DashboardOverview() {
     serviceSelection?.serviceTitle ||
     selectedProjectId ||
     "Project"
+  const selectedPlanName = serviceSelection?.pricingPlan || "Bronze"
+  const initialCharge = serviceSelection?.initialCharge ?? 40
+  const subsequentCharge = serviceSelection?.subsequentCharge ?? 100
+  const totalCharge = serviceSelection?.price ?? initialCharge + subsequentCharge
+  const paymentAmount = data.payment?.amount ?? totalCharge
+  const planSelectedDate = "05/05/2026"
+  const paymentReference = "PAY-AI4P-050526-7842"
+  const quotationPageHref = "/dashboard?stage=initial-quotation&readonly=1"
+  const quotationPdfLabel = "initial-quotation.pdf"
+  const initialQuotationSummary = `Your initial quotation for ${selectedProjectLabel} starts the ${selectedPlanName} plan and covers the first activation stage, including early review, planning checks, and guided preparation for the next steps in your service.`
+  const dashboardPaymentItems = [
+    { label: "Selected plan", value: selectedPlanName },
+    { label: "Plan selected date", value: planSelectedDate },
+    { label: "Payment reference", value: paymentReference },
+    { label: "Initial deposit", value: formatCurrency(initialCharge) },
+    { label: "Subsequent charges", value: formatCurrency(subsequentCharge) },
+    {
+      label: "Next payment",
+      value: data.payment?.status === "submitted" ? "No dues" : "Awaiting payment",
+    },
+  ]
 
   const handleAgentAction = () => {
     if (selectedProject) {
@@ -655,6 +712,188 @@ function DashboardOverview() {
             })}
           </div>
         )}
+      </div>
+
+      <div className="mt-6 rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+              Overview
+            </p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+              Payments, documents, communications and quotations
+            </h2>
+          </div>
+
+          <p className="max-w-xl text-sm leading-6 text-slate-600">
+            A simple live summary for{" "}
+            <span className="font-semibold text-slate-900">{selectedProjectLabel}</span>
+            {" "}so you can see what is paid, what is pending, and what needs your
+            attention next.
+          </p>
+        </div>
+
+        <div className="mt-8 grid gap-6 lg:grid-cols-3">
+          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
+                <Wallet className="h-5 w-5" />
+              </div>
+              <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                No dues
+              </span>
+            </div>
+
+            <div className="mt-6">
+              <p className="text-4xl font-semibold tracking-tight text-slate-900">
+                {formatCurrency(paymentAmount)}
+              </p>
+              <p className="mt-1 text-sm text-slate-600">
+                {data.payment?.status === "submitted" ? "Paid" : "Due"} - {formatCurrency(totalCharge)} total due
+              </p>
+            </div>
+
+            <div className="mt-6">
+              <div className="flex items-center justify-between text-sm font-medium text-slate-700">
+                <span>Payment progress</span>
+                <span>{data.payment?.status === "submitted" ? "100%" : "70%"}</span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className={`h-full rounded-full bg-blue-600 ${data.payment?.status === "submitted" ? "w-full" : "w-[70%]"
+                    }`}
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-3">
+              {dashboardPaymentItems.map((item) => (
+                <div
+                  key={item.label}
+                  className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3"
+                >
+                  <span className="text-sm text-slate-600">{item.label}</span>
+                  <span
+                    className={`text-sm font-semibold ${item.value === "No dues"
+                      ? "rounded-full bg-emerald-100 px-3 py-1 text-emerald-700"
+                      : "text-slate-900"
+                      }`}
+                  >
+                    {item.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
+                New Quote
+              </p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                The PDF link will appear here after the initial quotation is issued.
+              </p>
+              <a
+                href={quotationPageHref}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-flex text-sm font-medium text-blue-700 underline underline-offset-4 hover:text-blue-800"
+              >
+                {quotationPdfLabel}
+              </a>
+            </div>
+          </article>
+
+          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                <FileText className="h-5 w-5" />
+              </div>
+              <span className="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700">
+                5 pending
+              </span>
+            </div>
+
+            <div className="mt-6">
+              <p className="text-4xl font-semibold tracking-tight text-slate-900">0 / 5</p>
+              <p className="mt-1 text-sm text-slate-600">Documents uploaded</p>
+            </div>
+
+            <div className="mt-6">
+              <div className="flex items-center justify-between text-sm font-medium text-slate-700">
+                <span>Completion</span>
+                <span>0%</span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full w-0 rounded-full bg-amber-500" />
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-3">
+              {DASHBOARD_PENDING_DOCUMENTS.map((document) => (
+                <div
+                  key={document}
+                  className="flex items-center justify-between rounded-2xl bg-amber-50/60 px-4 py-3"
+                >
+                  <span className="text-sm text-slate-700">{document}</span>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">
+                    Pending
+                  </span>
+                </div>
+              ))}
+            </div>
+          </article>
+
+          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-100 text-teal-700">
+                <MessageSquare className="h-5 w-5" />
+              </div>
+              <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
+                3 unread
+              </span>
+            </div>
+
+            <div className="mt-6">
+              <p className="text-4xl font-semibold tracking-tight text-slate-900">3</p>
+              <p className="mt-1 text-sm text-slate-600">Unread chat messages</p>
+            </div>
+
+            <div className="mt-6">
+              <div className="flex items-center justify-between text-sm font-medium text-slate-700">
+                <span>Response rate</span>
+                <span>92%</span>
+              </div>
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                <div className="h-full w-[92%] rounded-full bg-teal-600" />
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-4">
+              {DASHBOARD_MESSAGES.map((message) => (
+                <div key={`${message.name}-${message.time}`} className="flex gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-100 text-xs font-semibold text-teal-800">
+                    {message.sender}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">
+                          {message.name}
+                          <span className="font-normal text-slate-500"> - {message.role}</span>
+                        </p>
+                        <p className="mt-1 line-clamp-2 text-sm text-slate-600">
+                          {message.message}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-xs text-slate-400">{message.time}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </article>
+        </div>
+
       </div>
     </section>
   )

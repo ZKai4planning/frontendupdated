@@ -33,7 +33,6 @@ export function WorksMaterialsStepContent({
   const proposedWorksRawValue = asStringValue(savedFormData["Description of Proposed Works"])
   const totalInternalFloorAreaLabel = "Total internal floor area (m\u00C2\u00B2)"
   const propertyFootprintLabel = "Property footprint (approx length \u00C3\u00D7 width in metres)"
-
   const summarizeProposedWorks = (value: string) => {
     const normalized = value.replace(/\s+/g, " ").trim()
     if (!normalized) return ""
@@ -147,7 +146,14 @@ export function WorksMaterialsStepContent({
         <div className="col-span-2 flex justify-end">
           <AgentActionButton
             label="Need help with dimensions? Ask Agent Z"
-            onClick={() => undefined}
+            onClick={() =>
+              updateSection("eligibility", {
+                formData: {
+                  ...savedFormData,
+                  "Need help with dimensions?": "Yes",
+                },
+              })
+            }
             agentFieldLabel="Need help with dimensions?"
             agentRequestType="ask-agent"
             className="mt-0"
@@ -351,7 +357,17 @@ export function WorksMaterialsStepContent({
           singleRow
           allowAddMore
           descriptionPlaceholder="For example: front view, rear garden, side boundary"
-          onMissingTrigger="No photographs uploaded - please add photos of the existing property."
+          onMissingTrigger={{
+            message: "No photographs uploaded - we can help coordinate the site photography needed for your application.",
+            decision: {
+              fieldLabel: "Need help with site photographs?",
+              prompt: "Would you like Agent Z to help with site photographs?",
+              yesMessage:
+                "Agent Z is preparing support for the site photographs needed for your application.",
+              noMessage:
+                "Agent Z has noted that you do not need help with site photographs right now.",
+            },
+          }}
         />
         <StructuredFileUploadArea
           label="Additional Drawings (floor plans, sections etc.)"
@@ -366,7 +382,6 @@ export function WorksMaterialsStepContent({
             decision: {
               fieldLabel: "Need help with additional drawings?",
               prompt: "Do you want help with additional drawings such as floor plans or sections?",
-              triggerAgent: false,
             },
           }}
         />
