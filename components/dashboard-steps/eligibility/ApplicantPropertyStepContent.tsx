@@ -479,7 +479,7 @@ export function ApplicantPropertyStepContent({
           <Input
             label="Postcode"
             autocompleteKind="postcode"
-            actionLabel={isGettingAddress ? "Getting..." : "Get address"}
+            // actionLabel={isGettingAddress ? "Getting..." : "Get address"}
             onAction={handleGetAddress}
             actionDisabled={!siteAddressLine1 || !postcode || isGettingAddress}
             actionOpensAgentSidebar={false}

@@ -131,7 +131,7 @@ export default function ServiceExpandPanel({
   useEffect(() => {
     if (!isExpanded) return;
     if (typeof window === "undefined") return;
-    const mediaQuery = window.matchMedia("(min-width: 768px) and (max-width: 1023px)");
+    const mediaQuery = window.matchMedia("(max-width: 1279px)");
     if (!mediaQuery.matches) return;
 
     requestAnimationFrame(() => {
@@ -222,9 +222,13 @@ export default function ServiceExpandPanel({
         style={{ flex: mobile ? undefined : isExpanded ? "3 1 0%" : "0 0 64px" }}
         transition={{ layout: { duration: 0.5, ease: [0.4, 0, 0.2, 1] } }}
         className={`relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden 
-          ${isExpanded ? "md:order-first lg:order-0 md:scroll-mt-24" : ""}
-          ${isExpanded ? "h-162.5 md:h-162.5 lg:h-full w-full lg:w-auto" : "h-16 md:h-20 lg:h-full w-full lg:w-16"}
-          ${isLaptop ? "lg:max-h-140" : ""}`}
+          ${isExpanded ? "md:order-first xl:order-0 md:scroll-mt-24" : ""}
+          ${
+            isExpanded
+              ? "w-full min-h-[42rem] sm:min-h-[46rem] md:min-h-[52rem] xl:min-h-0"
+              : "h-16 md:h-20 xl:h-auto w-full xl:w-16"
+          }
+          ${isLaptop ? "xl:max-h-[48rem]" : ""}`}
       >
         {/* Mobile Header */}
         {mobile && isExpanded && (
@@ -252,7 +256,7 @@ export default function ServiceExpandPanel({
             <motion.span
               animate={{ y: index % 2 === 0 ? [-8, 12, -7] : [10, -7, 10] }}
               transition={{ duration: 2.2, ease: "easeInOut", repeat: Infinity, delay: index * 0.10 }}
-              className={`font-bold uppercase tracking-[0.4em] text-xs lg:[writing-mode:vertical-rl] lg:rotate-180 ${
+              className={`font-bold uppercase tracking-[0.4em] text-xs xl:[writing-mode:vertical-rl] xl:rotate-180 ${
                 isServiceActive ? "text-white/50" : "text-white/25"
               }`}
             >
@@ -264,13 +268,13 @@ export default function ServiceExpandPanel({
         {/* Expanded Content */}
         {isExpanded && (
           <motion.div
-            className={`absolute inset-0 flex h-full w-full flex-col md:flex-row ${mobile ? "pt-16 md:pt-0 z-0" : ""}`}
+            className="flex w-full flex-1 flex-col xl:flex-row"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.3 }}
           >
             {/* Left Image */}
-            <div className="hidden md:flex w-full md:w-[40%] lg:w-[30%] h-56 md:h-full items-center justify-center bg-white/5 border-b border-white/10 md:border-b-0 md:border-r">
+            <div className="flex h-56 w-full items-center justify-center border-b border-white/10 bg-white/5 sm:h-72 md:h-80 xl:h-auto xl:w-[30%] xl:border-b-0 xl:border-r">
               <div className="relative w-full h-full overflow-hidden">
                 <Image src={service.image} alt={service.title} fill className="object-cover" priority />
                 <div className="absolute inset-0 bg-blue-900/30" />
@@ -288,8 +292,8 @@ export default function ServiceExpandPanel({
             </div>
 
             {/* Right Content */}
-            <div className={`relative flex-1 w-full md:w-[60%] lg:w-[70%] flex flex-col bg-white/5 overflow-y-auto ${isLaptop ? "p-5 md:p-6 lg:p-7" : "p-6 md:p-8 lg:p-10"}`}>
-              <button onClick={handleClose} className={`absolute top-6 right-6 z-20 h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/70 hover:bg-white/20 hover:text-white ${mobile ? "hidden md:inline-flex" : "inline-flex"}`}>
+            <div className={`relative flex w-full flex-1 flex-col bg-white/5 ${isLaptop ? "p-5 md:p-6 xl:p-7" : "p-5 sm:p-6 md:p-8 xl:p-10"}`}>
+              <button onClick={handleClose} className={`absolute top-4 right-4 z-20 h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-white/70 hover:bg-white/20 hover:text-white sm:top-6 sm:right-6 ${mobile ? "hidden md:inline-flex" : "inline-flex"}`}>
                 <span className="material-symbols-outlined text-xl leading-none">close</span>
               </button>
 
@@ -301,7 +305,7 @@ export default function ServiceExpandPanel({
                     </div>
                     <h2 className={`font-bold mb-2 ${isLaptop ? "text-2xl" : "text-3xl"}`}>Detailed Service View</h2>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_1.4fr] gap-6 mb-8">
+                    <div className="mb-8 grid grid-cols-1 gap-6 xl:grid-cols-[1.05fr_1.4fr]">
                       {/* Feature List */}
                       <div className="flex flex-col gap-3">
                         {service.features.map((feature, i) => {
@@ -380,7 +384,7 @@ export default function ServiceExpandPanel({
                             This subservice is currently inactive and cannot be selected.
                           </p>
                         ) : null}
-                        <div className="mt-6 flex items-center justify-center gap-4 rounded-2xl px-4 py-3 mb-8">
+                        <div className="mb-8 mt-6 flex items-center justify-center gap-4 rounded-2xl px-4 py-3">
                           <button
                             type="button"
                             onClick={handleApplyForService}
@@ -398,7 +402,7 @@ export default function ServiceExpandPanel({
                         </div>
 
                         {/* Help Section */}
-                        <div className="mt-auto flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-linear-to-r from-white/10 via-white/5 to-transparent px-2 py-4">
+                        <div className="mt-auto flex flex-col items-start justify-between gap-4 rounded-2xl border border-white/10 bg-linear-to-r from-white/10 via-white/5 to-transparent px-4 py-4 sm:flex-row sm:items-center">
                           <div className="flex items-center gap-3">
                             <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/20 text-blue-300">
                               <span className="material-symbols-outlined text-xl">help_outline</span>
@@ -421,7 +425,7 @@ export default function ServiceExpandPanel({
                     <h2 className={`${isLaptop ? "text-2xl" : "text-3xl"} font-bold mb-4`}>{service.title}</h2>
                     <p className={`text-white/70 mb-6 leading-relaxed italic ${isLaptop ? "text-sm" : "text-base"}`}>&quot;{service.description}&quot;</p>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                    <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
                       {service.features.map((feature, i) => {
                         const isFeatureActive = feature.status !== false;
 
@@ -463,7 +467,7 @@ export default function ServiceExpandPanel({
                     </div>
                   </div>
 
-                  <div className="mt-auto flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-linear-to-r from-white/10 via-white/5 to-transparent px-5 py-4">
+                  <div className="mt-auto flex flex-col items-start justify-between gap-4 rounded-2xl border border-white/10 bg-linear-to-r from-white/10 via-white/5 to-transparent px-5 py-4 sm:flex-row sm:items-center">
                     <div className="flex items-center gap-3">
                       <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/20 text-blue-300">
                         <span className="material-symbols-outlined text-xl">help_outline</span>

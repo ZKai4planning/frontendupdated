@@ -71,13 +71,14 @@ export function UtilitiesConsentsStepContent({
         <StructuredFileUploadArea
           label="Upload safety & compliance documents"
           accept=".pdf,.jpg,.jpeg,.png"
-          hint="Upload the Gas Safety Certificate, Electrical Report (EICR), and EPC if available."
+          hint="Upload the Gas Safety Certificate, Electrical Report (EICR), Energy Performance Certificate (EPC), and any other supporting safety/compliance documents if available."
           slotLabels={[
             "Gas Safety Certificate",
             "Electrical Report (EICR)",
             "EPC Certificate",
           ]}
           showDescriptionInput={false}
+          allowAddMore
           singleRow
           // onMissingTrigger={{
           //   message:

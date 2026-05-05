@@ -81,11 +81,8 @@ const SAFETY_COMPLIANCE_SLOT_LABELS = [
   "Electrical Report (EICR)",
   "EPC Certificate",
 ] as const
-const SAFETY_COMPLIANCE_MULTIPART_FIELD_KEYS = [
-  "gasSafetyCertificateUpload",
-  "electricalReportEicrUpload",
-  "epcCertificateUpload",
-] as const
+const SAFETY_COMPLIANCE_FILES_FIELD = "safetyComplianceDocuments"
+const SAFETY_COMPLIANCE_FILE_NAMES_FIELD = "safetyComplianceDocumentsFileNames"
 const ELIGIBILITY_CREATE_ENDPOINT =
   process.env.NEXT_PUBLIC_ELIGIBILITY_CREATE_ENDPOINT ?? "/eligibility"
 const SELECTED_PROJECT_STORAGE_KEY = "selectedProjectId"
@@ -1321,6 +1318,31 @@ const extractStringFromPaths = (
   return undefined
 }
 
+const extractStringArrayFromPaths = (
+  record: Record<string, unknown> | null,
+  paths: string[][]
+) => {
+  if (!record) return []
+
+  const value = getFirstPathValue(record, paths)
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === "string" ? item.trim() : typeof item === "number" ? String(item) : ""))
+      .filter(Boolean)
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    return [value.trim()]
+  }
+
+  if (typeof value === "number") {
+    return [String(value)]
+  }
+
+  return []
+}
+
 const extractBooleanFromPaths = (
   record: Record<string, unknown> | null,
   paths: string[][]
@@ -1515,56 +1537,77 @@ const normalizeEligibilityUploadsFromApi = (payload: unknown): EligibilityFileMa
     ["floodRiskAssesmentReport"],
     ["floodRiskAssessmentReport"],
   ])
-  const safetyComplianceEntries = [
-    normalizeRemoteUploadEntry(
-      getFirstPathValue(record, [
-        ["utilitesAndConsents", "safetyAndCompliance", "gasSafetyCertificateFile"],
-        ["utilitiesAndConsents", "safetyAndCompliance", "gasSafetyCertificateFile"],
-        ["utilitesAndConsents", "safetyAndCompliance", "gasSafetyCertificateUpload"],
-        ["utilitiesAndConsents", "safetyAndCompliance", "gasSafetyCertificateUpload"],
-        ["utilitesAndConsents", "safetyAndCompliance", "gasSafetyCertificateDocument"],
-        ["utilitiesAndConsents", "safetyAndCompliance", "gasSafetyCertificateDocument"],
-        ["gasSafetyCertificateUpload"],
-        ["gasSafetyCertificateDocument"],
-        ["gasSafetyCertificateFile"],
-      ]),
-      SAFETY_COMPLIANCE_SLOT_LABELS[0],
-      SAFETY_COMPLIANCE_SLOT_LABELS[0]
-    ) ?? createUploadEntry(SAFETY_COMPLIANCE_SLOT_LABELS[0]),
-    normalizeRemoteUploadEntry(
-      getFirstPathValue(record, [
-        ["utilitesAndConsents", "safetyAndCompliance", "electricalReportEicrFile"],
-        ["utilitiesAndConsents", "safetyAndCompliance", "electricalReportEicrFile"],
-        ["utilitesAndConsents", "safetyAndCompliance", "electricalReportEicrUpload"],
-        ["utilitiesAndConsents", "safetyAndCompliance", "electricalReportEicrUpload"],
-        ["utilitesAndConsents", "safetyAndCompliance", "electricalReportEicrDocument"],
-        ["utilitiesAndConsents", "safetyAndCompliance", "electricalReportEicrDocument"],
-        ["electricalReportEicrUpload"],
-        ["electricalReportEicrDocument"],
-        ["electricalReportEicrFile"],
-      ]),
-      SAFETY_COMPLIANCE_SLOT_LABELS[1],
-      SAFETY_COMPLIANCE_SLOT_LABELS[1]
-    ) ?? createUploadEntry(SAFETY_COMPLIANCE_SLOT_LABELS[1]),
-    normalizeRemoteUploadEntry(
-      getFirstPathValue(record, [
-        ["utilitesAndConsents", "safetyAndCompliance", "epcCertificateFile"],
-        ["utilitiesAndConsents", "safetyAndCompliance", "epcCertificateFile"],
-        ["utilitesAndConsents", "safetyAndCompliance", "epcCertificateUpload"],
-        ["utilitiesAndConsents", "safetyAndCompliance", "epcCertificateUpload"],
-        ["utilitesAndConsents", "safetyAndCompliance", "epcCertificateDocument"],
-        ["utilitiesAndConsents", "safetyAndCompliance", "epcCertificateDocument"],
-        ["epcCertificateUpload"],
-        ["epcCertificateDocument"],
-        ["epcCertificate"],
-      ]),
-      SAFETY_COMPLIANCE_SLOT_LABELS[2],
-      SAFETY_COMPLIANCE_SLOT_LABELS[2]
-    ) ?? createUploadEntry(SAFETY_COMPLIANCE_SLOT_LABELS[2]),
-  ]
+  const safetyComplianceDocuments = getFirstPathValue(record, [
+    ["utilitesAndConsents", "safetyAndCompliance", SAFETY_COMPLIANCE_FILES_FIELD],
+    ["utilitiesAndConsents", "safetyAndCompliance", SAFETY_COMPLIANCE_FILES_FIELD],
+    [SAFETY_COMPLIANCE_FILES_FIELD],
+  ])
+  const safetyComplianceFileNames = extractStringArrayFromPaths(record, [
+    ["utilitesAndConsents", "safetyAndCompliance", SAFETY_COMPLIANCE_FILE_NAMES_FIELD],
+    ["utilitiesAndConsents", "safetyAndCompliance", SAFETY_COMPLIANCE_FILE_NAMES_FIELD],
+    [SAFETY_COMPLIANCE_FILE_NAMES_FIELD],
+  ])
 
-  if (safetyComplianceEntries.some((entry) => entry.remoteFileUrl)) {
-    uploaded[SAFETY_COMPLIANCE_UPLOAD_LABEL] = safetyComplianceEntries
+  if (safetyComplianceDocuments !== undefined && safetyComplianceDocuments !== null) {
+    setUploads(
+      SAFETY_COMPLIANCE_UPLOAD_LABEL,
+      safetyComplianceDocuments,
+      safetyComplianceFileNames.length > 0
+        ? safetyComplianceFileNames
+        : [...SAFETY_COMPLIANCE_SLOT_LABELS]
+    )
+  } else {
+    const safetyComplianceEntries = [
+      normalizeRemoteUploadEntry(
+        getFirstPathValue(record, [
+          ["utilitesAndConsents", "safetyAndCompliance", "gasSafetyCertificateFile"],
+          ["utilitiesAndConsents", "safetyAndCompliance", "gasSafetyCertificateFile"],
+          ["utilitesAndConsents", "safetyAndCompliance", "gasSafetyCertificateUpload"],
+          ["utilitiesAndConsents", "safetyAndCompliance", "gasSafetyCertificateUpload"],
+          ["utilitesAndConsents", "safetyAndCompliance", "gasSafetyCertificateDocument"],
+          ["utilitiesAndConsents", "safetyAndCompliance", "gasSafetyCertificateDocument"],
+          ["gasSafetyCertificateUpload"],
+          ["gasSafetyCertificateDocument"],
+          ["gasSafetyCertificateFile"],
+        ]),
+        SAFETY_COMPLIANCE_SLOT_LABELS[0],
+        SAFETY_COMPLIANCE_SLOT_LABELS[0]
+      ) ?? createUploadEntry(SAFETY_COMPLIANCE_SLOT_LABELS[0]),
+      normalizeRemoteUploadEntry(
+        getFirstPathValue(record, [
+          ["utilitesAndConsents", "safetyAndCompliance", "electricalReportEicrFile"],
+          ["utilitiesAndConsents", "safetyAndCompliance", "electricalReportEicrFile"],
+          ["utilitesAndConsents", "safetyAndCompliance", "electricalReportEicrUpload"],
+          ["utilitiesAndConsents", "safetyAndCompliance", "electricalReportEicrUpload"],
+          ["utilitesAndConsents", "safetyAndCompliance", "electricalReportEicrDocument"],
+          ["utilitiesAndConsents", "safetyAndCompliance", "electricalReportEicrDocument"],
+          ["electricalReportEicrUpload"],
+          ["electricalReportEicrDocument"],
+          ["electricalReportEicrFile"],
+        ]),
+        SAFETY_COMPLIANCE_SLOT_LABELS[1],
+        SAFETY_COMPLIANCE_SLOT_LABELS[1]
+      ) ?? createUploadEntry(SAFETY_COMPLIANCE_SLOT_LABELS[1]),
+      normalizeRemoteUploadEntry(
+        getFirstPathValue(record, [
+          ["utilitesAndConsents", "safetyAndCompliance", "epcCertificateFile"],
+          ["utilitiesAndConsents", "safetyAndCompliance", "epcCertificateFile"],
+          ["utilitesAndConsents", "safetyAndCompliance", "epcCertificateUpload"],
+          ["utilitiesAndConsents", "safetyAndCompliance", "epcCertificateUpload"],
+          ["utilitesAndConsents", "safetyAndCompliance", "epcCertificateDocument"],
+          ["utilitiesAndConsents", "safetyAndCompliance", "epcCertificateDocument"],
+          ["epcCertificateUpload"],
+          ["epcCertificateDocument"],
+          ["epcCertificate"],
+        ]),
+        SAFETY_COMPLIANCE_SLOT_LABELS[2],
+        SAFETY_COMPLIANCE_SLOT_LABELS[2]
+      ) ?? createUploadEntry(SAFETY_COMPLIANCE_SLOT_LABELS[2]),
+    ]
+
+    if (safetyComplianceEntries.some((entry) => entry.remoteFileUrl)) {
+      uploaded[SAFETY_COMPLIANCE_UPLOAD_LABEL] = safetyComplianceEntries
+    }
   }
 
   return uploaded
@@ -1878,7 +1921,6 @@ const buildEligibilityMultipartFormData = ({
 }) => {
   const formData = new FormData()
   const getEntries = (label: string) => uploadedFiles[label] ?? []
-  const getFileAt = (label: string, index: number) => getEntries(label)[index]?.file ?? null
   const getFiles = (label: string, limit?: number) =>
     getEntries(label)
       .map((entry) => entry.file)
@@ -1944,23 +1986,14 @@ const buildEligibilityMultipartFormData = ({
     "floodRiskAssesmentReport",
     getFiles("Flood Risk Assessment (if available)")
   )
-  appendSingleFile(
+  appendRepeatedFiles(
     formData,
-    SAFETY_COMPLIANCE_MULTIPART_FIELD_KEYS[0],
-    [getFileAt(SAFETY_COMPLIANCE_UPLOAD_LABEL, 0)].filter((file): file is File => Boolean(file))
-  )
-  appendSingleFile(
-    formData,
-    SAFETY_COMPLIANCE_MULTIPART_FIELD_KEYS[1],
-    [getFileAt(SAFETY_COMPLIANCE_UPLOAD_LABEL, 1)].filter((file): file is File => Boolean(file))
-  )
-  appendSingleFile(
-    formData,
-    SAFETY_COMPLIANCE_MULTIPART_FIELD_KEYS[2],
-    [getFileAt(SAFETY_COMPLIANCE_UPLOAD_LABEL, 2)].filter((file): file is File => Boolean(file))
+    SAFETY_COMPLIANCE_FILES_FIELD,
+    getFiles(SAFETY_COMPLIANCE_UPLOAD_LABEL)
   )
   appendUploadFileNames("photographsOfSiteFileNames", "Photographs of Site")
   appendUploadFileNames("additionalDrawingsFileNames", "Additional Drawings (floor plans, sections etc.)")
+  appendUploadFileNames(SAFETY_COMPLIANCE_FILE_NAMES_FIELD, SAFETY_COMPLIANCE_UPLOAD_LABEL)
   if (signatureFile) {
     formData.append("digitalSignatureUrl", signatureFile)
   }
