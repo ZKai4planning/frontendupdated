@@ -17,6 +17,9 @@ import {
   X,
   PenLine,
   AlertCircle,
+  ExternalLink,
+  FileImage,
+  FileText,
 } from "lucide-react"
 import {
   PROJECT_FLOW,
@@ -56,6 +59,8 @@ type EligibilityAssetsContextValue = {
   setUploadedFiles: React.Dispatch<React.SetStateAction<EligibilityFileMap>>
   signatureFile: File | null
   setSignatureFile: React.Dispatch<React.SetStateAction<File | null>>
+  signaturePreviewUrl: string | null
+  setSignaturePreviewUrl: React.Dispatch<React.SetStateAction<string | null>>
 }
 
 type EligibilityAgentSidebarState = {
@@ -399,10 +404,47 @@ const hasUploadedAsset = (entry: UploadedFileEntry) => Boolean(entry.file || ent
 const getUploadedAssetName = (entry: UploadedFileEntry) =>
   entry.file?.name || entry.remoteFileName || entry.description || "Uploaded file"
 
+const getUploadedAssetMimeType = (entry: UploadedFileEntry) => entry.file?.type?.toLowerCase() ?? ""
+
+const getUploadedAssetExtension = (entry: UploadedFileEntry) => {
+  const candidate = getUploadedAssetName(entry).split("?")[0].trim()
+  const extension = candidate.includes(".") ? candidate.split(".").pop() ?? "" : ""
+  return extension.toLowerCase()
+}
+
+const isImageUploadEntry = (entry: UploadedFileEntry) => {
+  const mimeType = getUploadedAssetMimeType(entry)
+  if (mimeType.startsWith("image/")) return true
+
+  return ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"].includes(getUploadedAssetExtension(entry))
+}
+
+const isPdfUploadEntry = (entry: UploadedFileEntry) => {
+  const mimeType = getUploadedAssetMimeType(entry)
+  if (mimeType === "application/pdf") return true
+
+  return getUploadedAssetExtension(entry) === "pdf"
+}
+
 const getFileNameFromUrl = (url: string) => {
   const cleanUrl = url.split("?")[0]
   const lastSegment = cleanUrl.split("/").pop() ?? ""
   return decodeURIComponent(lastSegment) || "Uploaded file"
+}
+
+const formatSignedDateForDisplay = (value: string) => {
+  if (!value.trim()) return ""
+
+  const trimmed = value.trim()
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) return trimmed
+
+  const parsed = new Date(trimmed)
+  if (Number.isNaN(parsed.getTime())) return trimmed
+
+  const day = String(parsed.getUTCDate()).padStart(2, "0")
+  const month = String(parsed.getUTCMonth() + 1).padStart(2, "0")
+  const year = parsed.getUTCFullYear()
+  return `${day}/${month}/${year}`
 }
 
 const extractProjectId = (payload: unknown): string | null => {
@@ -1277,6 +1319,10 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
     setEligibilityFormValue(formData, label, getFirstPathValue(record, paths), mode)
   })
 
+  if (typeof formData["Date (dd/mm/yyyy)"] === "string") {
+    formData["Date (dd/mm/yyyy)"] = formatSignedDateForDisplay(formData["Date (dd/mm/yyyy)"])
+  }
+
   const setMissingValue = (label: string, value: unknown) => {
     if (asStringValue(formData[label]).trim()) return
     setEligibilityFormValue(formData, label, value)
@@ -1456,6 +1502,21 @@ const normalizeEligibilityResponseFromApi = (payload: unknown, fallbackProjectId
     isEligible,
     step: normalizedStep,
   }
+}
+
+const extractDigitalSignaturePreviewUrlFromApi = (payload: unknown) => {
+  const record = unwrapEligibilityRecord(payload)
+  if (!record) return null
+
+  return (
+    extractStringFromPaths(record, [
+      ["Declarations", "DigitalSignature", "digitalSignatureUrl"],
+      ["Declarations", "digitalSignature", "digitalSignatureUrl"],
+      ["declarations", "DigitalSignature", "digitalSignatureUrl"],
+      ["declarations", "digitalSignature", "digitalSignatureUrl"],
+      ["digitalSignature", "digitalSignatureUrl"],
+    ]) ?? null
+  )
 }
 
 const normalizeRemoteUploadEntry = (
@@ -2765,6 +2826,120 @@ function EligibilityAgentMovingBorder({
   )
 }
 
+function UploadedAssetPreview({
+  entry,
+  className = "",
+}: {
+  entry: UploadedFileEntry
+  className?: string
+}) {
+  const [loadedImagePreview, setLoadedImagePreview] = useState<{ key: string; url: string } | null>(null)
+  const [failedImagePreviewKey, setFailedImagePreviewKey] = useState<string | null>(null)
+  const isImageEntry = isImageUploadEntry(entry)
+  const localImagePreviewKey =
+    entry.file && isImageEntry
+      ? `${entry.file.name}-${entry.file.size}-${entry.file.lastModified}`
+      : null
+  const localDocumentPreviewUrl = useMemo(() => {
+    if (!entry.file || isImageEntry) return null
+    return URL.createObjectURL(entry.file)
+  }, [entry.file, isImageEntry])
+
+  useEffect(() => {
+    if (!localImagePreviewKey || !entry.file) return
+
+    let isCancelled = false
+    const reader = new FileReader()
+
+    reader.onload = () => {
+      if (isCancelled || typeof reader.result !== "string") return
+      setLoadedImagePreview({ key: localImagePreviewKey, url: reader.result })
+    }
+
+    reader.readAsDataURL(entry.file)
+
+    return () => {
+      isCancelled = true
+    }
+  }, [entry.file, localImagePreviewKey])
+
+  useEffect(() => {
+    return () => {
+      if (localDocumentPreviewUrl) {
+        URL.revokeObjectURL(localDocumentPreviewUrl)
+      }
+    }
+  }, [localDocumentPreviewUrl])
+
+  const localImagePreviewUrl =
+    localImagePreviewKey && loadedImagePreview?.key === localImagePreviewKey
+      ? loadedImagePreview.url
+      : null
+  const assetUrl = entry.remoteFileUrl ?? localImagePreviewUrl ?? localDocumentPreviewUrl
+  const assetName = getUploadedAssetName(entry)
+  const isImage = Boolean(assetUrl) && isImageEntry
+  const isPdf = isPdfUploadEntry(entry)
+  const extension = getUploadedAssetExtension(entry)
+  const fileTypeLabel = isImage ? "Image" : isPdf ? "PDF" : extension ? extension.toUpperCase() : "File"
+  const pdfPreviewUrl = isPdf && assetUrl ? `${assetUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH` : null
+  const imagePreviewKey = localImagePreviewKey ?? entry.remoteFileUrl ?? null
+  const shouldRenderImagePreview = Boolean(isImage && assetUrl && imagePreviewKey !== failedImagePreviewKey)
+  const imageAssetUrl = shouldRenderImagePreview ? assetUrl ?? undefined : undefined
+
+  return (
+    <div className={`flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 ${className}`.trim()}>
+      <div
+        className={`flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white ${
+          isPdf ? "h-28 w-24" : "h-24 w-24"
+        }`}
+      >
+        {shouldRenderImagePreview && imageAssetUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={imageAssetUrl}
+            alt={assetName}
+            className="h-full w-full object-cover"
+            onError={() => {
+              if (imagePreviewKey) {
+                setFailedImagePreviewKey(imagePreviewKey)
+              }
+            }}
+          />
+        ) : isPdf && pdfPreviewUrl ? (
+          <iframe
+            src={pdfPreviewUrl}
+            title={`${assetName} preview`}
+            className="h-full w-full border-0 bg-white"
+            loading="lazy"
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-1 text-slate-400">
+            {isPdf ? <FileText className="h-8 w-8" /> : <FileImage className="h-8 w-8" />}
+            <span className="text-[10px] font-semibold uppercase tracking-[0.2em]">{fileTypeLabel}</span>
+          </div>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-slate-700">{assetName}</p>
+        <p className="mt-1 text-xs text-slate-500">
+          {entry.description?.trim() || "Uploaded file ready for review."}
+        </p>
+        {assetUrl && (
+          <a
+            href={assetUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            View full file
+          </a>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function FileUploadArea({
   label,
   accept = "*",
@@ -2876,33 +3051,23 @@ function FileUploadArea({
       {files.length > 0 && (
         <ul className="mt-3 space-y-2">
           {files.map((f, i) => (
-            <li
-              key={i}
-              className="flex items-center justify-between rounded-lg border bg-white px-3 py-2 text-xs text-slate-700 shadow-sm"
-            >
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="truncate max-w-[200px]">{getUploadedAssetName(f)}</span>
-                {f.remoteFileUrl && (
-                  <a
-                    href={f.remoteFileUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="shrink-0 text-[11px] font-medium text-blue-600 hover:text-blue-700"
-                    onClick={(e) => e.stopPropagation()}
+            <li key={i} className="rounded-xl border bg-white p-3 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <UploadedAssetPreview entry={f} className="flex-1 border-0 bg-transparent p-0" />
+                {f.file && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      removeFile(i)
+                    }}
+                    className="inline-flex items-center gap-1 self-start rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-500 transition-colors hover:border-red-200 hover:text-red-500"
                   >
-                    View
-                  </a>
+                    <X className="h-4 w-4" />
+                    Remove
+                  </button>
                 )}
               </div>
-              {f.file && (
-                <button
-                  type="button"
-                  onClick={e => { e.stopPropagation(); removeFile(i) }}
-                  className="text-slate-400 hover:text-red-500 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
             </li>
           ))}
         </ul>
@@ -3163,6 +3328,10 @@ function StructuredFileUploadArea({
                   )}
                 </div>
               </div>
+
+              {hasUploadedAsset(entry) && (
+                <UploadedAssetPreview entry={entry} className="mt-3" />
+              )}
             </div>
           )
         })}
@@ -3211,15 +3380,11 @@ function SignaturePad({
   strokeWidth = 1.5, // Default set to 1.5 (Fine point) instead of 2.5
 }: SignaturePadProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const { signatureFile, setSignatureFile } = useEligibilityAssets()
-  const [isSigned, setIsSigned] = useState(Boolean(signatureFile))
+  const { signatureFile, setSignatureFile, signaturePreviewUrl, setSignaturePreviewUrl } = useEligibilityAssets()
   const [isDrawing, setIsDrawing] = useState(false)
+  const [hasInkStroke, setHasInkStroke] = useState(false)
   const fieldId = getFieldId(label)
-
-  // Update state when external signature file changes
-  useEffect(() => {
-    setIsSigned(Boolean(signatureFile))
-  }, [signatureFile])
+  const isSigned = hasInkStroke || Boolean(signatureFile || signaturePreviewUrl)
 
   // Helper: Configure the 2D context for smooth drawing
   const configureContext = (ctx: CanvasRenderingContext2D) => {
@@ -3232,6 +3397,7 @@ function SignaturePad({
   const persistSignature = () => {
     const canvas = canvasRef.current
     if (!canvas) return
+    setSignaturePreviewUrl(canvas.toDataURL("image/png"))
     canvas.toBlob((blob) => {
       if (!blob) return
       setSignatureFile(
@@ -3282,8 +3448,14 @@ function SignaturePad({
        // but this ensures safety for older browsers if needed.
     }
 
+    if (signaturePreviewUrl || signatureFile) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      setSignaturePreviewUrl(null)
+      setSignatureFile(null)
+    }
+
     setIsDrawing(true)
-    setIsSigned(true)
+    setHasInkStroke(true)
     
     const pos = getPos(e, canvas)
     
@@ -3323,8 +3495,9 @@ function SignaturePad({
     if (!ctx) return
     
     ctx.clearRect(0, 0, canvas.width, canvas.height)
-    setIsSigned(false)
+    setHasInkStroke(false)
     setSignatureFile(null)
+    setSignaturePreviewUrl(null)
   }
 
   return (
@@ -3345,6 +3518,16 @@ function SignaturePad({
           // "touch-none" is critical: it tells the browser "don't scroll when I touch this"
           className="w-full touch-none cursor-crosshair block"
         />
+        {signaturePreviewUrl && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/80 p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={signaturePreviewUrl}
+              alt="Digital signature preview"
+              className="max-h-full max-w-full rounded-md object-contain"
+            />
+          </div>
+        )}
         {!isSigned && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
             <div className="flex items-center gap-2 text-slate-300">
@@ -3367,6 +3550,19 @@ function SignaturePad({
           Clear
         </button>
       </div>
+      {signaturePreviewUrl && (
+        <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+          <p className="mb-2 text-xs font-medium text-emerald-700">Saved signature preview</p>
+          <div className="flex h-28 w-full items-center justify-center overflow-hidden rounded-md bg-white">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={signaturePreviewUrl}
+              alt="Digital signature preview"
+              className="max-h-full max-w-full object-contain"
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -3595,6 +3791,7 @@ function EligibilityCheckPage() {
   const [agentSidebar, setAgentSidebar] = useState<EligibilityAgentSidebarState>(null)
   const [uploadedFiles, setUploadedFiles] = useState<EligibilityFileMap>({})
   const [signatureFile, setSignatureFile] = useState<File | null>(null)
+  const [signaturePreviewUrl, setSignaturePreviewUrl] = useState<string | null>(null)
   const fetchedEligibilityProjectRef = useRef<string | null>(null)
   const profileAutofillKeyRef = useRef<string | null>(null)
   const latestEligibilityFormDataRef = useRef(savedFormData)
@@ -3692,6 +3889,8 @@ function EligibilityCheckPage() {
         )
         fetchedEligibilityProjectRef.current = normalized.projectId || existingProjectId
         setUploadedFiles(normalizedUploads)
+        setSignaturePreviewUrl(extractDigitalSignaturePreviewUrlFromApi(response.data))
+        setSignatureFile(null)
 
         if (normalized.step && normalized.step >= 1 && normalized.step <= TOTAL_STEPS) {
           setStep(normalized.step as Step)
@@ -4110,6 +4309,8 @@ function EligibilityCheckPage() {
             setUploadedFiles,
             signatureFile,
             setSignatureFile,
+            signaturePreviewUrl,
+            setSignaturePreviewUrl,
           }}
         >
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
