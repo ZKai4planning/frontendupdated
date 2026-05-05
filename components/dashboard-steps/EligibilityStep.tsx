@@ -3916,8 +3916,6 @@ function EligibilityCheckPage() {
     setIsAnalyzing(true)
 
     try {
-      const missingFields = STATIC_AGENT_Z_COMPLETION_REVIEW_FIELDS
-
       const submittedProjectId = await upsertEligibilityProject("submitted")
       const completedAt = new Date().toISOString()
 
@@ -3927,17 +3925,7 @@ function EligibilityCheckPage() {
         isEligible: true,
       })
 
-      setAgentSidebar({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        fieldLabel: "Eligibility Completion Review",
-        message:
-          missingFields.length > 0
-            ? "I can see you are close to completing your eligibility check. We have identified a few remaining items that still need to be completed before everything is fully in place. Please review the outstanding fields below, and if you would like complete support, speak with one of our experts using the consultation calendar below."
-            : "Your eligibility check has been submitted successfully. If you would like a professional review or guidance on the next steps, you can speak with one of our experts using the consultation calendar below.",
-        requestType: "completion-review",
-        responseMode: "info",
-        missingFields,
-      })
+      setAgentSidebar(null)
       setShowVerification(true)
       updateSection("eligibility", {
         ...(data.eligibility || {}),
@@ -3951,6 +3939,12 @@ function EligibilityCheckPage() {
       setIsAnalyzing(false)
     }
   }
+
+  useEffect(() => {
+    if (showVerification || hasSubmittedEligibility) {
+      setAgentSidebar(null)
+    }
+  }, [hasSubmittedEligibility, showVerification])
 
   const STEP_LABELS = [
     "1. Applicant & Property",

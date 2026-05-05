@@ -683,7 +683,13 @@ const CONVERSATIONAL_AGENT_RELATED_ANSWERS: Record<string, AgentInsight[]> = {
 }
 const isConversationalAgentField = (fieldLabel: string) => fieldLabel in CONVERSATIONAL_AGENT_INTROS
 
-const UPLOAD_HELP_CART_CONFIG = [
+type CartSupportConfigItem = {
+  fieldLabel: string
+  cartLabel: string
+  activeValue?: string
+}
+
+const UPLOAD_HELP_CART_CONFIG: readonly CartSupportConfigItem[] = [
   { fieldLabel: "Need help with location plan?", cartLabel: "Location Plan" },
   { fieldLabel: "Need help with site plan?", cartLabel: "Site Plan" },
   { fieldLabel: "Need help with elevations?", cartLabel: "Existing & Proposed Plans" },
@@ -694,7 +700,7 @@ const UPLOAD_HELP_CART_CONFIG = [
   { fieldLabel: "Need help with safety & compliance documents?", cartLabel: "Safety & Compliance Documents" },
 ] as const
 
-const CART_SUPPORT_CONFIG = [
+const CART_SUPPORT_CONFIG: readonly CartSupportConfigItem[] = [
   { fieldLabel: "Need help with dimensions?", cartLabel: "Site Measurement Survey" },
   ...UPLOAD_HELP_CART_CONFIG,
   {

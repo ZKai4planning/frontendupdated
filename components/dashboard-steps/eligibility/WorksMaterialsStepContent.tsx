@@ -1,4 +1,4 @@
-import { EligibilityStepContentProps } from "./types"
+import { EligibilityFormValues, EligibilityStepContentProps } from "./types"
 
 export function WorksMaterialsStepContent({
   savedFormData,
@@ -96,7 +96,7 @@ export function WorksMaterialsStepContent({
   }
 
   const updateDimensionsSupport = (value: "Yes" | "No") => {
-    const nextFormData = {
+    const nextFormData: EligibilityFormValues = {
       ...savedFormData,
       [dimensionsSupportFieldLabel]: value,
     }
