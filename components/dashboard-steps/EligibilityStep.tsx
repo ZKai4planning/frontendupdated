@@ -140,6 +140,11 @@ const isAgentOptionLabel = (value: string) => {
   return normalized.includes("ask agent z") || normalized === "unsure"
 }
 
+const getNativeSelectOptionStyle = (value: string) =>
+  isAgentOptionLabel(value)
+    ? { color: "#ffffff", backgroundColor: "#1f3d9a" }
+    : { color: "#0f172a", backgroundColor: "#ffffff" }
+
 const renderAgentOptionLabel = (value: string) => {
   const marker = "Agent Z"
   const index = value.indexOf(marker)
@@ -172,6 +177,36 @@ const isAgentSidebarTriggerValue = (value: string) => {
 const shouldAutoApplyYesNoResponse = (options: string[]) => {
   const normalizedOptions = options.map((option) => option.trim().toLowerCase())
   return normalizedOptions.includes("yes") && normalizedOptions.includes("no")
+}
+
+const scrollDashboardFormToTop = (target?: HTMLElement | null) => {
+  if (typeof window === "undefined") return
+
+  const scrollRoot = document.getElementById("dashboard-scroll-root")
+
+  if (scrollRoot && target) {
+    const rootRect = scrollRoot.getBoundingClientRect()
+    const targetRect = target.getBoundingClientRect()
+    const nextTop = scrollRoot.scrollTop + (targetRect.top - rootRect.top) - 16
+
+    scrollRoot.scrollTo({
+      top: Math.max(0, nextTop),
+      behavior: "smooth",
+    })
+    return
+  }
+
+  if (target) {
+    target.scrollIntoView({ behavior: "smooth", block: "start" })
+    return
+  }
+
+  if (scrollRoot) {
+    scrollRoot.scrollTo({ top: 0, left: 0, behavior: "smooth" })
+    return
+  }
+
+  window.scrollTo({ top: 0, left: 0, behavior: "smooth" })
 }
 
 const createAgentSidebarPayload = (
@@ -971,7 +1006,7 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
       paths: [["worksAndMaterials", "propertyOverview", "numberOfFloors"]],
     },
     {
-      label: "Property footprint (approx length × width in metres)",
+      label: "Property footprint (approx length x width in metres)",
       paths: [["worksAndMaterials", "propertyOverview", "propertyFootprint"]],
     },
     {
@@ -1822,7 +1857,7 @@ const buildEligibilityStepPayload = (
             totalInternalFloorAreaM2: getValue("Total internal floor area"),
             numberOfFloors: getValue("Number of floors"),
             propertyFootprint: getValue(
-              "Property footprint (approx length × width in metres)"
+              "Property footprint (approx length x width in metres)"
             ),
             gardenDepthM: getValue("Garden depth (metres)"),
             plotWidthM: getValue("Plot width (metres)"),
@@ -2182,7 +2217,7 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
     "Total internal floor space of the property measured in square meters.",
   "Number of floors":
     "List the storeys included in the property, such as ground, first, loft, or basement.",
-  "Property footprint (approx length × width in metres)":
+  "Property footprint (approx length x width in metres)":
     "Approximate overall building footprint using length by width in meters.",
   "Garden depth (metres)": "Depth of the rear garden or external amenity space in meters.",
   "Plot width (metres)": "Approximate width of the overall plot in meters.",
@@ -3795,6 +3830,7 @@ function EligibilityCheckPage() {
   const fetchedEligibilityProjectRef = useRef<string | null>(null)
   const profileAutofillKeyRef = useRef<string | null>(null)
   const latestEligibilityFormDataRef = useRef(savedFormData)
+  const formCardRef = useRef<HTMLDivElement | null>(null)
 
   const TOTAL_STEPS = 5
   const showAgentSidebar = Boolean(agentSidebar)
@@ -3803,6 +3839,16 @@ function EligibilityCheckPage() {
 
   const nextStep = () => setStep(prev => (prev < TOTAL_STEPS ? ((prev + 1) as Step) : prev))
   const prevStep = () => setStep(prev => (prev > 1 ? ((prev - 1) as Step) : prev))
+
+  useEffect(() => {
+    const animationFrame = window.requestAnimationFrame(() => {
+      scrollDashboardFormToTop(formCardRef.current)
+    })
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame)
+    }
+  }, [step])
 
   useEffect(() => {
     latestEligibilityFormDataRef.current = savedFormData
@@ -4316,7 +4362,10 @@ function EligibilityCheckPage() {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
             <div className={shouldShowEligibilitySidePanel ? "lg:col-span-8" : "lg:col-span-12"}>
               {isEligibilityFormVisible ? (
-                <div className="rounded-2xl border bg-white p-6 shadow-sm">
+                <div
+                  ref={formCardRef}
+                  className="rounded-2xl border bg-white p-6 shadow-sm"
+                >
                   <div className="mb-6 flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">
@@ -5419,7 +5468,7 @@ function SelectField({
           }}
           className={`w-full rounded-xl border px-4 py-2 text-sm transition-shadow focus:outline-none focus:ring-2 ${
             isAgentValue
-              ? "relative z-10 border-blue-200 bg-blue-50 text-slate-900 shadow-[0_12px_28px_rgba(37,99,235,0.12)] focus:ring-blue-200"
+              ? "relative z-10 border-blue-900/60 bg-gradient-to-r from-slate-800/92 via-[#1f3d9a]/86 to-blue-800/84 text-white shadow-[0_12px_28px_rgba(29,56,143,0.32)] focus:ring-blue-300/40"
               : "focus:ring-blue-200"
           }`}
         >
@@ -5430,7 +5479,7 @@ function SelectField({
             <option
               key={o}
               value={o}
-              style={{ color: "#0f172a", backgroundColor: "#ffffff" }}
+              style={getNativeSelectOptionStyle(o)}
             >
               {o}
             </option>
@@ -5664,6 +5713,8 @@ function RoadmapStep({ label, status, icon: Icon, onClick }: {
 function RoadmapLine() {
   return <div className="flex-1 h-[2px] bg-slate-200 mx-2 min-w-[120px]" />
 }
+
+
 
 
 

@@ -192,7 +192,7 @@ export function WorksMaterialsStepContent({
 
         <Input
           label="Total internal floor area"
-          placeholder="Enter total internal floor area (mÂ²) "
+          placeholder="Enter total internal floor area (m²)"
         />
         <Input
           label="Number of floors"

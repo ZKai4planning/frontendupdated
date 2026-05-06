@@ -440,6 +440,18 @@ function DashboardContent() {
   const StageComponent =
     stage !== "overview" ? STAGE_COMPONENTS[stage as StageKey] : undefined
 
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    const scrollRoot = document.getElementById("dashboard-scroll-root")
+
+    if (scrollRoot) {
+      scrollRoot.scrollTo({ top: 0, left: 0, behavior: "auto" })
+      return
+    }
+
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" })
+  }, [stage])
+
   if (stage !== "overview" && StageComponent) {
     return <StageComponent />
   }

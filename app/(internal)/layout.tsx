@@ -59,7 +59,10 @@ export default function DashboardLayout({
  
 
         {/* Page Content testing */}
-        <main className="flex-1 overflow-y-auto transition-all duration-300">
+        <main
+          id="dashboard-scroll-root"
+          className="flex-1 overflow-y-auto transition-all duration-300"
+        >
           {children}
         </main>
  

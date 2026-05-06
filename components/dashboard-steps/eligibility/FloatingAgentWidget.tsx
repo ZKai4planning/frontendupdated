@@ -263,8 +263,8 @@ const DIMENSIONS_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
   {
-    label: "Greater London / M25 Ring",
-    value: "Greater London / M25 Ring: \u00A3220 - \u00A3300",
+    label: "Greater London / m²5 Ring",
+    value: "Greater London / m²5 Ring: \u00A3220 - \u00A3300",
     confidence: "high",
   },
   {

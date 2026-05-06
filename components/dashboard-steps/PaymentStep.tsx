@@ -70,6 +70,43 @@ const buildStructuredAddress = (
   ...partial,
 })
 
+const parseStructuredAddressFromFullAddress = (
+  fullAddress: string,
+  postalCode = ""
+): CustomerAddressDetails => {
+  const segments = fullAddress
+    .split(/[\n,]+/)
+    .map(normalizeAddressPart)
+    .filter(Boolean)
+
+  const normalizedPostalCode = normalizeAddressPart(postalCode)
+
+  return {
+    ...getEmptyCustomerAddressDetails(),
+    street: segments[0] ?? "",
+    locality: segments[1] ?? "",
+    city: segments[2] ?? "",
+    state: segments[3] ?? "",
+    country: segments[4] ?? "",
+    postalCode: normalizedPostalCode,
+  }
+}
+
+const getStoredStructuredAddress = (
+  storedDetails?: StoredCustomerDetails
+): CustomerAddressDetails => {
+  const storedStructuredAddress = buildStructuredAddress(storedDetails?.addressDetails)
+
+  if (hasStructuredAddressDetails(storedStructuredAddress)) {
+    return storedStructuredAddress
+  }
+
+  return parseStructuredAddressFromFullAddress(
+    storedDetails?.fullAddress ?? "",
+    storedDetails?.postalCode ?? storedDetails?.postCode ?? ""
+  )
+}
+
 type StoredCustomerDetails = Omit<Partial<CustomerDetailsForm>, "addressDetails"> & {
   postCode?: string
   servicePostCode?: string
@@ -128,7 +165,7 @@ const createInitialCustomerDetails = (
   email: storedDetails?.email ?? defaults?.email ?? "",
   fullAddress: storedDetails?.fullAddress ?? "",
   postalCode: storedDetails?.postalCode ?? storedDetails?.postCode ?? "",
-  addressDetails: buildStructuredAddress(storedDetails?.addressDetails),
+  addressDetails: getStoredStructuredAddress(storedDetails),
   serviceLocationType: storedDetails?.serviceLocationType ?? "same",
   servicePostalCode:
     storedDetails?.servicePostalCode ?? storedDetails?.servicePostCode ?? "",
@@ -269,7 +306,8 @@ export default function PaymentUI() {
   const effectivePhoneCountryCode = customerDetails.phoneCountryCode || "+44"
   const effectivePhoneNumber = customerDetails.phoneNumber
   const effectiveEmail = customerDetails.email
-  const effectiveFullAddress = customerDetails.fullAddress
+  const effectiveFullAddress =
+    customerDetails.fullAddress || buildFullAddressFromAddress(customerDetails.addressDetails)
   const effectivePostCode = customerDetails.postalCode
   const effectiveServiceLocationType = customerDetails.serviceLocationType
   const effectiveServicePostCode = customerDetails.servicePostalCode
@@ -281,6 +319,7 @@ export default function PaymentUI() {
         fullName: effectiveFullName,
         phoneCountryCode: effectivePhoneCountryCode,
         email: effectiveEmail,
+        fullAddress: effectiveFullAddress,
         addressDetails: customerDetails.addressDetails,
       },
       transactionRef,
@@ -300,7 +339,7 @@ export default function PaymentUI() {
   const handleDetailChange = (
     field: keyof Pick<
       CustomerDetailsForm,
-      "fullName" | "email" | "fullAddress" | "postalCode" | "servicePostalCode"
+      "fullName" | "email" | "postalCode" | "servicePostalCode"
     >,
     value: string
   ) => {
@@ -308,15 +347,38 @@ export default function PaymentUI() {
       ...current,
       [field]: value,
       addressDetails:
-        field === "fullAddress"
-          ? getEmptyCustomerAddressDetails()
-          : field === "postalCode"
-            ? {
-                ...current.addressDetails,
-                postalCode: value,
-              }
-            : current.addressDetails,
+        field === "postalCode"
+          ? {
+              ...current.addressDetails,
+              postalCode: value,
+            }
+          : current.addressDetails,
     }))
+  }
+
+  const handleAddressDetailChange = (
+    field: keyof Pick<CustomerAddressDetails, "street" | "locality" | "city">,
+    value: string
+  ) => {
+    setCustomerDetails((current) => {
+      const nextAddressDetails =
+        field === "street"
+          ? {
+              ...current.addressDetails,
+              doorNo: "",
+              street: value,
+            }
+          : {
+              ...current.addressDetails,
+              [field]: value,
+            }
+
+      return {
+        ...current,
+        addressDetails: nextAddressDetails,
+        fullAddress: buildFullAddressFromAddress(nextAddressDetails),
+      }
+    })
   }
 
   const handlePhoneCountryCodeChange = (value: string) => {
@@ -567,6 +629,7 @@ export default function PaymentUI() {
                 phoneHelperText={phoneHelperText}
                 phoneHasError={phoneHasError}
                 onFieldChange={handleDetailChange}
+                onAddressDetailChange={handleAddressDetailChange}
                 onPhoneCountryCodeChange={handlePhoneCountryCodeChange}
                 onPhoneNumberChange={handlePhoneChange}
                 onSave={() => {

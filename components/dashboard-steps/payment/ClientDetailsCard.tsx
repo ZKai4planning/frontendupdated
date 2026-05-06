@@ -35,8 +35,12 @@ type ClientDetailsCardProps = {
   onFieldChange: (
     field: keyof Pick<
       CustomerDetailsForm,
-      "fullName" | "email" | "fullAddress" | "postalCode" | "servicePostalCode"
+      "fullName" | "email" | "postalCode" | "servicePostalCode"
     >,
+    value: string
+  ) => void
+  onAddressDetailChange: (
+    field: keyof Pick<CustomerAddressDetails, "street" | "locality" | "city">,
     value: string
   ) => void
   onPhoneCountryCodeChange: (value: string) => void
@@ -53,10 +57,18 @@ export function ClientDetailsCard({
   phoneHelperText,
   phoneHasError,
   onFieldChange,
+  onAddressDetailChange,
   onPhoneCountryCodeChange,
   onPhoneNumberChange,
   onSave,
 }: ClientDetailsCardProps) {
+  const addressLine1 = [customerDetails.addressDetails.doorNo, customerDetails.addressDetails.street]
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .join(", ")
+  const addressLine2 = customerDetails.addressDetails.locality
+  const townOrCity = customerDetails.addressDetails.city
+
   return (
     <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-5">
       <div className="mb-5">
@@ -144,14 +156,37 @@ export function ClientDetailsCard({
         />
 
         <FormField
-          label="Full Address"
+          label="Address Line 1"
           icon={MapPin}
-          value={customerDetails.fullAddress}
-          onChange={(value) => onFieldChange("fullAddress", value)}
+          value={addressLine1}
+          onChange={(value) => onAddressDetailChange("street", value)}
           disabled={isReadOnly}
-          placeholder="Enter your full current address"
-          autoComplete="street-address"
-          multiline
+          placeholder="Enter address line 1"
+          autoComplete="address-line1"
+          className="sm:col-span-2"
+          optional
+        />
+
+        <FormField
+          label="Address Line 2"
+          icon={MapPin}
+          value={addressLine2}
+          onChange={(value) => onAddressDetailChange("locality", value)}
+          disabled={isReadOnly}
+          placeholder="Enter address line 2"
+          autoComplete="address-line2"
+          className="sm:col-span-2"
+          optional
+        />
+
+        <FormField
+          label="Town / City"
+          icon={MapPin}
+          value={townOrCity}
+          onChange={(value) => onAddressDetailChange("city", value)}
+          disabled={isReadOnly}
+          placeholder="Enter town or city"
+          autoComplete="address-level2"
           className="sm:col-span-2"
           optional
         />
