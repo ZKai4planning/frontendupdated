@@ -47,29 +47,29 @@ export function SiteConstraintsStepContent({
         <RadioGroupField
           label="Trees with TPO on or near site?"
           options={["Yes", "No"]}
-          consultTrigger="An Arboriculture Report (BS5837) may be required. We can arrange this for you."
+          consultTrigger="An Tree Report (BS5837) may be required. We can arrange this for you."
         />
         <RadioGroupField
           label="Trees within falling distance of works?"
           options={["Yes", "No", "Ask Agent Z"]}
-          consultTrigger="An Arboriculture Report (BS5837) may be required. We can arrange this for you."
+          consultTrigger="An Tree Report (BS5837) may be required. We can arrange this for you."
         />
         <Input label="Tree Species (if known)" />
         <Input label="Approximate Tree Height (m)" />
         <FileUploadArea
-          label="Arboriculture Report / BS5837 Report (if available)"
+          label="Tree Report / BS5837 Report (if available)"
           accept=".pdf,.jpg,.jpeg,.png"
           multiple={false}
-          hint="Plan showing tree positions, root protection areas and species"
+          hint="Plan showing Tree positions, root protection areas and species"
           onMissingTrigger={{
-            message: "No tree plan uploaded - we can commission a BS5837 Arboriculture Report on your behalf.",
+            message: "No Tree plan uploaded - we can commission a BS5837 Tree Report on your behalf.",
             decision: {
-              fieldLabel: "Need help with arboriculture report?",
-              prompt: "Do you want help with the Arboriculture / BS5837 report?",
+              fieldLabel: "Need help with Tree report?",
+              prompt: "Do you want help with the Tree / BS5837 report?",
               yesMessage:
-                "Agent Z is preparing support for the Arboriculture / BS5837 report requirements.",
+                "Agent Z is preparing support for the Tree / BS5837 report requirements.",
               noMessage:
-                "Agent Z has noted that you do not need help with the Arboriculture / BS5837 report right now.",
+                "Agent Z has noted that you do not need help with the Tree / BS5837 report right now.",
             },
           }}
         />

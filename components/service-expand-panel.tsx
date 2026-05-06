@@ -27,7 +27,7 @@ interface ServiceExpandPanelProps {
 const FEATURE_ICON_MAP: Record<string, string> = {
   "non material amendment": "edit_note",
   "advertisement consent": "campaign",
-  "works to trees (tpo & conservation)": "park",
+  "works to Trees (tpo & conservation)": "park",
   "lawful development certificate (ldc)": "gavel",
   "certificate of lawfulness (proposed works to a listed building)": "account_balance",
   "permission in principle (pip)": "fact_check",
@@ -67,7 +67,7 @@ const FEATURE_ICON_MAP: Record<string, string> = {
 const getFeatureIcon = (title: string) => {
   const t = title.trim().toLowerCase();
   if (FEATURE_ICON_MAP[t]) return FEATURE_ICON_MAP[t];
-  if (t.includes("tree") || t.includes("tpo")) return "park";
+  if (t.includes("Tree") || t.includes("tpo")) return "park";
   if (t.includes("roof") || t.includes("loft")) return "roofing";
   if (t.includes("extension") || t.includes("add")) return "add_home";
   if (t.includes("repair") || t.includes("works")) return "build";

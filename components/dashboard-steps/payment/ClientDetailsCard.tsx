@@ -40,7 +40,7 @@ type ClientDetailsCardProps = {
     value: string
   ) => void
   onAddressDetailChange: (
-    field: keyof Pick<CustomerAddressDetails, "street" | "locality" | "city">,
+    field: keyof Pick<CustomerAddressDetails, "sTreet" | "locality" | "city">,
     value: string
   ) => void
   onPhoneCountryCodeChange: (value: string) => void
@@ -62,7 +62,7 @@ export function ClientDetailsCard({
   onPhoneNumberChange,
   onSave,
 }: ClientDetailsCardProps) {
-  const addressLine1 = [customerDetails.addressDetails.doorNo, customerDetails.addressDetails.street]
+  const addressLine1 = [customerDetails.addressDetails.doorNo, customerDetails.addressDetails.sTreet]
     .map((value) => value.trim())
     .filter(Boolean)
     .join(", ")
@@ -159,7 +159,7 @@ export function ClientDetailsCard({
           label="Address Line 1"
           icon={MapPin}
           value={addressLine1}
-          onChange={(value) => onAddressDetailChange("street", value)}
+          onChange={(value) => onAddressDetailChange("sTreet", value)}
           disabled={isReadOnly}
           placeholder="Enter address line 1"
           autoComplete="address-line1"

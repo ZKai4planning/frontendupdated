@@ -415,7 +415,7 @@ export default function ProfileSectionPage() {
         const { latitude, longitude } = position.coords;
 
         try {
-          const reverseGeoUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`;
+          const reverseGeoUrl = `https://nominatim.opensTreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`;
           const geoRes = await axios.get(reverseGeoUrl);
           const addr = geoRes.data?.address ?? {};
 
@@ -425,7 +425,7 @@ export default function ProfileSectionPage() {
               ...prev.address,
               doorNo:
                 typeof addr.house_number === "string" ? addr.house_number : prev.address.doorNo,
-              street: typeof addr.road === "string" ? addr.road : prev.address.street,
+              sTreet: typeof addr.road === "string" ? addr.road : prev.address.sTreet,
               locality:
                 typeof (addr.suburb || addr.neighbourhood) === "string"
                   ? (addr.suburb || addr.neighbourhood)
@@ -871,10 +871,10 @@ export default function ProfileSectionPage() {
                   disabled={!isEditMode}
                 />
                 <InputField
-                  label="Street"
-                  value={formProfile.address.street}
-                  onChange={(event) => handleAddressChange("street", event.target.value)}
-                  placeholder="Baker Street"
+                  label="STreet"
+                  value={formProfile.address.sTreet}
+                  onChange={(event) => handleAddressChange("sTreet", event.target.value)}
+                  placeholder="Baker STreet"
                   className="md:col-span-2"
                   autoComplete="address-line1"
                   disabled={!isEditMode}

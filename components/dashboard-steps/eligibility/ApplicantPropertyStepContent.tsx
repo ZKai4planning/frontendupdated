@@ -168,8 +168,8 @@ const getCandidateMatchScore = (
     toText(candidate.line_1),
     toText(candidate.line1),
     toText(candidate.address1),
-    toText(candidate.street_address),
-    toText(candidate.streetAddress),
+    toText(candidate.sTreet_address),
+    toText(candidate.sTreetAddress),
   ].find(Boolean)
 
   const fullAddress = [

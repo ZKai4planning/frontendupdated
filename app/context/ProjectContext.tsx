@@ -92,7 +92,7 @@ export type ProjectData = {
       postalCode?: string
       addressDetails?: {
         doorNo?: string
-        street?: string
+        sTreet?: string
         locality?: string
         city?: string
         state?: string

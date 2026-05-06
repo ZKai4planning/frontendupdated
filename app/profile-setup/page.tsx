@@ -269,8 +269,8 @@
 //         const { latitude, longitude } = position.coords;
         
 //         try {
-//           // OpenStreetMap Nominatim
-//           const reverseGeoUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`;
+//           // OpenSTreetMap Nominatim
+//           const reverseGeoUrl = `https://nominatim.opensTreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`;
           
 //           // FIX: Removed 'User-Agent' header which is forbidden by browsers
 //           const geoRes = await axios.get(reverseGeoUrl);
@@ -284,8 +284,8 @@
 //               ...prev.address,
 //               // OSM 'house_number' -> doorNo
 //               doorNo: addr.house_number || prev.address.doorNo,
-//               // OSM 'road' -> street
-//               street: addr.road || prev.address.street,
+//               // OSM 'road' -> sTreet
+//               sTreet: addr.road || prev.address.sTreet,
 //               // OSM 'suburb' or 'neighbourhood' -> locality
 //               locality: addr.suburb || addr.neighbourhood || prev.address.locality,
 //               // OSM 'city' or 'town' or 'village' -> city
@@ -573,7 +573,7 @@
               
 //               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 //                 <InputField label="Door / House No." value={formProfile.address.doorNo} onChange={(e) => handleAddressChange("doorNo", e.target.value)} placeholder="12-B" className="md:col-span-1" />
-//                 <InputField label="Street" value={formProfile.address.street} onChange={(e) => handleAddressChange("street", e.target.value)} placeholder="Baker Street" className="md:col-span-2" autoComplete="address-line1" />
+//                 <InputField label="STreet" value={formProfile.address.sTreet} onChange={(e) => handleAddressChange("sTreet", e.target.value)} placeholder="Baker STreet" className="md:col-span-2" autoComplete="address-line1" />
 //                 <InputField label="Locality" value={formProfile.address.locality} onChange={(e) => handleAddressChange("locality", e.target.value)} placeholder="Central" />
 //                 <InputField label="City" value={formProfile.address.city} onChange={(e) => handleAddressChange("city", e.target.value)} error={fieldErrors["address.city"]} autoComplete="address-level2" />
 //                 <InputField label="State" value={formProfile.address.state} onChange={(e) => handleAddressChange("state", e.target.value)} autoComplete="address-level1" />

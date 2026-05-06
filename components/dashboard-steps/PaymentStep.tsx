@@ -44,7 +44,7 @@ const normalizeAddressPart = (value: string) => value.trim().replace(/\s+/g, " "
 
 const getEmptyCustomerAddressDetails = (): CustomerAddressDetails => ({
   doorNo: "",
-  street: "",
+  sTreet: "",
   locality: "",
   city: "",
   state: "",
@@ -55,7 +55,7 @@ const getEmptyCustomerAddressDetails = (): CustomerAddressDetails => ({
 const hasStructuredAddressDetails = (address: CustomerAddressDetails) =>
   Boolean(
     address.doorNo ||
-      address.street ||
+      address.sTreet ||
       address.locality ||
       address.city ||
       address.state ||
@@ -83,7 +83,7 @@ const parseStructuredAddressFromFullAddress = (
 
   return {
     ...getEmptyCustomerAddressDetails(),
-    street: segments[0] ?? "",
+    sTreet: segments[0] ?? "",
     locality: segments[1] ?? "",
     city: segments[2] ?? "",
     state: segments[3] ?? "",
@@ -138,10 +138,10 @@ const applyPaymentAddressToProfile = (
   const normalizedPostalCode = normalizeAddressPart(postalCode)
 
   if (segments.length === 1) {
-    nextAddress.street = segments[0]
+    nextAddress.sTreet = segments[0]
   } else if (segments.length > 1) {
     nextAddress.doorNo = segments[0]
-    nextAddress.street = segments[1] ?? nextAddress.street
+    nextAddress.sTreet = segments[1] ?? nextAddress.sTreet
     nextAddress.locality = segments[2] ?? nextAddress.locality
     nextAddress.city = segments[3] ?? nextAddress.city
     nextAddress.state = segments[4] ?? nextAddress.state
@@ -174,7 +174,7 @@ const createInitialCustomerDetails = (
 const buildFullAddressFromAddress = (address: CustomerAddressDetails) =>
   [
     address.doorNo,
-    address.street,
+    address.sTreet,
     address.locality,
     address.city,
     address.state,
@@ -357,16 +357,16 @@ export default function PaymentUI() {
   }
 
   const handleAddressDetailChange = (
-    field: keyof Pick<CustomerAddressDetails, "street" | "locality" | "city">,
+    field: keyof Pick<CustomerAddressDetails, "sTreet" | "locality" | "city">,
     value: string
   ) => {
     setCustomerDetails((current) => {
       const nextAddressDetails =
-        field === "street"
+        field === "sTreet"
           ? {
               ...current.addressDetails,
               doorNo: "",
-              street: value,
+              sTreet: value,
             }
           : {
               ...current.addressDetails,

@@ -29,7 +29,7 @@ export type PhoneModel = {
 
 export type AddressModel = {
   doorNo: string;
-  street: string;
+  sTreet: string;
   locality: string;
   city: string;
   state: string;
@@ -53,7 +53,7 @@ export type ProfileFieldPath =
   | "landline.countryCode"
   | "landline.number"
   | "address.doorNo"
-  | "address.street"
+  | "address.sTreet"
   | "address.locality"
   | "address.city"
   | "address.state"
@@ -144,7 +144,7 @@ export const getEmptyProfile = (): ProfileModel => ({
   },
   address: {
     doorNo: "",
-    street: "",
+    sTreet: "",
     locality: "",
     city: "",
     state: "",
@@ -176,7 +176,7 @@ const FIELD_ORDER: ProfileFieldPath[] = [
   "landline.number",
   "landline.countryCode",
   "address.doorNo",
-  "address.street",
+  "address.sTreet",
   "address.locality",
   "address.city",
   "address.state",
@@ -294,7 +294,7 @@ export const mergeProfileData = (apiData: Partial<ProfileModel> | null | undefin
     },
     address: {
       doorNo: normalizeSpaces(apiData.address?.doorNo),
-      street: normalizeSpaces(apiData.address?.street),
+      sTreet: normalizeSpaces(apiData.address?.sTreet),
       locality: normalizeSpaces(apiData.address?.locality),
       city: normalizeSpaces(apiData.address?.city),
       state: normalizeSpaces(apiData.address?.state),
@@ -317,7 +317,7 @@ export const sanitizeProfileInput = (profile: ProfileModel): ProfileModel => ({
   },
   address: {
     doorNo: normalizeSpaces(profile.address.doorNo),
-    street: normalizeSpaces(profile.address.street),
+    sTreet: normalizeSpaces(profile.address.sTreet),
     locality: normalizeSpaces(profile.address.locality),
     city: normalizeSpaces(profile.address.city),
     state: normalizeSpaces(profile.address.state),
@@ -402,7 +402,7 @@ export const validateProfileInput = (profile: ProfileModel): ProfileValidationRe
   };
 
   validateAddressField("doorNo", 1, 30, "Door No");
-  validateAddressField("street", 2, 120, "Street");
+  validateAddressField("sTreet", 2, 120, "STreet");
   validateAddressField("locality", 2, 120, "Locality");
   validateAddressField("city", 2, 80, "City");
   validateAddressField("state", 2, 80, "State");

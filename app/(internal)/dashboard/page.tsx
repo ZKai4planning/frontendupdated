@@ -93,7 +93,13 @@ const ENERGY_PERFORMANCE_CERTIFICATE_LABEL = "Energy Performance Certificate (EP
 const LEGACY_ENERGY_PERFORMANCE_CERTIFICATE_LABEL = "EPC available?"
 const DASHBOARD_CART_PREVIEW_ITEMS = [
   "Location Plan",
+  "Site Measurement Survey",
+  "Existing & Proposed Plans",
+  "Tree / BS5837 Report",
+  "Flood Risk Assessment",
   "Smoke Alarms Compliance",
+  "Gas Safety Certificate",
+  "Electrical Report (EICR)",
   "Energy Performance Certificate (EPC)",
 ] as const
 
@@ -105,8 +111,8 @@ const DASHBOARD_CART_SUPPORT_CONFIG = [
   { fieldLabels: ["Need help with site photographs?"], cartLabel: "Photographs of Site", activeValue: "Yes" },
   { fieldLabels: ["Need help with additional drawings?"], cartLabel: "Additional Drawings", activeValue: "Yes" },
   {
-    fieldLabels: ["Need help with arboriculture report?"],
-    cartLabel: "Arboriculture / BS5837 Report",
+    fieldLabels: ["Need help with Tree report?"],
+    cartLabel: "Tree / BS5837 Report",
     activeValue: "Yes",
   },
   {

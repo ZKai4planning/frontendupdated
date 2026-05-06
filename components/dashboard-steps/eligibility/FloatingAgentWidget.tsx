@@ -351,34 +351,34 @@ const CONSERVATION_AREA_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const TREE_TPO_AGENT_INTRO = "No problem - I'll help you assess this."
-const TREE_TPO_RELATED_ANSWERS: AgentInsight[] = [
+const Tree_TPO_AGENT_INTRO = "No problem - I'll help you assess this."
+const Tree_TPO_RELATED_ANSWERS: AgentInsight[] = [
   {
-    label: "Protected trees",
+    label: "Protected Trees",
     value: "Trees covered by a Tree Preservation Order can limit design changes and may need formal review before work starts.",
     confidence: "high",
   },
   {
     label: "Why proximity matters",
-    value: "Large trees near the works can affect foundations, root protection, and where the extension can go.",
+    value: "Large Trees near the works can affect foundations, root protection, and where the extension can go.",
     confidence: "high",
   },
   {
     label: "Likely next step",
-    value: "If trees are close or protected, an arboricultural assessment or BS5837 report may be required.",
+    value: "If Trees are close or protected, an arboricultural assessment or BS5837 report may be required.",
     confidence: "high",
   },
 ]
-const TREE_FALLING_DISTANCE_AGENT_INTRO = "No problem - I'll help you assess this."
-const TREE_FALLING_DISTANCE_RELATED_ANSWERS: AgentInsight[] = [
+const Tree_FALLING_DISTANCE_AGENT_INTRO = "No problem - I'll help you assess this."
+const Tree_FALLING_DISTANCE_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "Simple rule",
-    value: "If a tree is tall enough to potentially fall onto the proposed works, it may be relevant to planning and design.",
+    value: "If a Tree is tall enough to potentially fall onto the proposed works, it may be relevant to planning and design.",
     confidence: "high",
   },
   {
     label: "Why it matters",
-    value: "Large or mature trees close to an extension can trigger survey requirements, TPO checks, or design changes.",
+    value: "Large or mature Trees close to an extension can trigger survey requirements, TPO checks, or design changes.",
     confidence: "high",
   },
   {
@@ -635,8 +635,8 @@ const CONVERSATIONAL_AGENT_INTROS: Record<string, string> = {
   "Roof Materials": ROOF_MATERIALS_AGENT_INTRO,
   "Materials match existing?": MATERIALS_MATCH_AGENT_INTRO,
   "Conservation Area or Near Listed Building?": CONSERVATION_AREA_AGENT_INTRO,
-  "Trees with TPO on or near site?": TREE_TPO_AGENT_INTRO,
-  "Trees within falling distance of works?": TREE_FALLING_DISTANCE_AGENT_INTRO,
+  "Trees with TPO on or near site?": Tree_TPO_AGENT_INTRO,
+  "Trees within falling distance of works?": Tree_FALLING_DISTANCE_AGENT_INTRO,
   "Is the site in Flood Zone 2 or 3?": FLOOD_ZONE_AGENT_INTRO,
   "Any known contamination on site?": CONTAMINATION_AGENT_INTRO,
   "Do you currently have smoke alarms installed?": SMOKE_ALARMS_AGENT_INTRO,
@@ -665,8 +665,8 @@ const CONVERSATIONAL_AGENT_RELATED_ANSWERS: Record<string, AgentInsight[]> = {
   "Roof Materials": ROOF_MATERIALS_RELATED_ANSWERS,
   "Materials match existing?": MATERIALS_MATCH_RELATED_ANSWERS,
   "Conservation Area or Near Listed Building?": CONSERVATION_AREA_RELATED_ANSWERS,
-  "Trees with TPO on or near site?": TREE_TPO_RELATED_ANSWERS,
-  "Trees within falling distance of works?": TREE_FALLING_DISTANCE_RELATED_ANSWERS,
+  "Trees with TPO on or near site?": Tree_TPO_RELATED_ANSWERS,
+  "Trees within falling distance of works?": Tree_FALLING_DISTANCE_RELATED_ANSWERS,
   "Is the site in Flood Zone 2 or 3?": FLOOD_ZONE_RELATED_ANSWERS,
   "Any known contamination on site?": CONTAMINATION_RELATED_ANSWERS,
   "Do you currently have smoke alarms installed?": SMOKE_ALARMS_RELATED_ANSWERS,
@@ -695,7 +695,7 @@ const UPLOAD_HELP_CART_CONFIG: readonly CartSupportConfigItem[] = [
   { fieldLabel: "Need help with elevations?", cartLabel: "Existing & Proposed Plans" },
   { fieldLabel: "Need help with site photographs?", cartLabel: "Photographs of Site" },
   { fieldLabel: "Need help with additional drawings?", cartLabel: "Additional Drawings" },
-  { fieldLabel: "Need help with arboriculture report?", cartLabel: "Arboriculture / BS5837 Report" },
+  { fieldLabel: "Need help with Tree report?", cartLabel: "Tree / BS5837 Report" },
   { fieldLabel: "Need help with flood risk assessment?", cartLabel: "Flood Risk Assessment" },
   { fieldLabel: "Need help with safety & compliance documents?", cartLabel: "Safety & Compliance Documents" },
 ] as const

@@ -653,8 +653,8 @@ const splitAutofillSiteAddress = (value: unknown) => {
 
 const buildProfileAddressLine1 = (address: {
   doorNo?: string
-  street?: string
-}) => [address.doorNo, address.street].map((value) => value?.trim()).filter(Boolean).join(", ")
+  sTreet?: string
+}) => [address.doorNo, address.sTreet].map((value) => value?.trim()).filter(Boolean).join(", ")
 
 const buildProfileAddressLine2 = (address: {
   locality?: string
@@ -1107,29 +1107,29 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
     {
       label: "Trees with TPO on or near site?",
       paths: [
-        ["siteConstratints", "treesHedgesLandscaping", "treesWithTPO"],
-        ["siteConstraints", "treesHedgesLandscaping", "treesWithTPO"],
+        ["siteConstratints", "TreesHedgesLandscaping", "TreesWithTPO"],
+        ["siteConstraints", "TreesHedgesLandscaping", "TreesWithTPO"],
       ],
     },
     {
       label: "Trees within falling distance of works?",
       paths: [
-        ["siteConstratints", "treesHedgesLandscaping", "treesWithinFallingDistance"],
-        ["siteConstraints", "treesHedgesLandscaping", "treesWithinFallingDistance"],
+        ["siteConstratints", "TreesHedgesLandscaping", "TreesWithinFallingDistance"],
+        ["siteConstraints", "TreesHedgesLandscaping", "TreesWithinFallingDistance"],
       ],
     },
     {
       label: "Tree Species (if known)",
       paths: [
-        ["siteConstratints", "treesHedgesLandscaping", "treeSpecies"],
-        ["siteConstraints", "treesHedgesLandscaping", "treeSpecies"],
+        ["siteConstratints", "TreesHedgesLandscaping", "TreeSpecies"],
+        ["siteConstraints", "TreesHedgesLandscaping", "TreeSpecies"],
       ],
     },
     {
       label: "Approximate Tree Height (m)",
       paths: [
-        ["siteConstratints", "treesHedgesLandscaping", "approximateTreeSizeM"],
-        ["siteConstraints", "treesHedgesLandscaping", "approximateTreeSizeM"],
+        ["siteConstratints", "TreesHedgesLandscaping", "approximateTreeSizeM"],
+        ["siteConstraints", "TreesHedgesLandscaping", "approximateTreeSizeM"],
       ],
     },
     {
@@ -1635,11 +1635,11 @@ const normalizeEligibilityUploadsFromApi = (payload: unknown): EligibilityFileMa
     ["worksAndMaterials", "plansDrawingsPhotographs", "additionalDrawings"],
     ["additionalDrawings"],
   ])
-  setUploadsFromPaths("Arboriculture Report / BS5837 Report (if available)", [
-    ["siteConstratints", "treesHedgesAndLandscaping", "arboricultureReportBs5837"],
-    ["siteConstraints", "treesHedgesAndLandscaping", "arboricultureReportBs5837"],
-    ["siteConstraints", "treesHedgesLandscaping", "arboricultureReportBs5837"],
-    ["treeSurveyReport"],
+  setUploadsFromPaths("Tree Report / BS5837 Report (if available)", [
+    ["siteConstratints", "TreesHedgesAndLandscaping", "TreeReportBs5837"],
+    ["siteConstraints", "TreesHedgesAndLandscaping", "TreeReportBs5837"],
+    ["siteConstraints", "TreesHedgesLandscaping", "TreeReportBs5837"],
+    ["TreeSurveyReport"],
   ])
   setUploadsFromPaths("Flood Risk Assessment (if available)", [
     ["siteConstratints", "floodAndEnvironmentalRisk", "floodRiskAssessment"],
@@ -1894,10 +1894,10 @@ const buildEligibilityStepPayload = (
             proposedParkingSpaces: getValue("Number of Proposed Parking Spaces"),
             cycleStorageProvisions: getValue("Cycle storage provided?"),
           },
-          treesHedgesLandscaping: {
-            treesWithTPO: getValue("Trees with TPO on or near site?"),
-            treesWithinFallingDistance: getValue("Trees within falling distance of works?"),
-            treeSpecies: getValue("Tree Species (if known)"),
+          TreesHedgesLandscaping: {
+            TreesWithTPO: getValue("Trees with TPO on or near site?"),
+            TreesWithinFallingDistance: getValue("Trees within falling distance of works?"),
+            TreeSpecies: getValue("Tree Species (if known)"),
             approximateTreeSizeM: getValue("Approximate Tree Height (m)"),
           },
           floodAndEnvironmentalRisk: {
@@ -2124,8 +2124,8 @@ const buildEligibilityMultipartFormData = ({
   )
   appendSingleFile(
     formData,
-    "treeSurveyReport",
-    getFiles("Arboriculture Report / BS5837 Report (if available)")
+    "TreeSurveyReport",
+    getFiles("Tree Report / BS5837 Report (if available)")
   )
   appendSingleFile(
     formData,
@@ -2250,10 +2250,10 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
   "Cycle storage provided?": "Indicate if cycle storage will be included.",
   "Trees with TPO on or near site?": "Tree Preservation Orders can require separate consent.",
   "Trees within falling distance of works?":
-    "Helps assess potential tree protection constraints.",
-  "Tree Species (if known)": "If known, specify tree species near the works.",
-  "Approximate Tree Height (m)": "Estimated height of nearby trees in meters.",
-  "Arboriculture Report / BS5837 Report (if available)":
+    "Helps assess potential Tree protection constraints.",
+  "Tree Species (if known)": "If known, specify Tree species near the works.",
+  "Approximate Tree Height (m)": "Estimated height of nearby Trees in meters.",
+  "Tree Report / BS5837 Report (if available)":
     "Upload an arboricultural survey if available.",
   "Is the site in Flood Zone 2 or 3?": "Flood zones may require additional assessments.",
   "Any known contamination on site?": "Known contamination can trigger further reports.",
@@ -2377,7 +2377,7 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Trees within falling distance of works?",
   "Tree Species (if known)",
   "Approximate Tree Height (m)",
-  "Arboriculture Report / BS5837 Report (if available)",
+  "Tree Report / BS5837 Report (if available)",
   "Is the site in Flood Zone 2 or 3?",
   "Any known contamination on site?",
   "Flood Risk Assessment (if available)",
@@ -2450,7 +2450,7 @@ const ELIGIBILITY_OPTIONAL_COMPLETION_LABELS = new Set<string>([
   "Colour / Finish Notes (optional)",
   "Tree Species (if known)",
   "Approximate Tree Height (m)",
-  "Arboriculture Report / BS5837 Report (if available)",
+  "Tree Report / BS5837 Report (if available)",
   "Flood Risk Assessment (if available)",
   "Upload safety & compliance documents",
   "Additional Drawings (floor plans, sections etc.)",
@@ -2470,7 +2470,7 @@ const STATIC_AGENT_Z_COMPLETION_REVIEW_FIELDS = [
   "Existing & Proposed Plans - Proposed elevation",
   "Photographs of Site",
   "Additional Drawings (floor plans, sections etc.)",
-  "Arboriculture Report / BS5837 Report (if available)",
+  "Tree Report / BS5837 Report (if available)",
   "Flood Risk Assessment (if available)",
 ]
 
