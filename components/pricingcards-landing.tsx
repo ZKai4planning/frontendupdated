@@ -144,7 +144,7 @@ export default function PricingCardsLanding({
                   }}
                   className={`mt-4 w-full rounded-xl ${isRestricted
                       ? "bg-white/20 text-white/60 cursor-not-allowed"
-                      : "bg-white text-black hover:bg-gray-200"
+                      : "bg-[#135BEC] text-white hover:bg-[#2A6BF0]"
                     }`}
                 >
                   {plan.button}
