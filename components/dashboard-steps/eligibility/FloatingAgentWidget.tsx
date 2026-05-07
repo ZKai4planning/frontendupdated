@@ -85,7 +85,7 @@ const PROPERTY_TYPE_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const OWNERSHIP_STATUS_AGENT_INTRO = "No worries, I'll help you figure this out \u{1F44D}"
+const OWNERSHIP_STATUS_AGENT_INTRO = "No worries, I'll help you figure this out \u{1F44D} 👍"
 const OWNERSHIP_STATUS_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "Freeholder",
@@ -108,7 +108,7 @@ const OWNERSHIP_STATUS_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const BUILDING_WORKS_AGENT_INTRO = "That's absolutely fine, I'll help you understand \u{1F44D}"
+const BUILDING_WORKS_AGENT_INTRO = "That's absolutely fine, I'll help you understand \u{1F44D} 👍"
 const BUILDING_WORKS_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "Building works explanation",
@@ -136,7 +136,7 @@ const BUILDING_WORKS_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const PROPERTY_EXTENDED_AGENT_INTRO = "That's quite common - I can help \u{1F44D}"
+const PROPERTY_EXTENDED_AGENT_INTRO = "That's quite common - I can help \u{1F44D} 👍"
 const PROPERTY_EXTENDED_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "Property extended explanation",
@@ -165,11 +165,11 @@ const PROPERTY_EXTENDED_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const SHARED_FACILITIES_AGENT_INTRO = "No problem, I'll help clarify \u{1F44D}"
+const SHARED_FACILITIES_AGENT_INTRO = "No problem, I'll help clarify  👍"
 const SHARED_FACILITIES_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "Shared facilities",
-    value: "Shared facilities mean tenants use the same kitchen or bathroom.",
+    value: "Shared facilities mean tenants use the same kitchen or bathroom.",  
     confidence: "high",
   },
   {
@@ -178,7 +178,7 @@ const SHARED_FACILITIES_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const INDIVIDUAL_ROOM_RENTAL_AGENT_INTRO = "No problem, I'll help clarify \u{1F44D}"
+const INDIVIDUAL_ROOM_RENTAL_AGENT_INTRO = "No problem, I'll help clarify  👍"
 const INDIVIDUAL_ROOM_RENTAL_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "HMO trigger",
@@ -199,7 +199,7 @@ const INDIVIDUAL_ROOM_RENTAL_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const COMMUNAL_KITCHEN_AGENT_INTRO = "No problem, I'll help clarify \u{1F44D}"
+const COMMUNAL_KITCHEN_AGENT_INTRO = "No problem, I'll help clarify  👍"
 const COMMUNAL_KITCHEN_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "Communal kitchen",
@@ -214,7 +214,7 @@ const COMMUNAL_KITCHEN_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const DIMENSIONS_AGENT_INTRO =
+const DIMENSIONS_AGENT_INTRO = "To proceed accurately, we need verified measurements of your property. Please book a professional site visit and measured survey. This ensures your drawings, compliance checks, and planning documents are correct."
   "To proceed accurately, we need verified measurements of your property. Please book a professional site visit and measured survey. This ensures your drawings, compliance checks, and planning documents are correct."
 const DIMENSIONS_RELATED_ANSWERS: AgentInsight[] = [
   {
@@ -263,8 +263,8 @@ const DIMENSIONS_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
   {
-    label: "Greater London / m²5 Ring",
-    value: "Greater London / m²5 Ring: \u00A3220 - \u00A3300",
+    label: "Greater London / M25 Ring",
+    value: "Greater London / M25 Ring: \u00A3220 - \u00A3300",
     confidence: "high",
   },
   {
@@ -274,7 +274,7 @@ const DIMENSIONS_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const WALL_MATERIALS_AGENT_INTRO = "That's absolutely fine - I can guide you."
+const WALL_MATERIALS_AGENT_INTRO = "That's absolutely fine - I can guide you.👍"
 const WALL_MATERIALS_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "Why it matters",
@@ -297,7 +297,7 @@ const WALL_MATERIALS_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const ROOF_MATERIALS_AGENT_INTRO = "No problem, I'll guide you."
+const ROOF_MATERIALS_AGENT_INTRO = "No problem, I'll guide you.👍"
 const ROOF_MATERIALS_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "Tiles or slate",
@@ -315,7 +315,7 @@ const ROOF_MATERIALS_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const MATERIALS_MATCH_AGENT_INTRO = "That's a great question - I can help."
+const MATERIALS_MATCH_AGENT_INTRO = "That's a great question - I can help.👍"
 const MATERIALS_MATCH_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "Council preference",
@@ -333,7 +333,7 @@ const MATERIALS_MATCH_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const CONSERVATION_AREA_AGENT_INTRO = "No problem - I can help you check this."
+const CONSERVATION_AREA_AGENT_INTRO = "No problem - I can help you check this.👍"
 const CONSERVATION_AREA_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "Conservation area",
@@ -351,7 +351,7 @@ const CONSERVATION_AREA_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const Tree_TPO_AGENT_INTRO = "No problem - I'll help you assess this."
+const Tree_TPO_AGENT_INTRO = "No problem - I'll help you assess this.👍"
 const Tree_TPO_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "Protected Trees",
@@ -369,7 +369,7 @@ const Tree_TPO_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const Tree_FALLING_DISTANCE_AGENT_INTRO = "No problem - I'll help you assess this."
+const Tree_FALLING_DISTANCE_AGENT_INTRO = "No problem - I'll help you assess this.👍"
 const Tree_FALLING_DISTANCE_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "Simple rule",
@@ -387,7 +387,7 @@ const Tree_FALLING_DISTANCE_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const FLOOD_ZONE_AGENT_INTRO = "No problem - I can check this for you."
+const FLOOD_ZONE_AGENT_INTRO = "No problem - I can check this for you.👍"
 const FLOOD_ZONE_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "Zone 1",
@@ -405,7 +405,7 @@ const FLOOD_ZONE_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const CONTAMINATION_AGENT_INTRO = "No problem - I'll help clarify."
+const CONTAMINATION_AGENT_INTRO = "No problem - I'll help clarify.👍"
 const CONTAMINATION_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "What contamination means",
@@ -423,7 +423,7 @@ const CONTAMINATION_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const SMOKE_ALARMS_AGENT_INTRO = "I can help with that."
+const SMOKE_ALARMS_AGENT_INTRO = "I can help with that.👍"
 const SMOKE_ALARMS_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "Newham standard",
@@ -441,7 +441,7 @@ const SMOKE_ALARMS_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const GAS_SAFETY_AGENT_INTRO = "I can help with that."
+const GAS_SAFETY_AGENT_INTRO = "I can help with that.👍"
 const GAS_SAFETY_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "Certificate needed",
@@ -459,7 +459,7 @@ const GAS_SAFETY_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const EICR_AGENT_INTRO = "I can help with that."
+const EICR_AGENT_INTRO = "I can help with that.👍"
 const EICR_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "Report needed",
@@ -477,7 +477,7 @@ const EICR_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const EPC_AGENT_INTRO = "I can help with that."
+const EPC_AGENT_INTRO = "I can help with that.👍"
 const EPC_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "Certificate needed",
@@ -495,7 +495,7 @@ const EPC_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const WATER_SUPPLY_AGENT_INTRO = "I can help with that."
+const WATER_SUPPLY_AGENT_INTRO = "I can help with that.👍"
 const WATER_SUPPLY_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "What is required",
@@ -513,7 +513,7 @@ const WATER_SUPPLY_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const SEWAGE_DRAINAGE_AGENT_INTRO = "I can help with that."
+const SEWAGE_DRAINAGE_AGENT_INTRO = "I can help with that.👍"
 const SEWAGE_DRAINAGE_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "What is required",
@@ -531,7 +531,7 @@ const SEWAGE_DRAINAGE_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const SURFACE_WATER_AGENT_INTRO = "I can help with that."
+const SURFACE_WATER_AGENT_INTRO = "I can help with that.👍"
 const SURFACE_WATER_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "Why it matters",
@@ -549,7 +549,7 @@ const SURFACE_WATER_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const WASTE_ARRANGEMENTS_AGENT_INTRO = "I can help with that."
+const WASTE_ARRANGEMENTS_AGENT_INTRO = "I can help with that.👍"
 const WASTE_ARRANGEMENTS_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "What is required",
@@ -567,7 +567,7 @@ const WASTE_ARRANGEMENTS_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const RENEWABLES_AGENT_INTRO = "I can help with that."
+const RENEWABLES_AGENT_INTRO = "I can help with that.👍"
 const RENEWABLES_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "Typical systems",
@@ -585,7 +585,7 @@ const RENEWABLES_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const ADDITIONAL_CONSENTS_AGENT_INTRO = "I can help with that."
+const ADDITIONAL_CONSENTS_AGENT_INTRO = "I can help with that.👍"
 const ADDITIONAL_CONSENTS_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "What this can include",
@@ -603,7 +603,7 @@ const ADDITIONAL_CONSENTS_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
-const OWNERSHIP_CERTIFICATE_AGENT_INTRO = "I can help you choose the right ownership certificate."
+const OWNERSHIP_CERTIFICATE_AGENT_INTRO = "I can help you choose the right ownership certificate.👍"
 const OWNERSHIP_CERTIFICATE_RELATED_ANSWERS: AgentInsight[] = [
   {
     label: "Certificate A",
@@ -648,7 +648,7 @@ const CONVERSATIONAL_AGENT_INTROS: Record<string, string> = {
   "Surface Water Drainage": SURFACE_WATER_AGENT_INTRO,
   "Existing Waste Arrangements": WASTE_ARRANGEMENTS_AGENT_INTRO,
   "Renewable energy installations proposed?": RENEWABLES_AGENT_INTRO,
-  "Which Ownership Certificate applies?": OWNERSHIP_CERTIFICATE_AGENT_INTRO,
+  // "Which Ownership Certificate applies?": OWNERSHIP_CERTIFICATE_AGENT_INTRO,
   "Additional Consents": ADDITIONAL_CONSENTS_AGENT_INTRO,
 }
 const CONVERSATIONAL_AGENT_RELATED_ANSWERS: Record<string, AgentInsight[]> = {
@@ -678,7 +678,7 @@ const CONVERSATIONAL_AGENT_RELATED_ANSWERS: Record<string, AgentInsight[]> = {
   "Surface Water Drainage": SURFACE_WATER_RELATED_ANSWERS,
   "Existing Waste Arrangements": WASTE_ARRANGEMENTS_RELATED_ANSWERS,
   "Renewable energy installations proposed?": RENEWABLES_RELATED_ANSWERS,
-  "Which Ownership Certificate applies?": OWNERSHIP_CERTIFICATE_RELATED_ANSWERS,
+  // "Which Ownership Certificate applies?": OWNERSHIP_CERTIFICATE_RELATED_ANSWERS,
   "Additional Consents": ADDITIONAL_CONSENTS_RELATED_ANSWERS,
 }
 const isConversationalAgentField = (fieldLabel: string) => fieldLabel in CONVERSATIONAL_AGENT_INTROS

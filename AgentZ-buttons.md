@@ -86,7 +86,7 @@
 
 ## Ownership Certificate
 
-80. Which Ownership Certificate applies? --> Ask Agent Z / need advice
+
 
 ## Additional Consents Required
 

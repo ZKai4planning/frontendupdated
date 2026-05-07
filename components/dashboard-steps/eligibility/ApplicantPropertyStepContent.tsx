@@ -227,7 +227,7 @@ export function ApplicantPropertyStepContent({
   } = components
   const [isGettingAddress, setIsGettingAddress] = useState(false)
 
-  const previousCouncilApplication = savedFormData["Have you previously applied to the council?"]
+  const previousCouncilApplication = savedFormData["have you previously applied to any council?"]
   const useAlternateCorrespondenceAddress =
     asStringValue(savedFormData["Alternate address for correspondence?"]).trim() === "Yes"
   const usesPlanningAgent =
@@ -531,7 +531,7 @@ export function ApplicantPropertyStepContent({
       <div className="grid grid-cols-2 gap-6 mb-6">
         <div className="col-span-2">
           <RadioGroupField
-            label="Have you previously applied to the council?"
+            label="have you previously applied to any council?"
             options={["Yes", "No"]}
             tooltip="If yes, we will collect details about the earlier council application before proceeding."
           />

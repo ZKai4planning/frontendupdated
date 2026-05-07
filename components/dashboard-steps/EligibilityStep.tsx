@@ -872,7 +872,7 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
     //   paths: [["applicantAndProperty", "agentDetails", "agentContactEmailPhone"]],
     // },
     {
-      label: "Have you previously applied to the council?",
+      label: "Have you previously applied to any council?",
       paths: [["applicantAndProperty", "councilApplicationHistory", "hasPreviousCouncilApplication"]],
     },
     {
@@ -1253,13 +1253,7 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
         ["utilitiesAndConsents", "utilitiesAndWaste", "renewableEnergyDetails"],
       ],
     },
-    {
-      label: "Which Ownership Certificate applies?",
-      paths: [
-        ["utilitesAndConsents", "ownershipCertificate", "certificateOfOwnership"],
-        ["utilitiesAndConsents", "ownershipCertificate", "certificateOfOwnership"],
-      ],
-    },
+   
     {
       label: "Names & Addresses of Other Owners (if Certificate B, C or D)",
       paths: [
@@ -1797,7 +1791,7 @@ const buildEligibilityStepPayload = (
           councilApplicationHistory: {
             hasPreviousCouncilApplication: getBooleanFieldValue(
               formValues,
-              "Have you previously applied to the council?"
+              "have you previously applied to any council?"
             ),
             previousProposalDetails: getValue(
               "What was previously proposed, and was it approved, refused, or withdrawn?"
@@ -2169,7 +2163,7 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
   // "Agent Name": "Name of the planning agent or firm.",
   // "Agent Address": "Address of the planning agent or firm.",
   // "Agent Contact": "Best email or phone for the agent.",
-  "Have you previously applied to the council?":
+  "have you previously applied to any council?":
     "Tell us whether there has already been a council application connected to this site or proposal.",
   "What was previously proposed, and was it approved, refused, or withdrawn?":
     "Summarise the earlier scheme and confirm whether it was approved, refused, or withdrawn.",
@@ -2284,8 +2278,8 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
     "Include solar panels, heat pumps, or other renewable measures.",
   "Details of Renewable / Energy Measures (if applicable)":
     "Describe any energy measures proposed.",
-  "Which Ownership Certificate applies?":
-    "Planning applications require the correct ownership certificate.",
+  // "Which Ownership Certificate applies?":
+  //   "Planning applications require the correct ownership certificate.",
   "Names & Addresses of Other Owners (if Certificate B, C or D)":
     "List other owners or agricultural tenants when required.",
   "Additional Consents": "Select any other consents that may be needed.",
@@ -2325,7 +2319,7 @@ const ELIGIBILITY_QUESTION_ORDER = [
   // "Agent Name",
   // "Agent Address",
   // "Agent Contact",
-  "Have you previously applied to the council?",
+  "have you previously applied to any council?",
   "What was previously proposed, and was it approved, refused, or withdrawn?",
   "Planning Reference Number *",
   "Type of Application *",
@@ -2398,7 +2392,7 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Existing Waste Arrangements",
   "Renewable energy installations proposed?",
   "Details of Renewable / Energy Measures (if applicable)",
-  "Which Ownership Certificate applies?",
+  // "Which Ownership Certificate applies?",
   "Names & Addresses of Other Owners (if Certificate B, C or D)",
   "Additional Consents",
   "Community consultation undertaken?",
@@ -2513,7 +2507,7 @@ const isCompletionCheckRelevant = (
       "Is this project similar to the previous application or different this time?",
     ].includes(label)
   ) {
-    return isYesLikeValue(formData["Have you previously applied to the council?"])
+    return isYesLikeValue(formData["have you previously applied to any council?"])
   }
 
   if (label === "Details of Renewable / Energy Measures (if applicable)") {
@@ -4706,7 +4700,7 @@ function AgenticAssistantCard({
   const quickPointTwo = "Tailored to your council area"
   const quickPointThree = "Helps avoid delays or errors"
   const aiSupportText =
-    "Your subscription includes 10 smart AI buttons designed to support you through every stage of your application journey."
+    "Your subscription includes 15 smart AI buttons designed to support you through every stage of your application journey."
   const exploreText =
     "Explore each feature and enjoy your personalised AI experience."
   const beginText = "Click Eligibility Check  to begin."
@@ -4764,12 +4758,12 @@ function AgenticAssistantCard({
             speed={typeSpeed}
             startDelay={introDelay}
           />
-          <TypewriterText
+          {/* <TypewriterText
             text={councilText}
             className="mt-3 text-sm leading-6 text-cyan-100"
             speed={typeSpeed}
             startDelay={councilDelay}
-          />
+          /> */}
           <TypewriterText
             text={guidanceText}
             className="mt-3 text-sm leading-6 text-slate-300"
