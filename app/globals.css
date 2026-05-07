@@ -540,6 +540,51 @@
   color: #f8fafc;
   background: #091226;
 }
+
+.eligibility-form-theme input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.eligibility-form-theme select,
+.eligibility-form-theme textarea {
+  background-color: #0c1529 !important;
+  color: #f8fafc !important;
+  border-color: rgba(71, 85, 105, 0.72) !important;
+}
+
+.eligibility-form-theme input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):hover,
+.eligibility-form-theme input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+.eligibility-form-theme input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):active,
+.eligibility-form-theme select:hover,
+.eligibility-form-theme select:focus,
+.eligibility-form-theme select:active,
+.eligibility-form-theme textarea:hover,
+.eligibility-form-theme textarea:focus,
+.eligibility-form-theme textarea:active {
+  background-color: #0c1529 !important;
+  color: #f8fafc !important;
+}
+
+.eligibility-form-theme input:not([type="checkbox"]):not([type="radio"]):not([type="file"])::placeholder,
+.eligibility-form-theme textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+.eligibility-form-theme select option {
+  background: #0c1529;
+  color: #f8fafc;
+}
+
+.eligibility-form-theme input:-webkit-autofill,
+.eligibility-form-theme input:-webkit-autofill:hover,
+.eligibility-form-theme input:-webkit-autofill:focus,
+.eligibility-form-theme textarea:-webkit-autofill,
+.eligibility-form-theme textarea:-webkit-autofill:hover,
+.eligibility-form-theme textarea:-webkit-autofill:focus,
+.eligibility-form-theme select:-webkit-autofill,
+.eligibility-form-theme select:-webkit-autofill:hover,
+.eligibility-form-theme select:-webkit-autofill:focus {
+  -webkit-text-fill-color: #f8fafc;
+  -webkit-box-shadow: 0 0 0 1000px #0c1529 inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
  
 .btn-1 {
   background: #50a2ff;
