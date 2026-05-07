@@ -229,7 +229,7 @@ export function ClientDetailsCard({
             type="button"
             disabled={!isSaveEnabled}
             onClick={onSave}
-            className="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSavingProfile ? "Saving..." : "Save Client Details"}
           </button>
