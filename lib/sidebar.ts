@@ -1,5 +1,6 @@
 import {
   FiHome,
+  FiMessageSquare,
   FiSettings,
   FiGrid,
   FiFileText,
@@ -33,6 +34,12 @@ export const SIDEBAR_ITEMS: SidebarItem[] = [
     label: "Dashboard",
     icon: FiHome,
     href: "/dashboard",
+  },
+  {
+    id: "chat",
+    label: "Chat",
+    icon: FiMessageSquare,
+    href: "/chat",
   },
   // {
   //   id: "services",

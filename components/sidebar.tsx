@@ -126,6 +126,7 @@ export default function Sidebar({
             return (
               <button
                 key={item.id}
+                onClick={() => undefined}
                 className={cn(
                   "w-full flex items-center rounded-md transition hover:bg-slate-100",
                   collapsed

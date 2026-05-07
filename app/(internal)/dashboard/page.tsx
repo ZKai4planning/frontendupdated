@@ -32,6 +32,14 @@ import {
   extractProjectFromResponse,
   extractProjectsFromResponse,
 } from "@/lib/project-api"
+import {
+  fetchServiceCart,
+  fetchServiceCartQuotations,
+  readStoredServiceCart,
+  type ServiceCartQuotation,
+  type StoredServiceCartPayload,
+} from "@/lib/service-cart"
+import { openQuotationInvoicePdf } from "@/lib/quotation-pdf"
 import { useUserIdentity } from "@/lib/use-user-identity"
 import { useResolvedServiceSelection } from "@/lib/use-service-selection"
 import {
@@ -39,6 +47,8 @@ import {
   useServiceCatalog,
 } from "@/lib/use-service-catalog"
 import { useServiceSelectionStore } from "@/lib/zustand"
+
+const DASHBOARD_OPEN_CHAT_EVENT = "dashboard-open-chat"
 
 type ProjectService = {
   serviceId?: string
@@ -321,6 +331,15 @@ const formatDashboardDate = (value?: string) => {
 const getEligibilityFormFieldCount = (summary?: DashboardEligibilitySummary | null) =>
   summary ? Object.keys(summary.formData).length : 0
 
+const readStoredSelectedProjectId = () => {
+  if (typeof window === "undefined") return null
+
+  return (
+    window.localStorage.getItem(SELECTED_PROJECT_STORAGE_KEY) ||
+    window.sessionStorage.getItem(SELECTED_PROJECT_STORAGE_KEY)
+  )
+}
+
 const readStoredDashboardEligibilitySummary = (projectId: string): DashboardEligibilitySummary | null => {
   if (typeof window === "undefined" || !projectId.trim()) return null
 
@@ -346,20 +365,42 @@ const DASHBOARD_PENDING_DOCUMENTS = [
   "EICR certificate",
 ] as const
 
-const DASHBOARD_MESSAGES = [
+const DASHBOARD_CHAT_MESSAGES = [
   {
-    sender: "JD",
-    name: "James D.",
-    role: "Consultant",
-    message: "We will review your plan set and confirm the next step shortly.",
-    time: "2h",
+    id: "customer-1",
+    sender: "customer",
+    name: "Customer",
+    senderBadge: "CU",
+    message: "Hi Agent X, I have uploaded the site plan and proposed drawings. Can you confirm what is still pending?",
+    time: "09:12 AM",
+    unread: false,
   },
   {
-    sender: "AZ",
-    name: "Agent Z",
-    role: "AI Assistant",
-    message: "3 supporting documents are still pending for this project.",
-    time: "5h",
+    id: "agent-1",
+    sender: "agent",
+    name: "Agent X",
+    senderBadge: "AX",
+    message: "Thanks, I can see those files. We still need the application form and one supporting compliance document before I can move this to the next review step.",
+    time: "09:16 AM",
+    unread: true,
+  },
+  {
+    id: "customer-2",
+    sender: "customer",
+    name: "Customer",
+    senderBadge: "CU",
+    message: "Understood. I will upload the application form today. Can the compliance document be submitted after that?",
+    time: "09:18 AM",
+    unread: false,
+  },
+  {
+    id: "agent-2",
+    sender: "agent",
+    name: "Agent X",
+    senderBadge: "AX",
+    message: "Yes. Upload the application form first, then I will issue the updated quotation and guide you through the remaining document requirement.",
+    time: "09:21 AM",
+    unread: true,
   },
 ] as const
 
@@ -441,10 +482,35 @@ function DashboardLoading() {
 }
 
 function DashboardContent() {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const stage = searchParams.get("stage") ?? "overview"
+  const section = searchParams.get("section")
   const StageComponent =
     stage !== "overview" ? STAGE_COMPONENTS[stage as StageKey] : undefined
+
+  const scrollToChatSection = useCallback(() => {
+    if (typeof window === "undefined") return
+
+    const target = document.getElementById("dashboard-chat-card")
+    const scrollRoot = document.getElementById("dashboard-scroll-root")
+
+    if (!target) return
+
+    if (scrollRoot) {
+      const rootRect = scrollRoot.getBoundingClientRect()
+      const targetRect = target.getBoundingClientRect()
+      const nextTop = scrollRoot.scrollTop + (targetRect.top - rootRect.top) - 24
+
+      scrollRoot.scrollTo({
+        top: Math.max(0, nextTop),
+        behavior: "smooth",
+      })
+      return
+    }
+
+    target.scrollIntoView({ behavior: "smooth", block: "start" })
+  }, [])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -457,6 +523,36 @@ function DashboardContent() {
 
     window.scrollTo({ top: 0, left: 0, behavior: "auto" })
   }, [stage])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+    if (stage !== "overview" || section !== "chat") return
+
+    const timer = window.setTimeout(scrollToChatSection, 120)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [scrollToChatSection, section, stage])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const handleOpenChat = () => {
+      if (stage !== "overview") {
+        router.push("/dashboard?section=chat")
+        return
+      }
+
+      scrollToChatSection()
+    }
+
+    window.addEventListener(DASHBOARD_OPEN_CHAT_EVENT, handleOpenChat)
+
+    return () => {
+      window.removeEventListener(DASHBOARD_OPEN_CHAT_EVENT, handleOpenChat)
+    }
+  }, [router, scrollToChatSection, stage])
 
   if (stage !== "overview" && StageComponent) {
     return <StageComponent />
@@ -475,8 +571,7 @@ function DashboardOverview() {
   const clearServiceSelection = useServiceSelectionStore((state) => state.clearSelection)
 
   const displayName = fullName || "User"
-  const selectedProjectId = data.eligibility?.projectId ?? null
-
+  const [storedSelectedProjectId, setStoredSelectedProjectId] = useState<string | null>(null)
   const [projects, setProjects] = useState<UserProject[]>([])
   const [isLoadingProjects, setIsLoadingProjects] = useState(false)
   const [projectsError, setProjectsError] = useState<string | null>(null)
@@ -484,18 +579,25 @@ function DashboardOverview() {
     null
   )
   const [isLoadingEligibilitySummary, setIsLoadingEligibilitySummary] = useState(false)
+  const [serviceCart, setServiceCart] = useState<StoredServiceCartPayload | null>(null)
+  const [isLoadingServiceCart, setIsLoadingServiceCart] = useState(false)
+  const [quotations, setQuotations] = useState<ServiceCartQuotation[]>([])
+  const [isLoadingQuotations, setIsLoadingQuotations] = useState(false)
+  const [showPaymentRedirectPopup, setShowPaymentRedirectPopup] = useState(false)
+  const [isQuoteDetailsOpen, setIsQuoteDetailsOpen] = useState(false)
+  const selectedProjectId = data.eligibility?.projectId ?? storedSelectedProjectId ?? null
 
   useEffect(() => {
     if (typeof window === "undefined") return
-    if (data.eligibility?.projectId) return
 
-    const storedProjectId =
-      window.localStorage.getItem(SELECTED_PROJECT_STORAGE_KEY) ||
-      window.sessionStorage.getItem(SELECTED_PROJECT_STORAGE_KEY)
+    const storedProjectId = readStoredSelectedProjectId()
     const storedProjectStageId =
       window.localStorage.getItem(SELECTED_PROJECT_STAGE_STORAGE_KEY) ||
       window.sessionStorage.getItem(SELECTED_PROJECT_STAGE_STORAGE_KEY)
 
+    setStoredSelectedProjectId(storedProjectId)
+
+    if (data.eligibility?.projectId) return
     if (!storedProjectId) return
 
     updateSection("eligibility", {
@@ -567,6 +669,7 @@ function DashboardOverview() {
       if (typeof window !== "undefined") {
         window.localStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, project.projectId)
         window.sessionStorage.removeItem(SELECTED_PROJECT_STORAGE_KEY)
+        setStoredSelectedProjectId(project.projectId)
 
         if (project.currentStage?.stageId) {
           window.localStorage.setItem(
@@ -670,6 +773,91 @@ function DashboardOverview() {
     }
   }, [data.eligibility, selectedProjectId])
 
+  useEffect(() => {
+    if (!selectedProjectId || !userId) {
+      setServiceCart(null)
+      return
+    }
+
+    let isCancelled = false
+    const storedCart = readStoredServiceCart(selectedProjectId)
+
+    if (storedCart?.userId === userId) {
+      setServiceCart(storedCart)
+    } else {
+      setServiceCart(null)
+    }
+
+    const loadServiceCart = async () => {
+      setIsLoadingServiceCart(true)
+
+      try {
+        const normalized = await fetchServiceCart({
+          projectId: selectedProjectId,
+          userId,
+        })
+
+        if (isCancelled) return
+
+        if (normalized) {
+          setServiceCart(normalized)
+          return
+        }
+
+        setServiceCart(storedCart?.userId === userId ? storedCart : null)
+      } catch {
+        if (isCancelled) return
+        setServiceCart(storedCart?.userId === userId ? storedCart : null)
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingServiceCart(false)
+        }
+      }
+    }
+
+    void loadServiceCart()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [selectedProjectId, userId])
+
+  useEffect(() => {
+    if (!selectedProjectId || !userId) {
+      setQuotations([])
+      return
+    }
+
+    let isCancelled = false
+
+    const loadQuotations = async () => {
+      setIsLoadingQuotations(true)
+
+      try {
+        const nextQuotations = await fetchServiceCartQuotations({
+          projectId: selectedProjectId,
+          userId,
+        })
+
+        if (isCancelled) return
+        setQuotations(nextQuotations)
+      } catch {
+        if (isCancelled) return
+        setQuotations([])
+      } finally {
+        if (!isCancelled) {
+          setIsLoadingQuotations(false)
+        }
+      }
+    }
+
+    void loadQuotations()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [selectedProjectId, userId])
+
   const handleProjectSelect = useCallback(
     async (project: UserProject) => {
       persistSelectedProject(project)
@@ -770,6 +958,7 @@ function DashboardOverview() {
       window.localStorage.removeItem(SELECTED_PROJECT_STAGE_STORAGE_KEY)
       window.sessionStorage.removeItem(SELECTED_PROJECT_STAGE_STORAGE_KEY)
     }
+    setStoredSelectedProjectId(null)
 
     router.push(preservedServiceSelection ? PLANS_STAGE_ROUTE : "/services")
   }, [clearServiceSelection, router, serviceSelection, setServiceSelection, updateSection])
@@ -778,6 +967,15 @@ function DashboardOverview() {
     () => projects.find((project) => project.projectId === selectedProjectId) ?? null,
     [projects, selectedProjectId]
   )
+  const orderedProjects = useMemo(() => {
+    if (!selectedProjectId) return projects
+
+    return [...projects].sort((left, right) => {
+      if (left.projectId === selectedProjectId) return -1
+      if (right.projectId === selectedProjectId) return 1
+      return 0
+    })
+  }, [projects, selectedProjectId])
 
   const selectedProjectService = getPrimaryProjectService(selectedProject)
   const selectedProjectLabel =
@@ -793,9 +991,8 @@ function DashboardOverview() {
   const paymentAmount = data.payment?.amount ?? totalCharge
   const planSelectedDate = "05/05/2026"
   const paymentReference = "PAY-AI4P-050526-7842"
-  const quotationPageHref = "/dashboard?stage=initial-quotation&readonly=1"
+  const fallbackQuotationPageHref = "/dashboard?stage=initial-quotation&readonly=1"
   const paymentPageHref = "/dashboard?stage=payment"
-  const quotationPdfLabel = "initial-quotation.pdf"
   const dashboardPaymentItems = [
     { label: "Plan selected date", value: planSelectedDate },
     { label: "Payment reference", value: paymentReference },
@@ -820,10 +1017,52 @@ function DashboardOverview() {
           : null,
     [data.eligibility, eligibilitySummary, selectedProjectId]
   )
-  const submittedCartItems = useMemo(
-    () => getDashboardCartItems(submittedEligibilitySummary?.formData ?? {}),
-    [submittedEligibilitySummary]
+  const persistedCartItems = useMemo(
+    () =>
+      serviceCart?.projectId === selectedProjectId
+        ? serviceCart.services.map((service) => service.serviceName).filter(Boolean)
+        : [],
+    [selectedProjectId, serviceCart]
   )
+  const submittedCartItems = useMemo(
+    () =>
+      persistedCartItems.length > 0
+        ? persistedCartItems
+        : getDashboardCartItems(submittedEligibilitySummary?.formData ?? {}),
+    [persistedCartItems, submittedEligibilitySummary]
+  )
+  const cartSubmittedAt =
+    serviceCart?.projectId === selectedProjectId
+      ? serviceCart.updatedAt ?? submittedEligibilitySummary?.completedAt
+      : submittedEligibilitySummary?.completedAt
+  const recentQuotation = useMemo(
+    () =>
+      [...quotations].sort((left, right) => {
+        const leftTime = new Date(left.updatedAt ?? left.createdAt ?? 0).getTime()
+        const rightTime = new Date(right.updatedAt ?? right.createdAt ?? 0).getTime()
+        return rightTime - leftTime
+      })[0] ?? null,
+    [quotations]
+  )
+  const recentQuotationServiceNames = recentQuotation?.services.map((service) => service.serviceName) ?? []
+  const recentQuotationPdfLabel = recentQuotation
+    ? `invoice-${recentQuotation.quotationId}.pdf`
+    : "initial-quotation.pdf"
+  const unreadChatCount = DASHBOARD_CHAT_MESSAGES.filter((message) => message.unread).length
+  const recentQuotationAddressLines = useMemo(() => {
+    const address = recentQuotation?.customer?.address
+    if (!address) return []
+
+    return [
+      address.doorNo,
+      address.street ?? undefined,
+      address.locality,
+      address.city,
+      address.state,
+      address.country,
+      address.postalCode,
+    ].filter((value): value is string => Boolean(value?.trim()))
+  }, [recentQuotation])
   const dimensionSurveyBookingDate =
     typeof submittedEligibilitySummary?.formData["Dimension Survey Booking Date"] === "string"
       ? submittedEligibilitySummary.formData["Dimension Survey Booking Date"]
@@ -834,8 +1073,9 @@ function DashboardOverview() {
       : ""
   const hasSubmittedCartItems = submittedCartItems.length > 0
   const hasDimensionSurveyBooking = Boolean(dimensionSurveyBookingDate && dimensionSurveyBookingTime)
+  const isLoadingSupportSummary = isLoadingEligibilitySummary || isLoadingServiceCart
 
-  const handleAgentAction = () => {
+  const handleContinueWithApplication = () => {
     if (selectedProject) {
       void handleProjectSelect(selectedProject)
       return
@@ -846,6 +1086,169 @@ function DashboardOverview() {
 
   return (
     <section className="min-h-full bg-slate-50 p-4 sm:p-6 lg:p-8">
+      {showPaymentRedirectPopup ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">
+              Payment Gateway
+            </p>
+            <h3 className="mt-2 text-xl font-semibold text-slate-900">
+              Continue to payment
+            </h3>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              You will be redirect to a payment gateway.
+            </p>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowPaymentRedirectPopup(false)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isQuoteDetailsOpen && recentQuotation ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-3xl bg-white p-6 shadow-xl sm:p-8">
+            <div className="flex flex-col gap-6 border-b border-slate-200 pb-6 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">
+                  Recent Quote
+                </p>
+                <h3 className="mt-2 text-3xl font-semibold text-slate-900">
+                  Invoice
+                </h3>
+                <p className="mt-3 text-sm text-slate-500">
+                  Invoice ID: {recentQuotation.quotationId}
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Project ID: {recentQuotation.projectId}
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Date: {formatDashboardDate(recentQuotation.updatedAt ?? recentQuotation.createdAt)}
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-slate-50 px-5 py-4 text-sm text-slate-600">
+                <p className="font-semibold text-slate-900">AI4Planning</p>
+                <p className="mt-1">Planning support and quotation summary</p>
+                <p className="mt-1">hello@ai4planning.com</p>
+              </div>
+            </div>
+
+            <div className="mt-8 grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+              <div>
+                <h4 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Bill To
+                </h4>
+                <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                  <p className="text-base font-semibold text-slate-900">
+                    {recentQuotation.customer?.fullName || "Not available"}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {recentQuotation.customer?.email || "No email available"}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {recentQuotation.customer?.phoneNumber || "No phone available"}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Council: {recentQuotation.customer?.council || "Not available"}
+                  </p>
+                  {recentQuotationAddressLines.length > 0 ? (
+                    <div className="mt-3 space-y-1 text-sm text-slate-600">
+                      {recentQuotationAddressLines.map((line) => (
+                        <p key={line}>{line}</p>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-sm font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Quote Summary
+                </h4>
+                <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50 p-5">
+                  <p className="text-sm leading-6 text-slate-600">
+                    {recentQuotation.notes || "Quotation generated for final approval."}
+                  </p>
+                  <div className="mt-4 grid gap-3">
+                    <div className="flex items-center justify-between rounded-xl bg-white px-4 py-3">
+                      <span className="text-sm text-slate-600">Total services</span>
+                      <span className="text-sm font-semibold text-slate-900">
+                        {recentQuotation.totalServices}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between rounded-xl bg-white px-4 py-3">
+                      <span className="text-sm text-slate-600">Total payment</span>
+                      <span className="text-sm font-semibold text-slate-900">
+                        {formatCurrency(recentQuotation.totalPayment)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 overflow-hidden rounded-2xl border border-slate-200">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-100 text-slate-700">
+                  <tr>
+                    <th className="px-4 py-3 font-semibold">Service</th>
+                    <th className="px-4 py-3 font-semibold">Item ID</th>
+                    <th className="px-4 py-3 text-right font-semibold">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 bg-white">
+                  {recentQuotation.services.map((service) => (
+                    <tr key={service.serviceItemId ?? service.serviceName}>
+                      <td className="px-4 py-3 text-slate-800">{service.serviceName}</td>
+                      <td className="px-4 py-3 text-slate-500">
+                        {service.serviceItemId || "Not available"}
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium text-slate-900">
+                        {formatCurrency(service.payment)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-slate-50">
+                  <tr>
+                    <td colSpan={2} className="px-4 py-4 text-right font-semibold text-slate-700">
+                      Total
+                    </td>
+                    <td className="px-4 py-4 text-right text-base font-semibold text-slate-900">
+                      {formatCurrency(recentQuotation.totalPayment)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            <div className="mt-8 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setIsQuoteDetailsOpen(false)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => openQuotationInvoicePdf(recentQuotation)}
+                className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+              >
+                Download PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-8 p-6 sm:p-8 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-3xl flex-1">
@@ -923,14 +1326,14 @@ function DashboardOverview() {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={handleAgentAction}
-              className="mt-4 flex w-full items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm font-medium text-slate-900 transition hover:bg-slate-100"
-            >
-              {selectedProject ? "Continue with Agent Z" : "Start with Agent Z"}
-              <ArrowRight className="h-4 w-4 text-blue-600" />
-            </button>
+              <button
+                type="button"
+                onClick={handleContinueWithApplication}
+                className="mt-4 flex w-full items-center justify-between rounded-2xl bg-white px-4 py-3 text-sm font-medium text-slate-900 transition hover:bg-slate-100"
+              >
+              {selectedProject ? "Continue with application" : "Start with Agent Z"}
+                <ArrowRight className="h-4 w-4 text-blue-600" />
+              </button>
           </div>
         </div>
       </div>
@@ -980,14 +1383,14 @@ function DashboardOverview() {
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={() => void handleProjectSelect(selectedProject)}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
-              >
-                <FolderOpen className="h-4 w-4" />
-                Open Selected Project
-              </button>
+                <button
+                  type="button"
+                  onClick={() => void handleProjectSelect(selectedProject)}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                >
+                  <FolderOpen className="h-4 w-4" />
+                  Continue with application
+                </button>
             </div>
           </div>
         ) : null}
@@ -1016,12 +1419,12 @@ function DashboardOverview() {
               New Project
             </button>
           </div>
-        ) : (
-          <div className="mt-8 grid gap-4 lg:grid-cols-2">
-            {projects.map((project) => {
-              const service = getPrimaryProjectService(project)
-              const serviceLabel =
-                resolveProjectServiceName(service, serviceLabelMap) || project.projectId
+          ) : (
+            <div className="mt-8 grid gap-4 lg:grid-cols-2">
+              {orderedProjects.map((project) => {
+                const service = getPrimaryProjectService(project)
+                const serviceLabel =
+                  resolveProjectServiceName(service, serviceLabelMap) || project.projectId
               const isSelected = selectedProjectId === project.projectId
               const projectDescription =
                 service?.description ||
@@ -1105,8 +1508,8 @@ function DashboardOverview() {
           </p>
         </div>
 
-        {isLoadingEligibilitySummary ? (
-          <div className="mt-6 flex gap-4 overflow-x-auto pb-2">
+        {isLoadingSupportSummary ? (
+            <div className="mt-6 flex gap-4 overflow-x-auto pb-2">
             {[0, 1].map((item) => (
               <div
                 key={item}
@@ -1135,12 +1538,12 @@ function DashboardOverview() {
                   </span>
                 </div>
 
-                <div className="mt-6">
+                  <div className="mt-6">
                   <p className="text-3xl font-semibold tracking-tight text-slate-900">
-                    Cart requests
+                    Services Added to Cart
                   </p>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Agent Z support requests captured from your submitted eligibility answers.
+                    Real cart services saved for this project are shown here.
                   </p>
                 </div>
 
@@ -1164,7 +1567,7 @@ function DashboardOverview() {
                       Submitted
                     </p>
                     <p className="mt-1 text-sm text-slate-700">
-                      {formatDashboardDate(submittedEligibilitySummary?.completedAt)}
+                      {formatDashboardDate(cartSubmittedAt)}
                     </p>
                   </div>
                   <a
@@ -1355,7 +1758,10 @@ function DashboardOverview() {
         </div>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-3">
-          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+            <article
+              id="dashboard-chat-card"
+              className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm"
+            >
             <div className="flex items-start justify-between gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
                 <Wallet className="h-5 w-5" />
@@ -1394,28 +1800,81 @@ function DashboardOverview() {
             </div>
 
             <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
-                New Quote
-              </p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                The PDF link will appear here after the initial quotation is issued.
-              </p>
-              <a
-                href={quotationPageHref}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-3 inline-flex text-sm font-medium text-blue-700 underline underline-offset-4 hover:text-blue-800"
-              >
-                {quotationPdfLabel}
-              </a>
-              <a
-                href={paymentPageHref}
-                className="mt-4 ml-6 inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
-              >
-                Make Payment
-              </a>
-            </div>
-          </article>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
+                  Recent Quote
+                </p>
+                {isLoadingQuotations ? (
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Loading the latest quotation...
+                  </p>
+                ) : recentQuotation ? (
+                  <>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      Quote ID {recentQuotation.quotationId} with {recentQuotation.totalServices} service
+                      {recentQuotation.totalServices === 1 ? "" : "s"} totals {formatCurrency(recentQuotation.totalPayment)}.
+                    </p>
+                    <p className="mt-3 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Included services
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {recentQuotationServiceNames.slice(0, 3).map((serviceName) => (
+                        <span
+                          key={serviceName}
+                          className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-blue-100"
+                        >
+                          {serviceName}
+                        </span>
+                      ))}
+                      {recentQuotationServiceNames.length > 3 ? (
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-blue-100">
+                          +{recentQuotationServiceNames.length - 3} more
+                        </span>
+                      ) : null}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setIsQuoteDetailsOpen(true)}
+                        className="inline-flex rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                      >
+                        View Details
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => openQuotationInvoicePdf(recentQuotation)}
+                        className="inline-flex text-sm font-medium text-blue-700 underline underline-offset-4 hover:text-blue-800"
+                      >
+                        {recentQuotationPdfLabel}
+                      </button>
+                    </div>
+                      <p className="mt-2 text-xs text-slate-500">
+                        Updated {formatDashboardDate(recentQuotation.updatedAt ?? recentQuotation.createdAt)}
+                      </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      The PDF link will appear here after the initial quotation is issued.
+                    </p>
+                    <a
+                      href={fallbackQuotationPageHref}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-3 inline-flex text-sm font-medium text-blue-700 underline underline-offset-4 hover:text-blue-800"
+                    >
+                      {recentQuotationPdfLabel}
+                    </a>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowPaymentRedirectPopup(true)}
+                  className="mt-4 ml-6 inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                >
+                  Make Payment
+                </button>
+              </div>
+            </article>
 
           <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-start justify-between gap-4">
@@ -1458,19 +1917,19 @@ function DashboardOverview() {
           </article>
 
           <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-100 text-teal-700">
-                <MessageSquare className="h-5 w-5" />
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-100 text-teal-700">
+                  <MessageSquare className="h-5 w-5" />
+                </div>
+                <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
+                  {unreadChatCount} unread
+                </span>
               </div>
-              <span className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
-                3 unread
-              </span>
-            </div>
 
-            <div className="mt-6">
-              <p className="text-4xl font-semibold tracking-tight text-slate-900">3</p>
-              <p className="mt-1 text-sm text-slate-600">Unread chat messages</p>
-            </div>
+              <div className="mt-6">
+                <p className="text-4xl font-semibold tracking-tight text-slate-900">{unreadChatCount}</p>
+                <p className="mt-1 text-sm text-slate-600">Unread chat messages from Agent X</p>
+              </div>
 
             <div className="mt-6">
               <div className="flex items-center justify-between text-sm font-medium text-slate-700">
@@ -1482,30 +1941,47 @@ function DashboardOverview() {
               </div>
             </div>
 
-            <div className="mt-6 space-y-4">
-              {DASHBOARD_MESSAGES.map((message) => (
-                <div key={`${message.name}-${message.time}`} className="flex gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-100 text-xs font-semibold text-teal-800">
-                    {message.sender}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-900">
-                          {message.name}
-                          <span className="font-normal text-slate-500"> - {message.role}</span>
-                        </p>
-                        <p className="mt-1 line-clamp-2 text-sm text-slate-600">
-                          {message.message}
-                        </p>
+              <div className="mt-6 space-y-4">
+                {DASHBOARD_CHAT_MESSAGES.map((message) => {
+                  const isAgent = message.sender === "agent"
+
+                  return (
+                    <div
+                      key={message.id}
+                      className={`flex gap-3 ${isAgent ? "" : "justify-end"}`}
+                    >
+                      {isAgent ? (
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-teal-100 text-xs font-semibold text-teal-800">
+                          {message.senderBadge}
+                        </div>
+                      ) : null}
+                      <div className={`min-w-0 max-w-[85%] ${isAgent ? "" : "order-first"}`}>
+                        <div
+                          className={`rounded-2xl px-4 py-3 ${
+                            isAgent
+                              ? "bg-teal-50 text-slate-800 ring-1 ring-teal-100"
+                              : "bg-slate-100 text-slate-800 ring-1 ring-slate-200"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="text-sm font-semibold text-slate-900">{message.name}</p>
+                            <span className="shrink-0 text-[11px] text-slate-400">{message.time}</span>
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-slate-600">
+                            {message.message}
+                          </p>
+                        </div>
                       </div>
-                      <span className="shrink-0 text-xs text-slate-400">{message.time}</span>
+                      {!isAgent ? (
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700">
+                          {message.senderBadge}
+                        </div>
+                      ) : null}
                     </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </article>
+                  )
+                })}
+              </div>
+            </article>
         </div>
 
       </div>

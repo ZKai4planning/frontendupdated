@@ -32,6 +32,7 @@ import {
 import { useUserIdentity } from "@/lib/use-user-identity"
 import { useUserProfile } from "@/lib/use-user-profile"
 import { useResolvedServiceSelection } from "@/lib/use-service-selection"
+import { buildServiceCartPayload, postServiceCart } from "@/lib/service-cart"
 import axiosInstance from "@/lib/axiosinstance"
 import { BorderBeam } from "@/components/ui/border-beam"
 import { ApplicantPropertyStepContent } from "@/components/dashboard-steps/eligibility/ApplicantPropertyStepContent"
@@ -4154,17 +4155,28 @@ function EligibilityCheckPage() {
     }
   }
 
-  const handleEligibilitySubmit = async () => {
-    if (hasSubmittedEligibility || isAnalyzing || isSavingDraft || isSavingStep || isLoadingEligibility) return
+    const handleEligibilitySubmit = async () => {
+      if (hasSubmittedEligibility || isAnalyzing || isSavingDraft || isSavingStep || isLoadingEligibility) return
 
     setSubmitError(null)
     setIsAnalyzing(true)
 
-    try {
-      const submittedProjectId = await upsertEligibilityProject("submitted")
-      const completedAt = new Date().toISOString()
+      try {
+        const submittedProjectId = await upsertEligibilityProject("submitted")
+        if (!userId) {
+          throw new Error("User ID is missing. Unable to sync the selected cart services.")
+        }
 
-      persistSelectedEligibilityProject(submittedProjectId, existingProjectStageId)
+        const serviceCartPayload = buildServiceCartPayload({
+          projectId: submittedProjectId,
+          userId,
+          formData: savedFormData,
+        })
+
+        await postServiceCart(serviceCartPayload)
+        const completedAt = new Date().toISOString()
+
+        persistSelectedEligibilityProject(submittedProjectId, existingProjectStageId)
       persistDashboardEligibilitySummary(submittedProjectId, savedFormData, {
         completedAt,
         isEligible: true,

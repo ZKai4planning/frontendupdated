@@ -5,6 +5,7 @@ import Sidebar from "../../components/sidebar"
 import DashboardHeader from "../../components/dashboard-header"
 import GetStarted from "../../components/onGetStarted"
 import HelpWidget from "../../components/helpwidget"
+import WhatsAppButton from "../../components/whatsppp-button"
 import { DashboardFooter } from "../../components/dashboard-footer"
 import { FiX } from "react-icons/fi"
 import { hydrateProjectFlowFromApi } from "@/lib/project-flow"
@@ -91,8 +92,9 @@ export default function DashboardLayout({
           </div>
         </>
       )}
- 
+
       <HelpWidget />
+      <WhatsAppButton />
     </div>
   )
 }

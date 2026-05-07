@@ -168,20 +168,6 @@ const buildProjectServiceSelection = (
   }
 }
 
-const resolveStageFromStatus = (status?: string | null) => {
-  const normalized = status?.toLowerCase() ?? ""
-
-  if (normalized.includes("final_quotation")) return "final-quotation"
-  if (normalized.includes("initial_quotation")) return "initial-quotation"
-  if (normalized.includes("consultant")) return "consultant"
-  if (normalized.includes("eligibility")) return "eligibility"
-  if (normalized.includes("payment")) return "payment"
-  if (normalized.includes("upload")) return "upload"
-  if (normalized.includes("review")) return "review"
-
-  return null
-}
-
 interface DashboardHeaderProps {
   breadcrumbs: Breadcrumb[]
   userName: string
@@ -387,25 +373,11 @@ export default function DashboardHeader({
 
       const detailedProject = extractProjectFromResponse(response.data) ?? project
       persistSelectedProject(detailedProject)
-
-      const stageRoute =
-        detailedProject.currentStage?.route ||
-        resolveStageFromStatus(detailedProject.status) ||
-        "overview"
-
-      router.push(
-        stageRoute === "overview"
-          ? "/dashboard"
-          : `/dashboard?stage=${stageRoute}`
-      )
     } catch {
-      const fallbackStage = resolveStageFromStatus(project.status) || "overview"
-      router.push(
-        fallbackStage === "overview"
-          ? "/dashboard"
-          : `/dashboard?stage=${fallbackStage}`
-      )
+      // Keep the selected project in context/storage even if the detail fetch fails.
     }
+
+    router.push("/dashboard")
   }
 
   const handleStartNewProject = () => {
