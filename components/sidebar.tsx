@@ -44,7 +44,7 @@ export default function Sidebar({
   return (
     <aside
       className={cn(
-        "flex h-full flex-col border-r border-white/10 bg-[#050B18] text-slate-200 shadow-[18px_0_48px_rgba(2,6,23,0.3)] transition-all duration-300",
+        "flex h-full flex-col border-r border-white/10 bg-[linear-gradient(180deg,rgba(5,11,24,0.98),rgba(9,18,38,0.95))] text-slate-200 shadow-[18px_0_48px_rgba(2,6,23,0.38)] backdrop-blur-xl transition-all duration-300",
         collapsed ? "w-20" : "w-64"
       )}
     >
@@ -93,19 +93,19 @@ export default function Sidebar({
                     ? "justify-center px-3 py-3"
                     : "gap-3 px-4 py-2",
                   isActive
-                    ? "bg-white/10 text-blue-300"
+                    ? "bg-[#135BEC]/18 text-blue-200"
                     : "hover:bg-white/5"
                 )}
               >
                 {isActive && (
-                  <span className="absolute right-0 top-0 h-full w-1 rounded-r-md bg-blue-400" />
+                  <span className="absolute right-0 top-0 h-full w-1 rounded-r-md bg-[#4F8DFF]" />
                 )}
  
                 <Icon
                   className={cn(
                     "text-lg",
                     isActive
-                      ? "text-blue-300"
+                      ? "text-blue-200"
                       : "text-slate-400 group-hover:text-slate-200"
                   )}
                 />
@@ -178,12 +178,12 @@ export default function Sidebar({
                         className={cn(
                           "relative block px-3 py-2 rounded-md text-sm transition",
                           childActive
-                            ? "bg-white/10 text-blue-300"
+                            ? "bg-[#135BEC]/18 text-blue-200"
                             : "text-slate-400 hover:bg-white/5"
                         )}
                       >
                         {childActive && (
-                          <span className="absolute right-0 top-0 h-full w-1 rounded-r-md bg-blue-400" />
+                          <span className="absolute right-0 top-0 h-full w-1 rounded-r-md bg-[#4F8DFF]" />
                         )}
                         {child.label}
                       </Link>
@@ -210,7 +210,7 @@ export default function Sidebar({
               <div className="flex flex-col items-center gap-2">
                 <div className="relative flex h-11 w-11 items-center justify-center rounded-full bg-white/10 shadow-sm">
                   {isProfileStatusLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                    <Loader2 className="h-4 w-4 animate-spin text-blue-300" />
                   ) : (
                     <span className="text-xs font-semibold text-blue-200">
                       {completionPercentage}%
@@ -236,7 +236,7 @@ export default function Sidebar({
 
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
                   <div
-                    className="h-full rounded-full bg-blue-400 transition-all duration-300"
+                    className="h-full rounded-full bg-[#4F8DFF] transition-all duration-300"
                     style={{ width: `${completionPercentage}%` }}
                   />
                 </div>
@@ -257,7 +257,7 @@ export default function Sidebar({
         {!collapsed && (
           <div className="border-t border-white/10 px-4 py-3">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-500 text-sm font-semibold text-white">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#135BEC] text-sm font-semibold text-white">
                 {initials}
               </div>
               <div className="min-w-0">

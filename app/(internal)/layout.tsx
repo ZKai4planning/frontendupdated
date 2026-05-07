@@ -42,7 +42,7 @@ export default function DashboardLayout({
       />
  
       {/* Content wrapper */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="relative flex flex-1 flex-col overflow-hidden">
  
  
  
@@ -68,6 +68,15 @@ export default function DashboardLayout({
  
         {/* Footer */}
         <DashboardFooter />
+
+        <div className="pointer-events-none absolute bottom-6 right-4 z-[80] flex flex-col items-end gap-3 sm:right-6">
+          <div className="pointer-events-auto">
+            <WhatsAppButton inline />
+          </div>
+          <div className="pointer-events-auto relative">
+            <HelpWidget inline />
+          </div>
+        </div>
       </div>
  
       {/* Get Started Modal */}
@@ -91,9 +100,6 @@ export default function DashboardLayout({
           </div>
         </>
       )}
-
-      <HelpWidget />
-      <WhatsAppButton />
     </div>
   )
 }

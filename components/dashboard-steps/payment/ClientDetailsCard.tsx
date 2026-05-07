@@ -313,21 +313,16 @@ function FormField({
 function FieldLabel({
   label,
   required = false,
-  optional = false,
   trailing,
 }: {
   label: string
   required?: boolean
-  optional?: boolean
   trailing?: ReactNode
 }) {
   return (
     <div className="mb-1.5 flex items-center gap-2">
       <label className="block text-sm font-medium text-slate-200">
         {label} {required ? <span className="text-red-400">*</span> : null}
-        {optional ? (
-          <span className="text-xs font-normal text-slate-400">(Optional)</span>
-        ) : null}
       </label>
       {trailing}
     </div>

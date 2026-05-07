@@ -473,7 +473,7 @@ export default function DashboardHeader({
   }
 
   return (
-    <header className="sticky top-0 z-50 h-18 w-full border-b border-white/10 bg-[#050B18]">
+    <header className="sticky top-0 z-50 h-18 w-full border-b border-white/10 bg-[linear-gradient(180deg,rgba(5,11,24,0.96),rgba(9,18,38,0.9))] backdrop-blur-xl">
       <div className="mx-auto max-w-8xl px-6">
         <div className="flex h-16 items-center justify-between">
 
@@ -520,7 +520,7 @@ export default function DashboardHeader({
                   <button
                     type="button"
                     onClick={handleStartNewProject}
-                    className="inline-flex items-center gap-2 rounded-xl bg-blue-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-400"
+                    className="inline-flex items-center gap-2 rounded-xl bg-[#135BEC] px-4 py-2 text-sm font-medium text-white shadow-lg shadow-blue-500/20 transition hover:bg-[#2A6BF0]"
                   >
                     <Folder className="h-4 w-4 shrink-0" />
                     <span>New Project</span>
@@ -533,7 +533,7 @@ export default function DashboardHeader({
                         void handleProjectSelect(singleProject)
                       }
                     }}
-                    className="flex max-w-[320px] items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100 transition hover:bg-white/10"
+                    className="flex max-w-[320px] items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100 backdrop-blur-xl transition hover:border-blue-400/30 hover:bg-white/10"
                     aria-label={`Open project ${selectedProjectLabel || singleProject?.projectId || ""}`}
                   >
                     <Folder className="h-4 w-4 shrink-0 text-blue-600" />
@@ -546,7 +546,7 @@ export default function DashboardHeader({
                     <button
                       type="button"
                       onClick={() => setIsProjectOpen((prev) => !prev)}
-                      className="flex max-w-70 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100 transition hover:bg-white/10"
+                      className="flex max-w-70 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100 backdrop-blur-xl transition hover:border-blue-400/30 hover:bg-white/10"
                       aria-haspopup="menu"
                       aria-expanded={isProjectOpen}
                     >
@@ -560,7 +560,7 @@ export default function DashboardHeader({
                     {isProjectOpen && (
                       <div
                         role="menu"
-                        className="absolute right-0 mt-3 w-80 rounded-xl border border-white/10 bg-[rgba(8,16,32,0.96)] shadow-lg backdrop-blur-xl"
+                        className="absolute right-0 mt-3 w-80 rounded-xl border border-white/10 bg-[linear-gradient(180deg,rgba(8,16,32,0.96),rgba(11,23,44,0.94))] shadow-2xl backdrop-blur-xl"
                       >
                         <div className="border-b border-white/10 px-4 py-3">
                           <p className="text-sm font-semibold text-white">Projects</p>
@@ -588,7 +588,7 @@ export default function DashboardHeader({
                               type="button"
                               role="menuitem"
                               onClick={() => handleProjectSelect(project)}
-                              className={`w-full px-4 py-3 text-left transition hover:bg-white/10 ${selectedProjectId === project.projectId ? "bg-blue-500/20" : ""
+                              className={`w-full px-4 py-3 text-left transition hover:bg-white/10 ${selectedProjectId === project.projectId ? "bg-[#135BEC]/20" : ""
                                 }`}
                             >
                               <span className="block truncate text-sm font-medium text-white">
@@ -610,7 +610,7 @@ export default function DashboardHeader({
                 <button
                   type="button"
                   onClick={handleStartNewProject}
-                  className="inline-flex items-center gap-2 rounded-xl bg-blue-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-400"
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#135BEC] px-4 py-2 text-sm font-medium text-white shadow-lg shadow-blue-500/20 transition hover:bg-[#2A6BF0]"
                 >
                   <Plus className="h-4 w-4 shrink-0" />
                   <span>New Project</span>
@@ -619,7 +619,7 @@ export default function DashboardHeader({
             </div>
 
             {/* Notification */}
-            <button className="relative rounded-xl border border-white/10 bg-white/5 p-2 transition hover:bg-white/10">
+            <button className="relative rounded-xl border border-white/10 bg-white/5 p-2 backdrop-blur-xl transition hover:border-blue-400/30 hover:bg-white/10">
               <Bell className="h-5 w-5 text-slate-200" />
               <span className="absolute -top-1 -right-1 h-2 w-2 rounded-full bg-blue-400" />
             </button>
@@ -640,7 +640,7 @@ export default function DashboardHeader({
               {isProfileOpen && (
                 <div
                   role="menu"
-                  className="absolute right-0 mt-3 w-56 rounded-xl border border-white/10 bg-[rgba(8,16,32,0.96)] shadow-lg backdrop-blur-xl"
+                  className="absolute right-0 mt-3 w-56 rounded-xl border border-white/10 bg-[linear-gradient(180deg,rgba(8,16,32,0.96),rgba(11,23,44,0.94))] shadow-2xl backdrop-blur-xl"
                 >
                   <div className="border-b border-white/10 px-4 py-3">
                     <p className="text-sm font-semibold text-white">

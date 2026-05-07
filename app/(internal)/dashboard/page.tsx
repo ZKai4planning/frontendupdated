@@ -1113,7 +1113,7 @@ function DashboardOverview() {
 
       {isQuoteDetailsOpen && recentQuotation ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-3xl bg-white p-6 shadow-xl sm:p-8">
+          <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-3xl bg-white p-4 shadow-xl sm:p-6 lg:p-8">
             <div className="flex flex-col gap-6 border-b border-slate-200 pb-6 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-700">
@@ -1194,8 +1194,8 @@ function DashboardOverview() {
               </div>
             </div>
 
-            <div className="mt-8 overflow-hidden rounded-2xl border border-slate-200">
-              <table className="w-full text-left text-sm">
+            <div className="mt-8 overflow-x-auto rounded-2xl border border-slate-200">
+              <table className="min-w-[640px] w-full text-left text-sm">
                 <thead className="bg-slate-100 text-slate-700">
                   <tr>
                     <th className="px-4 py-3 font-semibold">Service</th>
@@ -1229,7 +1229,7 @@ function DashboardOverview() {
               </table>
             </div>
 
-            <div className="mt-8 flex justify-end gap-3">
+            <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() => setIsQuoteDetailsOpen(false)}
@@ -1289,7 +1289,7 @@ function DashboardOverview() {
             </div>
           </div>
 
-          <div className="w-full max-w-sm rounded-[28px] bg-slate-800 p-5 text-white shadow-lg">
+          <div className="w-full rounded-[28px] bg-slate-800 p-5 text-white shadow-lg lg:max-w-sm">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-cyan-400/10 ring-1 ring-white/10">
@@ -1491,20 +1491,20 @@ function DashboardOverview() {
         )}
       </div>
 
-      <div className="mt-6 rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+      <div className="mt-6 rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,16,32,0.92),rgba(11,23,44,0.9))] p-6 shadow-sm backdrop-blur-xl sm:p-8">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
               Eligibility Requests
             </p>
-            <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+            <h3 className="mt-2 text-2xl font-semibold tracking-tight text-white">
               Submitted support requests and survey bookings
             </h3>
           </div>
 
-          <p className="max-w-2xl text-sm leading-6 text-slate-600">
+          <p className="max-w-2xl text-sm leading-6 text-slate-300">
             This section shows the support items and survey booking details captured from your
-            eligibility flow for <span className="font-semibold text-slate-900">{selectedProjectLabel}</span>.
+            eligibility flow for <span className="font-semibold text-white">{selectedProjectLabel}</span>.
           </p>
         </div>
 
@@ -1526,9 +1526,9 @@ function DashboardOverview() {
             ))}
           </div>
         ) : (
-          <div className="-mx-1 mt-6 flex snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2">
+          <div className="-mx-1 mt-6 flex flex-col gap-4 px-1 pb-2 lg:flex-row lg:snap-x lg:snap-mandatory lg:overflow-x-auto">
             {hasSubmittedCartItems ? (
-              <article className="min-w-[340px] flex-1 snap-start rounded-[28px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-blue-50 p-6 shadow-sm">
+              <article className="w-full flex-1 rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,16,32,0.88),rgba(11,23,44,0.86))] p-5 shadow-sm backdrop-blur-xl sm:p-6 lg:min-w-[340px] lg:snap-start">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
                     <ShoppingCart className="h-5 w-5" />
@@ -1539,10 +1539,10 @@ function DashboardOverview() {
                 </div>
 
                   <div className="mt-6">
-                  <p className="text-3xl font-semibold tracking-tight text-slate-900">
+                  <p className="text-3xl font-semibold tracking-tight text-white">
                     Services Added to Cart
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
                     Real cart services saved for this project are shown here.
                   </p>
                 </div>
@@ -1551,22 +1551,22 @@ function DashboardOverview() {
                   {submittedCartItems.map((item) => (
                     <div
                       key={item}
-                      className="flex items-center justify-between rounded-2xl bg-white/90 px-4 py-3 ring-1 ring-slate-200"
+                      className="flex items-center justify-between rounded-2xl bg-blue-500/10 px-4 py-3 ring-1 ring-blue-400/20 backdrop-blur-xl"
                     >
-                      <span className="text-sm font-medium text-slate-800">{item}</span>
-                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                      <span className="text-sm font-medium text-white">{item}</span>
+                      <span className="rounded-full bg-blue-500/15 px-3 py-1 text-xs font-semibold text-blue-200 ring-1 ring-blue-400/20">
                         Requested
                       </span>
                     </div>
                   ))}
                 </div>
 
-                <div className="mt-6 flex items-center justify-between rounded-2xl border border-blue-100 bg-blue-50/80 px-4 py-3">
+                <div className="mt-6 flex items-center justify-between rounded-2xl border border-blue-400/20 bg-blue-500/10 px-4 py-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
                       Submitted
                     </p>
-                    <p className="mt-1 text-sm text-slate-700">
+                    <p className="mt-1 text-sm text-slate-200">
                       {formatDashboardDate(cartSubmittedAt)}
                     </p>
                   </div>
@@ -1580,21 +1580,21 @@ function DashboardOverview() {
                 </div>
               </article>
             ) : (
-              <article className="min-w-[340px] flex-1 snap-start rounded-[28px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-blue-50 p-6 shadow-sm">
+              <article className="w-full flex-1 rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,16,32,0.88),rgba(11,23,44,0.86))] p-5 shadow-sm backdrop-blur-xl sm:p-6 lg:min-w-[340px] lg:snap-start">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
                     <ShoppingCart className="h-5 w-5" />
                   </div>
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                  <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-slate-200">
                     Preview
                   </span>
                 </div>
 
                 <div className="mt-6">
-                  <p className="text-3xl font-semibold tracking-tight text-slate-900">
+                  <p className="text-3xl font-semibold tracking-tight text-white">
                     Cart requests
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
                     This preview shows how submitted support requests will appear here.
                   </p>
                 </div>
@@ -1603,18 +1603,18 @@ function DashboardOverview() {
                   {DASHBOARD_CART_PREVIEW_ITEMS.map((item) => (
                     <div
                       key={item}
-                      className="flex items-center justify-between rounded-2xl bg-white/90 px-4 py-3 ring-1 ring-slate-200"
+                      className="flex items-center justify-between rounded-2xl bg-white/8 px-4 py-3 ring-1 ring-white/10 backdrop-blur-xl"
                     >
-                      <span className="text-sm font-medium text-slate-800">{item}</span>
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                      <span className="text-sm font-medium text-white">{item}</span>
+                      <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-slate-200">
                         Example
                       </span>
                     </div>
                   ))}
                 </div>
 
-                <div className="mt-6 rounded-2xl border border-dashed border-blue-200 bg-blue-50/70 px-4 py-3">
-                  <p className="text-sm text-blue-800">
+                <div className="mt-6 rounded-2xl border border-dashed border-blue-400/25 bg-blue-500/10 px-4 py-3">
+                  <p className="text-sm text-blue-200">
                     Submit step 5 of eligibility to replace this preview with live cart request data.
                   </p>
                 </div>
@@ -1622,7 +1622,7 @@ function DashboardOverview() {
             )}
 
             {hasDimensionSurveyBooking ? (
-              <article className="min-w-[340px] flex-1 snap-start rounded-[28px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-emerald-50 p-6 shadow-sm">
+              <article className="w-full flex-1 rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,16,32,0.88),rgba(11,23,44,0.86))] p-5 shadow-sm backdrop-blur-xl sm:p-6 lg:min-w-[340px] lg:snap-start">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
                     <Ruler className="h-5 w-5" />
@@ -1633,42 +1633,42 @@ function DashboardOverview() {
                 </div>
 
                 <div className="mt-6">
-                  <p className="text-3xl font-semibold tracking-tight text-slate-900">
+                  <p className="text-3xl font-semibold tracking-tight text-white">
                     Site measurement survey
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
                     Your booked Agent Z survey slot is recorded below.
                   </p>
                 </div>
 
                 <div className="mt-6 grid gap-3">
-                  <div className="flex items-center gap-3 rounded-2xl bg-white/90 px-4 py-4 ring-1 ring-slate-200">
+                  <div className="flex items-center gap-3 rounded-2xl bg-white/8 px-4 py-4 ring-1 ring-white/10 backdrop-blur-xl">
                     <CalendarDays className="h-5 w-5 text-emerald-700" />
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                         Survey date
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">
+                      <p className="mt-1 text-sm font-semibold text-white">
                         {dimensionSurveyBookingDate}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 rounded-2xl bg-white/90 px-4 py-4 ring-1 ring-slate-200">
+                  <div className="flex items-center gap-3 rounded-2xl bg-white/8 px-4 py-4 ring-1 ring-white/10 backdrop-blur-xl">
                     <Clock3 className="h-5 w-5 text-emerald-700" />
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                         Survey time
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">
+                      <p className="mt-1 text-sm font-semibold text-white">
                         {dimensionSurveyBookingTime}
                       </p>
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-6 flex items-center justify-between rounded-2xl border border-emerald-100 bg-emerald-50/80 px-4 py-3">
-                  <div className="flex items-center gap-2 text-sm font-medium text-emerald-800">
+                <div className="mt-6 flex items-center justify-between rounded-2xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3">
+                  <div className="flex items-center gap-2 text-sm font-medium text-emerald-200">
                     <CheckCircle2 className="h-4 w-4" />
                     Confirmed from your eligibility submission
                   </div>
@@ -1682,53 +1682,53 @@ function DashboardOverview() {
                 </div>
               </article>
             ) : (
-              <article className="min-w-[340px] flex-1 snap-start rounded-[28px] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-emerald-50 p-6 shadow-sm">
+              <article className="w-full flex-1 rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,16,32,0.88),rgba(11,23,44,0.86))] p-5 shadow-sm backdrop-blur-xl sm:p-6 lg:min-w-[340px] lg:snap-start">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
                     <Ruler className="h-5 w-5" />
                   </div>
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                  <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-slate-200">
                     Preview
                   </span>
                 </div>
 
                 <div className="mt-6">
-                  <p className="text-3xl font-semibold tracking-tight text-slate-900">
+                  <p className="text-3xl font-semibold tracking-tight text-white">
                     Site measurement survey
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
                     This preview shows how a confirmed dimensions survey booking will appear here.
                   </p>
                 </div>
 
                 <div className="mt-6 grid gap-3">
-                  <div className="flex items-center gap-3 rounded-2xl bg-white/90 px-4 py-4 ring-1 ring-slate-200">
+                  <div className="flex items-center gap-3 rounded-2xl bg-white/8 px-4 py-4 ring-1 ring-white/10 backdrop-blur-xl">
                     <CalendarDays className="h-5 w-5 text-emerald-700" />
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                         Survey date
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">
+                      <p className="mt-1 text-sm font-semibold text-white">
                         14 May 2026
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3 rounded-2xl bg-white/90 px-4 py-4 ring-1 ring-slate-200">
+                  <div className="flex items-center gap-3 rounded-2xl bg-white/8 px-4 py-4 ring-1 ring-white/10 backdrop-blur-xl">
                     <Clock3 className="h-5 w-5 text-emerald-700" />
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                         Survey time
                       </p>
-                      <p className="mt-1 text-sm font-semibold text-slate-900">
+                      <p className="mt-1 text-sm font-semibold text-white">
                         11:00 AM
                       </p>
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-6 rounded-2xl border border-dashed border-emerald-200 bg-emerald-50/70 px-4 py-3">
-                  <p className="text-sm text-emerald-800">
+                <div className="mt-6 rounded-2xl border border-dashed border-emerald-400/25 bg-emerald-500/10 px-4 py-3">
+                  <p className="text-sm text-emerald-200">
                     Book a dimensions survey in eligibility to replace this preview with live booking details.
                   </p>
                 </div>
@@ -1760,7 +1760,7 @@ function DashboardOverview() {
         <div className="mt-8 grid gap-6 lg:grid-cols-3">
             <article
               id="dashboard-chat-card"
-              className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm"
+              className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm sm:p-6"
             >
             <div className="flex items-start justify-between gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
@@ -1784,13 +1784,13 @@ function DashboardOverview() {
               {dashboardPaymentItems.map((item) => (
                 <div
                   key={item.label}
-                  className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3"
+                  className="flex items-center justify-between rounded-2xl bg-white/8 px-4 py-3 ring-1 ring-white/10 backdrop-blur-xl"
                 >
-                  <span className="text-sm text-slate-600">{item.label}</span>
+                  <span className="text-sm text-slate-300">{item.label}</span>
                   <span
                     className={`text-sm font-semibold ${item.value === "Paid"
-                      ? "rounded-full bg-emerald-100 px-3 py-1 text-emerald-700"
-                      : "text-slate-900"
+                      ? "rounded-full bg-emerald-500/15 px-3 py-1 text-emerald-200 ring-1 ring-emerald-400/20"
+                      : "text-white"
                       }`}
                   >
                     {item.value}
@@ -1799,17 +1799,17 @@ function DashboardOverview() {
               ))}
             </div>
 
-            <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+            <div className="mt-6 rounded-2xl border border-blue-400/20 bg-blue-500/10 p-4 backdrop-blur-xl">
                 <p className="text-xs font-semibold uppercase tracking-[0.16em] text-blue-700">
                   Recent Quote
                 </p>
                 {isLoadingQuotations ? (
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
                     Loading the latest quotation...
                   </p>
                 ) : recentQuotation ? (
                   <>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                    <p className="mt-2 text-sm leading-6 text-slate-300">
                       Quote ID {recentQuotation.quotationId} with {recentQuotation.totalServices} service
                       {recentQuotation.totalServices === 1 ? "" : "s"} totals {formatCurrency(recentQuotation.totalPayment)}.
                     </p>
@@ -1820,13 +1820,13 @@ function DashboardOverview() {
                       {recentQuotationServiceNames.slice(0, 3).map((serviceName) => (
                         <span
                           key={serviceName}
-                          className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-blue-100"
+                          className="rounded-full bg-white/8 px-3 py-1 text-xs font-medium text-white ring-1 ring-blue-400/20"
                         >
                           {serviceName}
                         </span>
                       ))}
                       {recentQuotationServiceNames.length > 3 ? (
-                        <span className="rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 ring-1 ring-blue-100">
+                        <span className="rounded-full bg-white/8 px-3 py-1 text-xs font-medium text-white ring-1 ring-blue-400/20">
                           +{recentQuotationServiceNames.length - 3} more
                         </span>
                       ) : null}
@@ -1835,7 +1835,7 @@ function DashboardOverview() {
                       <button
                         type="button"
                         onClick={() => setIsQuoteDetailsOpen(true)}
-                        className="inline-flex rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                        className="inline-flex rounded-xl border border-blue-400/20 bg-white/8 px-4 py-2 text-sm font-semibold text-blue-200 transition hover:bg-blue-500/15"
                       >
                         View Details
                       </button>
@@ -1847,13 +1847,13 @@ function DashboardOverview() {
                         {recentQuotationPdfLabel}
                       </button>
                     </div>
-                      <p className="mt-2 text-xs text-slate-500">
+                      <p className="mt-2 text-xs text-slate-400">
                         Updated {formatDashboardDate(recentQuotation.updatedAt ?? recentQuotation.createdAt)}
                       </p>
                   </>
                 ) : (
                   <>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                    <p className="mt-2 text-sm leading-6 text-slate-300">
                       The PDF link will appear here after the initial quotation is issued.
                     </p>
                     <a
@@ -1869,14 +1869,14 @@ function DashboardOverview() {
                 <button
                   type="button"
                   onClick={() => setShowPaymentRedirectPopup(true)}
-                  className="mt-4 ml-6 inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
+                  className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 sm:w-auto"
                 >
                   Make Payment
                 </button>
               </div>
             </article>
 
-          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <article className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,16,32,0.92),rgba(11,23,44,0.9))] p-6 shadow-sm backdrop-blur-xl">
             <div className="flex items-start justify-between gap-4">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
                 <FileText className="h-5 w-5" />
@@ -1887,16 +1887,16 @@ function DashboardOverview() {
             </div>
 
             <div className="mt-6">
-              <p className="text-4xl font-semibold tracking-tight text-slate-900">0 / 5</p>
-              <p className="mt-1 text-sm text-slate-600">Documents uploaded</p>
+              <p className="text-4xl font-semibold tracking-tight text-white">0 / 5</p>
+              <p className="mt-1 text-sm text-slate-300">Documents uploaded</p>
             </div>
 
             <div className="mt-6">
-              <div className="flex items-center justify-between text-sm font-medium text-slate-700">
+              <div className="flex items-center justify-between text-sm font-medium text-slate-300">
                 <span>Completion</span>
                 <span>0%</span>
               </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
                 <div className="h-full w-0 rounded-full bg-amber-500" />
               </div>
             </div>
@@ -1905,10 +1905,10 @@ function DashboardOverview() {
               {DASHBOARD_PENDING_DOCUMENTS.map((document) => (
                 <div
                   key={document}
-                  className="flex items-center justify-between rounded-2xl bg-amber-50/60 px-4 py-3"
+                  className="flex items-center justify-between rounded-2xl bg-amber-500/10 px-4 py-3 ring-1 ring-amber-400/20 backdrop-blur-xl"
                 >
-                  <span className="text-sm text-slate-700">{document}</span>
-                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-700 ring-1 ring-amber-200">
+                  <span className="text-sm text-white">{document}</span>
+                  <span className="rounded-full bg-white/8 px-3 py-1 text-xs font-semibold text-amber-200 ring-1 ring-amber-400/20">
                     Pending
                   </span>
                 </div>
@@ -1916,7 +1916,7 @@ function DashboardOverview() {
             </div>
           </article>
 
-          <article className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+          <article className="rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,16,32,0.92),rgba(11,23,44,0.9))] p-6 shadow-sm backdrop-blur-xl">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-teal-100 text-teal-700">
                   <MessageSquare className="h-5 w-5" />
@@ -1927,16 +1927,16 @@ function DashboardOverview() {
               </div>
 
               <div className="mt-6">
-                <p className="text-4xl font-semibold tracking-tight text-slate-900">{unreadChatCount}</p>
-                <p className="mt-1 text-sm text-slate-600">Unread chat messages from Agent X</p>
+                <p className="text-4xl font-semibold tracking-tight text-white">{unreadChatCount}</p>
+                <p className="mt-1 text-sm text-slate-300">Unread chat messages from Agent X</p>
               </div>
 
             <div className="mt-6">
-              <div className="flex items-center justify-between text-sm font-medium text-slate-700">
+              <div className="flex items-center justify-between text-sm font-medium text-slate-300">
                 <span>Response rate</span>
                 <span>92%</span>
               </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+              <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10">
                 <div className="h-full w-[92%] rounded-full bg-teal-600" />
               </div>
             </div>
@@ -1955,25 +1955,25 @@ function DashboardOverview() {
                           {message.senderBadge}
                         </div>
                       ) : null}
-                      <div className={`min-w-0 max-w-[85%] ${isAgent ? "" : "order-first"}`}>
+                      <div className={`min-w-0 max-w-[calc(100%-3.25rem)] sm:max-w-[85%] ${isAgent ? "" : "order-first"}`}>
                         <div
                           className={`rounded-2xl px-4 py-3 ${
                             isAgent
-                              ? "bg-teal-50 text-slate-800 ring-1 ring-teal-100"
-                              : "bg-slate-100 text-slate-800 ring-1 ring-slate-200"
+                              ? "bg-teal-500/10 text-slate-100 ring-1 ring-teal-400/20 backdrop-blur-xl"
+                              : "bg-white/8 text-slate-100 ring-1 ring-white/10 backdrop-blur-xl"
                           }`}
                         >
                           <div className="flex items-start justify-between gap-3">
-                            <p className="text-sm font-semibold text-slate-900">{message.name}</p>
+                            <p className="text-sm font-semibold text-white">{message.name}</p>
                             <span className="shrink-0 text-[11px] text-slate-400">{message.time}</span>
                           </div>
-                          <p className="mt-2 text-sm leading-6 text-slate-600">
+                          <p className="mt-2 text-sm leading-6 text-slate-300">
                             {message.message}
                           </p>
                         </div>
                       </div>
                       {!isAgent ? (
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-semibold text-slate-700">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-slate-200">
                           {message.senderBadge}
                         </div>
                       ) : null}
