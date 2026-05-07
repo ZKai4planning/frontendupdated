@@ -32,10 +32,34 @@ export default function DashboardLayout({
       mounted = false
     }
   }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const syncSidebarForViewport = () => {
+      setCollapsed(window.innerWidth < 1024)
+    }
+
+    syncSidebarForViewport()
+    window.addEventListener("resize", syncSidebarForViewport)
+
+    return () => {
+      window.removeEventListener("resize", syncSidebarForViewport)
+    }
+  }, [])
  
   return (
     <div className="internal-shell flex h-screen overflow-hidden">
       {/* Sidebar */}
+      {!collapsed ? (
+        <button
+          type="button"
+          aria-label="Close sidebar overlay"
+          onClick={() => setCollapsed(true)}
+          className="fixed inset-0 z-30 bg-black/40 lg:hidden"
+        />
+      ) : null}
+
       <Sidebar
         collapsed={collapsed}
         onGetStarted={() => setShowGetStarted(true)}
@@ -87,11 +111,11 @@ export default function DashboardLayout({
             onClick={() => setShowGetStarted(false)}
           />
  
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="relative">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="relative w-full max-w-xl">
               <button
                 onClick={() => setShowGetStarted(false)}
-                className="absolute -top-3 -right-3 bg-black text-white p-2 rounded-full"
+                className="absolute -top-3 right-3 rounded-full bg-black p-2 text-white sm:-right-3"
               >
                 <FiX size={14} />
               </button>

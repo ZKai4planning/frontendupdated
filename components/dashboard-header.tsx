@@ -473,12 +473,12 @@ export default function DashboardHeader({
   }
 
   return (
-    <header className="sticky top-0 z-50 h-18 w-full border-b border-white/10 bg-[linear-gradient(180deg,rgba(5,11,24,0.96),rgba(9,18,38,0.9))] backdrop-blur-xl">
-      <div className="mx-auto max-w-8xl px-6">
-        <div className="flex h-16 items-center justify-between">
+    <header className="sticky top-0 z-30 w-full border-b border-white/10 bg-[linear-gradient(180deg,rgba(5,11,24,0.96),rgba(9,18,38,0.9))] backdrop-blur-xl">
+      <div className="mx-auto max-w-8xl px-4 sm:px-6">
+        <div className="flex min-h-16 flex-wrap items-center justify-between gap-4 py-3">
 
           {/* ================= LEFT ================= */}
-          <div className="flex items-center gap-6">
+          <div className="flex min-w-0 items-center gap-4 sm:gap-6">
 
             {/* Sidebar Toggle */}
             <button
@@ -494,7 +494,7 @@ export default function DashboardHeader({
             </button>
 
             {breadcrumbTrail.length > 0 ? (
-              <nav className="hidden items-center gap-2 text-sm text-slate-400 md:flex">
+              <nav className="hidden min-w-0 items-center gap-2 text-sm text-slate-400 md:flex">
                 {breadcrumbTrail.map((crumb, index) => (
                   <div key={`${crumb.label}-${index}`} className="flex items-center gap-2">
                     {index > 0 ? <span>/</span> : null}
@@ -512,10 +512,10 @@ export default function DashboardHeader({
           </div>
 
           {/* ================= RIGHT ================= */}
-          <div className="flex items-center gap-6">
+          <div className="flex flex-1 flex-wrap items-center justify-end gap-3 sm:gap-4 lg:flex-none">
             {/* Project Selector */}
-            <div className="flex items-center gap-3">
-              <div className="relative" ref={projectRef}>
+            <div className="flex flex-wrap items-center justify-end gap-3">
+              <div className="relative max-w-full" ref={projectRef}>
                 {!hasProjects ? (
                   <button
                     type="button"
@@ -533,7 +533,7 @@ export default function DashboardHeader({
                         void handleProjectSelect(singleProject)
                       }
                     }}
-                    className="flex max-w-[320px] items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100 backdrop-blur-xl transition hover:border-blue-400/30 hover:bg-white/10"
+                    className="flex max-w-full items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100 backdrop-blur-xl transition hover:border-blue-400/30 hover:bg-white/10 sm:max-w-[320px]"
                     aria-label={`Open project ${selectedProjectLabel || singleProject?.projectId || ""}`}
                   >
                     <Folder className="h-4 w-4 shrink-0 text-blue-600" />
@@ -546,7 +546,7 @@ export default function DashboardHeader({
                     <button
                       type="button"
                       onClick={() => setIsProjectOpen((prev) => !prev)}
-                      className="flex max-w-70 items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100 backdrop-blur-xl transition hover:border-blue-400/30 hover:bg-white/10"
+                      className="flex max-w-full items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2 text-sm text-slate-100 backdrop-blur-xl transition hover:border-blue-400/30 hover:bg-white/10 sm:max-w-[280px]"
                       aria-haspopup="menu"
                       aria-expanded={isProjectOpen}
                     >
@@ -560,7 +560,7 @@ export default function DashboardHeader({
                     {isProjectOpen && (
                       <div
                         role="menu"
-                        className="absolute right-0 mt-3 w-80 rounded-xl border border-white/10 bg-[linear-gradient(180deg,rgba(8,16,32,0.96),rgba(11,23,44,0.94))] shadow-2xl backdrop-blur-xl"
+                        className="absolute right-0 mt-3 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-white/10 bg-[linear-gradient(180deg,rgba(8,16,32,0.96),rgba(11,23,44,0.94))] shadow-2xl backdrop-blur-xl"
                       >
                         <div className="border-b border-white/10 px-4 py-3">
                           <p className="text-sm font-semibold text-white">Projects</p>

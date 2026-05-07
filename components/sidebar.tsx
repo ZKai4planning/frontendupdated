@@ -44,8 +44,10 @@ export default function Sidebar({
   return (
     <aside
       className={cn(
-        "flex h-full flex-col border-r border-white/10 bg-[linear-gradient(180deg,rgba(5,11,24,0.98),rgba(9,18,38,0.95))] text-slate-200 shadow-[18px_0_48px_rgba(2,6,23,0.38)] backdrop-blur-xl transition-all duration-300",
-        collapsed ? "w-20" : "w-64"
+        "fixed inset-y-0 left-0 z-40 flex h-full flex-col border-r border-white/10 bg-[linear-gradient(180deg,rgba(5,11,24,0.98),rgba(9,18,38,0.95))] text-slate-200 shadow-[18px_0_48px_rgba(2,6,23,0.38)] backdrop-blur-xl transition-all duration-300 lg:static lg:z-auto",
+        collapsed
+          ? "-translate-x-full lg:translate-x-0 lg:w-20"
+          : "translate-x-0 w-[85vw] max-w-xs lg:w-64"
       )}
     >
       {/* Header */}

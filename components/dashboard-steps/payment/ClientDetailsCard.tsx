@@ -313,10 +313,12 @@ function FormField({
 function FieldLabel({
   label,
   required = false,
+  optional = false,
   trailing,
 }: {
   label: string
   required?: boolean
+  optional?: boolean
   trailing?: ReactNode
 }) {
   return (
