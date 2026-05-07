@@ -29,8 +29,6 @@ export function UtilitiesConsentsStepContent({
     return null
   }
 
-  const otherOwnersDetailsLabel =
-    "Names & Addresses of Other Owners (if Certificate B, C or D)"
   const safetyComplianceFields = [
     {
       label: "Do you currently have smoke alarms installed?",
@@ -114,60 +112,48 @@ export function UtilitiesConsentsStepContent({
       <div className="grid grid-cols-2 gap-6 mb-6">
         <SelectField
           label="Water Supply"
-          options={["Mains connected", "Borehole / private supply", "Not applicable", "Ask Agent Z"]}
+          options={[
+            "Mains connected",
+            "Borehole / private supply",
+            "Not applicable",
+            "Don't know",
+            "Ask Agent Z",
+          ]}
           consultTrigger="We can provide an infrastructure assessment."
         />
         <SelectField
           label="Sewage / Drainage"
-          options={["Mains sewer", "Septic tank", "Package treatment plant", "Not applicable", "Ask Agent Z"]}
+          options={[
+            "Mains sewer",
+            "Septic tank",
+            "Package treatment plant",
+            "Not applicable",
+            "Don't know",
+            "Ask Agent Z",
+          ]}
           consultTrigger="We can provide a drainage strategy."
         />
         <SelectField
           label="Surface Water Drainage"
-          options={["Connected to sewer", "Soakaway", "Watercourse", "SuDS proposed", "Ask Agent Z"]}
+          options={[
+            "Connected to sewer",
+            "Soakaway",
+            "Watercourse",
+            "SuDS proposed",
+            "Don't know",
+            "Ask Agent Z",
+          ]}
           consultTrigger="We can provide a Surface Water Drainage Strategy."
         />
         <SelectField
           label="Existing Waste Arrangements"
-          options={["Kerbside collection", "Communal bins", "Other", "Ask Agent Z"]}
+          options={["Kerbside collection", "Communal bins", "Other", "Don't know", "Ask Agent Z"]}
         />
         <RadioGroupField
           label="Renewable energy installations proposed?"
           options={["Yes", "No", "Ask Agent Z"]}
         />
         <Input label="Details of Renewable / Energy Measures (if applicable)" />
-      </div>
-
-      <SectionHeading>Ownership Certificate</SectionHeading>
-      <div className="grid grid-cols-2 gap-6 mb-6">
-        <SelectField
-          label="Which Ownership Certificate applies?"
-          options={[
-            "Certificate A - sole owner",
-            "Certificate B - known other owner(s), notices served",
-            "Certificate C - agricultural tenants, notices served",
-            "Certificate D - owner(s) unknown, notice published",
-            "Ask Agent Z / need advice",
-          ]}
-          consultTrigger="We can handle certificate notices and land registry checks on your behalf."
-        />
-        <div className="col-span-2">
-          <FieldLabel
-            label={otherOwnersDetailsLabel}
-            wrapperClassName="mb-1"
-          />
-          <textarea
-            rows={2}
-            placeholder="List any other known owners or agricultural tenants..."
-            className="w-full rounded-xl border px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
-            value={asStringValue(savedFormData[otherOwnersDetailsLabel])}
-            onChange={e =>
-              updateSection("eligibility", {
-                formData: { ...savedFormData, [otherOwnersDetailsLabel]: e.target.value },
-              })
-            }
-          />
-        </div>
       </div>
 
       <SectionHeading>Additional Consents Required</SectionHeading>

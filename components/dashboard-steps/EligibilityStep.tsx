@@ -831,7 +831,7 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
       ],
     },
     {
-      label: "Alternate address for correspondence?",
+      label: "Is this address same as site address?",
       paths: [
         ["applicantAndProperty", "applicantDetails", "useAlternateCorrespondenceAddress"],
         ["applicantAndProperty", "applicantDetails", "correspondenceAddress", "enabled"],
@@ -847,6 +847,12 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
       label: "Correspondence Address Line 2",
       paths: [
         ["applicantAndProperty", "applicantDetails", "correspondenceAddress", "line2"],
+      ],
+    },
+    {
+      label: "Correspondence Council",
+      paths: [
+        ["applicantAndProperty", "applicantDetails", "correspondenceAddress", "council"],
       ],
     },
     {
@@ -1349,6 +1355,11 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
     setEligibilityFormValue(formData, label, getFirstPathValue(record, paths), mode)
   })
 
+  if (typeof formData["Is this address same as site address?"] === "string") {
+    formData["Is this address same as site address?"] =
+      isYesLikeValue(formData["Is this address same as site address?"]) ? "No" : "Yes"
+  }
+
   if (typeof formData["Date (dd/mm/yyyy)"] === "string") {
     formData["Date (dd/mm/yyyy)"] = formatSignedDateForDisplay(formData["Date (dd/mm/yyyy)"])
   }
@@ -1383,6 +1394,11 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
   setMissingValue("Phone Number", legacyContactDetails.phoneNumber)
 
   const legacyAddressLines = splitLegacySiteAddress(legacySiteAddress)
+  setMissingValue("Correspondence Address Line 1", legacyAddressLines.line1)
+  setMissingValue("Correspondence Address Line 2", legacyAddressLines.line2)
+  setMissingValue("Correspondence Postcode", legacyPostcode)
+  setMissingValue("Correspondence Council", legacyCouncil)
+  setMissingValue("Correspondence Council", formData["Which council have you applied for?"])
   setMissingValue("Site Address Line 1", legacyAddressLines.line1)
   setMissingValue("Site Address Line 2", legacyAddressLines.line2)
   setMissingValue("Postcode", legacyPostcode)
@@ -1744,15 +1760,29 @@ const buildEligibilityStepPayload = (
   const buildCorrespondenceAddress = () => {
     const line1 = getValue("Correspondence Address Line 1")
     const line2 = getValue("Correspondence Address Line 2")
+    const council = getValue("Correspondence Council")
     const postcode = getValue("Correspondence Postcode")
 
-    if (![line1, line2, postcode].some(Boolean)) {
+    if (![line1, line2, council, postcode].some(Boolean)) {
       return undefined
     }
 
-    return { line1, line2, postcode }
+    return { line1, line2, council, postcode }
   }
   const buildApplicantSiteAddress = () => {
+    if (getBooleanFieldValue(formValues, "Is this address same as site address?")) {
+      const correspondenceAddress = buildCorrespondenceAddress()
+      if (!correspondenceAddress) {
+        return undefined
+      }
+
+      return {
+        line1: correspondenceAddress.line1,
+        line2: correspondenceAddress.line2,
+        postcode: correspondenceAddress.postcode,
+      }
+    }
+
     const line1 = getValue("Site Address Line 1")
     const line2 = getValue("Site Address Line 2")
     const postcode = getValue("Postcode")
@@ -1776,10 +1806,8 @@ const buildEligibilityStepPayload = (
             countryCode: getValue("Country Code"),
             phoneNumber: getValue("Phone Number"),
             siteAddress: buildApplicantSiteAddress(),
-            useAlternateCorrespondenceAddress: getBooleanFieldValue(
-              formValues,
-              "Alternate address for correspondence?"
-            ),
+            useAlternateCorrespondenceAddress:
+              !getBooleanFieldValue(formValues, "Is this address same as site address?"),
             correspondenceAddress: buildCorrespondenceAddress(),
           },
           // agentDetails: {
@@ -2152,10 +2180,11 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
   "Site Address Line 1": "Primary address line for the property where the works are proposed.",
   "Site Address Line 2": "Optional second address line for the property.",
   "Postcode": "Postcode helps us identify planning constraints in your area.",
-  "Alternate address for correspondence?":
-    "Choose Yes if planning correspondence should be sent to a different address.",
+  "Is this address same as site address?":
+    "Choose Yes if the site address is the same as the correspondence address.",
   "Correspondence Address Line 1": "Primary address line for correspondence.",
   "Correspondence Address Line 2": "Optional second address line for correspondence.",
+  "Correspondence Council": "Council for the correspondence address.",
   "Correspondence Postcode": "Postcode for the correspondence address.",
   Council:
     "Local planning authority or council for this property and any related previous application.",
@@ -2307,14 +2336,15 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Applicant Last Name",
   "Email Address",
   "Phone Number",
+  "Correspondence Address Line 1",
+  "Correspondence Address Line 2",
+  "Correspondence Council",
+  "Correspondence Postcode",
+  "Is this address same as site address?",
   "Site Address Line 1",
   "Site Address Line 2",
   "Council",
   "Postcode",
-  "Alternate address for correspondence?",
-  "Correspondence Address Line 1",
-  "Correspondence Address Line 2",
-  "Correspondence Postcode",
   // "Are you using a planning agent?",
   // "Agent Name",
   // "Agent Address",
@@ -2327,6 +2357,7 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Is this project similar to the previous application or different this time?",
   "Property Type",
   "Ownership Status",
+  "Names & Addresses of Other Owners (if Certificate B, C or D)",
   "Are you planning any building works?",
   "Has the property already been extended before?",
   "How is the property currently used?",
@@ -2393,7 +2424,6 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Renewable energy installations proposed?",
   "Details of Renewable / Energy Measures (if applicable)",
   // "Which Ownership Certificate applies?",
-  "Names & Addresses of Other Owners (if Certificate B, C or D)",
   "Additional Consents",
   "Community consultation undertaken?",
   "The information given in this application is correct and accurate to the best of my knowledge.",
@@ -2490,12 +2520,13 @@ const isCompletionCheckRelevant = (
 
   if (
     [
-      "Correspondence Address Line 1",
-      "Correspondence Address Line 2",
-      "Correspondence Postcode",
+      "Site Address Line 1",
+      "Site Address Line 2",
+      "Council",
+      "Postcode",
     ].includes(label)
   ) {
-    return isYesLikeValue(formData["Alternate address for correspondence?"])
+    return !isYesLikeValue(formData["Is this address same as site address?"])
   }
 
   if (
@@ -4020,6 +4051,10 @@ function EligibilityCheckPage() {
       "Phone Number",
       userProfile?.phone.number || paymentCustomerDetails?.phoneNumber || ""
     )
+    setMissingValue("Correspondence Address Line 1", siteAddressLine1)
+    setMissingValue("Correspondence Address Line 2", siteAddressLine2)
+    setMissingValue("Correspondence Postcode", userProfile?.address.postalCode || paymentPostcode)
+    setMissingValue("Correspondence Council", userProfile?.council || "")
     setMissingValue("Site Address Line 1", siteAddressLine1)
     setMissingValue("Site Address Line 2", siteAddressLine2)
     setMissingValue("Postcode", userProfile?.address.postalCode || paymentPostcode)
@@ -4385,15 +4420,25 @@ function EligibilityCheckPage() {
                         <span className="font-medium text-slate-700">{selectedServiceAppliedName}</span>.
                       </p>
                     </div>
-                    {!isReviewOnly && (
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => setIsEligibilityFormVisible(false)}
-                        className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                        disabled={step === 1}
+                        onClick={prevStep}
+                        className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
                       >
-                        Hide form
+                        ← Back
                       </button>
-                    )}
+                      {!isReviewOnly && (
+                        <button
+                          type="button"
+                          onClick={() => setIsEligibilityFormVisible(false)}
+                          className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                        >
+                          Hide form
+                        </button>
+                      )}
+                    </div>
                   </div>
 
               {/* Step tabs */}

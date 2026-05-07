@@ -125,14 +125,6 @@ export function WorksMaterialsStepContent({
           label="Number of bathrooms / shower rooms?"
           placeholder="Enter number of bathrooms or shower rooms"
         />
-        <RadioGroupField
-          label="Is there a communal kitchen?"
-          options={["Yes", "No", "Planning to create one / Ask Agent Z Can help you"]}
-        />
-        <RadioGroupField
-          label="Is any lounge/dining room proposed as a bedroom?"
-          options={["Yes", "No"]}
-        />
       </div>
 
       <SectionHeading>Description of Works</SectionHeading>

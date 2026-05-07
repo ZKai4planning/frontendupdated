@@ -215,6 +215,8 @@ export function ApplicantPropertyStepContent({
   asStringValue,
   components,
 }: EligibilityStepContentProps) {
+  const otherOwnersDetailsLabel =
+    "Names & Addresses of Other Owners (if Certificate B, C or D)"
   const { data } = useProject()
   const {
     SectionHeading,
@@ -229,7 +231,7 @@ export function ApplicantPropertyStepContent({
 
   const previousCouncilApplication = savedFormData["have you previously applied to any council?"]
   const useAlternateCorrespondenceAddress =
-    asStringValue(savedFormData["Alternate address for correspondence?"]).trim() === "Yes"
+    asStringValue(savedFormData["Is this address same as site address?"]).trim() === "No"
   const usesPlanningAgent =
     asStringValue(savedFormData["Are you using a planning agent?"]).trim() === "Yes"
   const siteAddressLine1 = asStringValue(savedFormData["Site Address Line 1"]).trim()
@@ -468,42 +470,47 @@ export function ApplicantPropertyStepContent({
           <Input label="Email Address" />
           <PhoneNumberField />
         </div>
-        <div className="grid gap-6 md:grid-cols-3">
-          <div className="md:col-span-2">
-            <Input label="Site Address Line 1" />
+        <div className="grid gap-6 md:grid-cols-2">
+          <div className="md:col-span-2 grid gap-6">
+            <div className="grid gap-6 md:grid-cols-2">
+              <Input label="Correspondence Address Line 1" />
+              <Input label="Correspondence Address Line 2" />
+            </div>
+            <div className="grid gap-6 md:grid-cols-2">
+              <Input label="Correspondence Council" />
+              <Input
+                label="Correspondence Postcode"
+                autocompleteKind="postcode"
+              />
+            </div>
           </div>
-          <Input label="Site Address Line 2" />
-        </div>
-        <div className="grid gap-6 md:grid-cols-2">
-          <Input label="Council" />
-          <Input
-            label="Postcode"
-            autocompleteKind="postcode"
-            // actionLabel={isGettingAddress ? "Getting..." : "Get address"}
-            onAction={handleGetAddress}
-            actionDisabled={!siteAddressLine1 || !postcode || isGettingAddress}
-            actionOpensAgentSidebar={false}
-          />
-        </div>
-        <div className="grid gap-6 md:grid-cols-2">
           <div className="md:col-span-2">
             <RadioGroupField
-              label="Alternate address for correspondence?"
+              label="Is this address same as site address?"
               options={["Yes", "No"]}
-              tooltip="Choose Yes if correspondence should be sent to a different address."
+              tooltip="Choose Yes if the site address is the same as the correspondence address."
             />
           </div>
 
           {useAlternateCorrespondenceAddress && (
             <div className="md:col-span-2 grid gap-6 animate-in fade-in duration-300">
-              <div className="grid gap-6 md:grid-cols-2">
-                <Input label="Correspondence Address Line 1" />
-                <Input label="Correspondence Address Line 2" />
+              <div className="grid gap-6 md:grid-cols-3">
+                <div className="md:col-span-2">
+                  <Input label="Site Address Line 1" />
+                </div>
+                <Input label="Site Address Line 2" />
               </div>
-              <Input
-                label="Correspondence Postcode"
-                autocompleteKind="postcode"
-              />
+              <div className="grid gap-6 md:grid-cols-2">
+                <Input label="Council" />
+                <Input
+                  label="Postcode"
+                  autocompleteKind="postcode"
+                  // actionLabel={isGettingAddress ? "Getting..." : "Get address"}
+                  onAction={handleGetAddress}
+                  actionDisabled={!siteAddressLine1 || !postcode || isGettingAddress}
+                  actionOpensAgentSidebar={false}
+                />
+              </div>
             </div>
           )}
         </div>
@@ -619,6 +626,26 @@ export function ApplicantPropertyStepContent({
           ]}
           consultTrigger="We can assist with land registry checks."
         />
+        <div className="col-span-2">
+          <FieldLabel
+            label={otherOwnersDetailsLabel}
+            wrapperClassName="mb-1"
+          />
+          <textarea
+            rows={2}
+            placeholder="List any other known owners or agricultural tenants..."
+            className="w-full rounded-xl border px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
+            value={asStringValue(savedFormData[otherOwnersDetailsLabel])}
+            onChange={e =>
+              updateSection("eligibility", {
+                formData: {
+                  ...savedFormData,
+                  [otherOwnersDetailsLabel]: e.target.value,
+                },
+              })
+            }
+          />
+        </div>
         <CheckboxGroup
           label="Are you planning any building works?"
           options={[
@@ -685,6 +712,14 @@ export function ApplicantPropertyStepContent({
         <RadioGroupField
           label="Will rooms be rented individually?"
           options={["Yes", "No", "Don't know / Ask Agent Z"]}
+        />
+        <RadioGroupField
+          label="Is there a communal kitchen?"
+          options={["Yes", "No", "Planning to create one / Ask Agent Z Can help you"]}
+        />
+        <RadioGroupField
+          label="Is any lounge/dining room proposed as a bedroom?"
+          options={["Yes", "No"]}
         />
       </div>
     </>
