@@ -68,7 +68,7 @@ export const teamShowcaseMembers = [
       "Mike is a accomplished entrepreneur and qualified mechanical engineer whose career spans sales, marketing and project management.  Based in Norfolk, he has spent more than 20 years in property development—leading new builds, renovations and design projects while navigating planning, building control and compliance.  He champions sustainability, integrating heat pumps, solar power and other technologies to ensure every project meets modern standards of efficiency and quality.",
     name: "Mike",
     designation: " Partner - Construction & Regulations Director",
-    src: "/Team².png",
+    src: "/Team2.png",
     roleSummary:
       "Works alongside the founder to coordinate timelines, site progress, and practical decision-making across high-detail residential renovation projects.",
     focusAreas: [

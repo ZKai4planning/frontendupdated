@@ -34,16 +34,15 @@ export default function DashboardLayout({
   }, [])
  
   return (
-    <div className="h-screen flex bg-gray-100 overflow-hidden">
+    <div className="internal-shell flex h-screen overflow-hidden">
       {/* Sidebar */}
       <Sidebar
         collapsed={collapsed}
-        onToggle={() => setCollapsed((p) => !p)}
         onGetStarted={() => setShowGetStarted(true)}
       />
  
       {/* Content wrapper */}
-      <div className="flex flex-col flex-1 overflow-hidden">
+      <div className="flex flex-1 flex-col overflow-hidden">
  
  
  
@@ -62,7 +61,7 @@ export default function DashboardLayout({
         {/* Page Content testing */}
         <main
           id="dashboard-scroll-root"
-          className="flex-1 overflow-y-auto transition-all duration-300"
+          className="relative flex-1 overflow-y-auto transition-all duration-300"
         >
           {children}
         </main>
