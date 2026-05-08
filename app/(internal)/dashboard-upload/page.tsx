@@ -101,7 +101,7 @@ export default function UploadDocumentsDashboard() {
       <div className="flex items-start justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">
-            Welcome back, {displayName}
+            Welcome, {displayName}
           </h1>
 
           <p className="text-xl text-slate-600 mt-2">

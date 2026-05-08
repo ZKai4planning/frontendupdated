@@ -2928,7 +2928,7 @@ function AskAgentUsageSummaryButton({
             </div>
             <div className="text-left">
               <p className="text-sm font-semibold text-white">
-                Ask Agent Z credits {usedAskAgentCount}/{maxAskAgentUses}
+                Ask Agent Z credits {maxAskAgentUses}
               </p>
               <p className="text-[11px] text-slate-300">
                 {totalAskAgentTouchpoints} buttons in this form
@@ -5029,7 +5029,7 @@ function EligibilityCheckPage() {
       {/* HEADER */}
       <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Welcome back, {displayName}</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Welcome, {displayName}</h1>
           <p className="text-xl text-slate-600 mt-2">
             Customer ID: <span className="font-medium"> {userId} </span>
           </p>

@@ -231,7 +231,7 @@ export function ClientDetailsCard({
             onClick={onSave}
             className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isSavingProfile ? "Saving..." : "Save Client Details"}
+            {isSavingProfile ? "Saving..." : "Save Details"}
           </button>
         </div>
       ) : null}
