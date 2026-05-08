@@ -45,7 +45,7 @@ export function SiteConstraintsStepContent({
       <SectionHeading>Trees, Hedges & Landscaping</SectionHeading>
       <div className="mb-6 grid grid-cols-2 gap-6">
         <RadioGroupField
-          label="Trees with TPO on or near site?"
+          label="Trees with TPO (Tree Preservation Order) on or near site?"
           options={["Yes", "No"]}
           consultTrigger="An Tree Report (BS5837) may be required. We can arrange this for you."
         />

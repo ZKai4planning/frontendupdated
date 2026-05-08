@@ -2567,11 +2567,13 @@ const isCompletionCheckSatisfied = ({
   formData,
   uploadedFiles,
   signatureFile,
+  signaturePreviewUrl,
 }: {
   label: string
   formData: EligibilityFormValues
   uploadedFiles: EligibilityFileMap
   signatureFile: File | null
+  signaturePreviewUrl?: string | null
 }) => {
   if (label === "Phone Number") {
     return (
@@ -2595,7 +2597,7 @@ const isCompletionCheckSatisfied = ({
   }
 
   if (label === "Digital Signature") {
-    return Boolean(signatureFile)
+    return Boolean(signatureFile || signaturePreviewUrl)
   }
 
   if (label in ELIGIBILITY_DECLARATION_FIELD_KEY_BY_LABEL) {
@@ -2616,10 +2618,12 @@ const getMissingEligibilityFields = ({
   formData,
   uploadedFiles,
   signatureFile,
+  signaturePreviewUrl,
 }: {
   formData: EligibilityFormValues
   uploadedFiles: EligibilityFileMap
   signatureFile: File | null
+  signaturePreviewUrl?: string | null
 }) =>
   ELIGIBILITY_QUESTION_ORDER.filter((label) => {
     if (!isCompletionCheckRelevant(label, formData)) {
@@ -2631,6 +2635,7 @@ const getMissingEligibilityFields = ({
       formData,
       uploadedFiles,
       signatureFile,
+      signaturePreviewUrl,
     })
   })
 
@@ -3859,9 +3864,26 @@ function EligibilityCheckPage() {
   const formCardRef = useRef<HTMLDivElement | null>(null)
 
   const TOTAL_STEPS = 5
+  const declarationCompletionLabels = [
+    ...ELIGIBILITY_DECLARATION_FIELDS.map(({ label }) => label),
+    "Full Name of Signatory",
+    "Date (dd/mm/yyyy)",
+    "Capacity (Owner / Agent / Other)",
+    "Digital Signature",
+  ]
   const showAgentSidebar = Boolean(agentSidebar)
   const shouldShowEligibilitySidePanel =
     !isEligibilityFormVisible || showAgentSidebar || showVerification
+  const missingDeclarationFields = declarationCompletionLabels.filter((label) => (
+    !isCompletionCheckSatisfied({
+      label,
+      formData: savedFormData,
+      uploadedFiles,
+      signatureFile,
+      signaturePreviewUrl,
+    })
+  ))
+  const isDeclarationsComplete = missingDeclarationFields.length === 0
 
   const nextStep = () => setStep(prev => (prev < TOTAL_STEPS ? ((prev + 1) as Step) : prev))
   const prevStep = () => setStep(prev => (prev > 1 ? ((prev - 1) as Step) : prev))
@@ -3968,9 +3990,9 @@ function EligibilityCheckPage() {
           setStep(normalized.step as Step)
         }
 
-        if (normalized.completedAt || normalized.isEligible) {
+        if (normalized.completedAt) {
           setShowVerification(true)
-          setIsEligibilityFormVisible(true)
+          setIsEligibilityFormVisible(false)
         }
       } catch {
         if (!isCancelled) {
@@ -4184,10 +4206,14 @@ function EligibilityCheckPage() {
     }
   }
 
-    const handleEligibilitySubmit = async () => {
+  const handleEligibilitySubmit = async () => {
       if (hasSubmittedEligibility || isAnalyzing || isSavingDraft || isSavingStep || isLoadingEligibility) return
 
     setSubmitError(null)
+    if (!isDeclarationsComplete) {
+      setSubmitError("Complete all Review & Declarations fields, including the digital signature, before submitting.")
+      return
+    }
     setIsAnalyzing(true)
 
       try {
@@ -4213,6 +4239,7 @@ function EligibilityCheckPage() {
 
       setAgentSidebar(null)
       setShowVerification(true)
+      setIsEligibilityFormVisible(false)
       updateSection("eligibility", {
         ...(data.eligibility || {}),
         isEligible: true,
@@ -4442,6 +4469,16 @@ function EligibilityCheckPage() {
                   </div>
 
               {/* Step tabs */}
+              <div className="mb-4 flex">
+                <button
+                  type="button"
+                  disabled={step === 1}
+                  onClick={prevStep}
+                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  ← Back
+                </button>
+              </div>
               <div className="flex gap-6 border-b pb-4 mb-6 text-sm overflow-x-auto">
                 {STEP_LABELS.map((label, i) => (
                   <StepLabel key={i} active={step === i + 1}>{label}</StepLabel>
@@ -4605,7 +4642,14 @@ function EligibilityCheckPage() {
                 </div>
               ) : !isReviewOnly ? (
                 <button
-                  disabled={hasSubmittedEligibility || isAnalyzing || isSavingDraft || isSavingStep || isLoadingEligibility}
+                  disabled={
+                    hasSubmittedEligibility ||
+                    isAnalyzing ||
+                    isSavingDraft ||
+                    isSavingStep ||
+                    isLoadingEligibility ||
+                    !isDeclarationsComplete
+                  }
                   onClick={handleEligibilitySubmit}
                   className="rounded-xl bg-green-600 text-white px-5 py-2 text-sm font-semibold cursor-pointer hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
@@ -4614,21 +4658,33 @@ function EligibilityCheckPage() {
               ) : null
               }
               </div>
+              {step === TOTAL_STEPS && !isReviewOnly && !isDeclarationsComplete && (
+                <p className="mt-3 text-sm text-amber-700">
+                  Complete all Review &amp; Declarations fields, including the digital signature, to enable submit.
+                </p>
+              )}
               {submitError && (
                 <p className="mt-3 text-sm text-red-600">{submitError}</p>
               )}
                 </div>
               ) : (
-                <EligibilityEntryCard
-                  serviceName={selectedServiceAppliedName}
-                  onActivate={() => setIsEligibilityFormVisible(true)}
-                />
+                showVerification && hasSubmittedEligibility ? (
+                  <EligibilitySubmittedCard
+                    serviceName={selectedServiceAppliedName}
+                    onReviewSubmission={() => setIsEligibilityFormVisible(true)}
+                  />
+                ) : (
+                  <EligibilityEntryCard
+                    serviceName={selectedServiceAppliedName}
+                    onActivate={() => setIsEligibilityFormVisible(true)}
+                  />
+                )
               )}
             </div>
 
             {shouldShowEligibilitySidePanel && (
               <div className="space-y-6 lg:col-span-4">
-                {!isEligibilityFormVisible && (
+                {!isEligibilityFormVisible && !showVerification && (
                   <AgenticAssistantCard
                     serviceName={selectedServiceAppliedName}
                     councilName="Newham Council"
@@ -4646,7 +4702,7 @@ function EligibilityCheckPage() {
                     onClose={() => setAgentSidebar(null)}
                   />
                 )}
-                {showVerification && (
+                {showVerification && hasSubmittedEligibility && (
                   <VerificationCalendar disabled={!hasSubmittedEligibility || isReadOnly} />
                 )}
               </div>
@@ -4718,6 +4774,61 @@ function EligibilityEntryCard({
         className="mt-6 rounded-2xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
       >
         Open Eligibility Check
+      </button>
+    </div>
+  )
+}
+
+function EligibilitySubmittedCard({
+  serviceName,
+  onReviewSubmission,
+}: {
+  serviceName: string
+  onReviewSubmission: () => void
+}) {
+  return (
+    <div className="rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm sm:p-8">
+      <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-700">
+        <CheckCircle className="h-3.5 w-3.5" />
+        Eligibility Submitted
+      </div>
+
+      <h2 className="mt-5 text-2xl font-semibold text-slate-900">
+        Consultation Scheduling
+      </h2>
+      <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+        Your eligibility assessment for <span className="font-bold text-slate-800">{serviceName}</span> has been submitted successfully.
+      </p>
+      <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+        The next step is to choose a consultation slot using the calendar on the right.
+      </p>
+
+      <div className="mt-6 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
+          Next Step
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-emerald-100">
+            <p className="text-sm font-semibold text-slate-900">Pick a time</p>
+            <p className="mt-2 text-sm text-slate-500">
+              Choose a 15 minute consultation slot from the calendar.
+            </p>
+          </div>
+          <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-emerald-100">
+            <p className="text-sm font-semibold text-slate-900">Review if needed</p>
+            <p className="mt-2 text-sm text-slate-500">
+              You can reopen the submitted eligibility form in read-only mode at any time.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={onReviewSubmission}
+        className="mt-6 rounded-2xl border border-slate-200 px-6 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+      >
+        Review Submitted Form
       </button>
     </div>
   )

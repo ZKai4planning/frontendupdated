@@ -59,6 +59,239 @@ const DUMMY_REQUEST_BUTTONS = [
   { label: "Resolved", accent: "bg-violet-400" },
   { label: "Flagged", accent: "bg-rose-400" },
 ]
+const DEFAULT_ELIGIBILITY_AGENT_Z_INTRO =
+  "No problem, I can help you identify this \u{1F44D}"
+const ELIGIBILITY_AGENT_Z_STANDALONE_RESPONSE_FIELDS = new Set([
+  "Has the property already been extended before?",
+  "Will occupants share kitchen/bathroom?",
+  "Will occupants share kitchen and/or bathroom?",
+  "Will rooms be rented individually?",
+  "Is there a communal kitchen?",
+  "Need help with dimensions?",
+])
+const ELIGIBILITY_AGENT_Z_DOCUMENT_RESPONSES: Record<string, string> = {
+  "Property Type": `A terraced house is part of a row of similar houses sharing side walls.
+A semi-detached house is attached to one other house.
+A detached house stands alone.
+A flat or maisonette is part of a building with shared or separate access.`,
+  "Ownership Status": `If you own the property and the land it stands on, you are a freeholder.
+If you own the property but not the land (usually in flats), you are a leaseholder.
+If the property is owned by a company, select company-owned.
+If you're renting or managing on behalf of someone else, select tenant or acting on behalf of owner.`,
+  "Are you planning any building works?": `Agent Z Smart Response (Conversational)
+Building works include any physical changes to your property such as:
+Extending the property (rear or side)
+Converting loft or garage
+Moving or removing walls
+Adding bedrooms or bathrooms`,
+  "Has the property already been extended before?": `That's quite common - I can help 👍
+A property is considered extended if any additional space has been added beyond the original structure, such as:
+A rear or side extension
+A loft conversion with dormer
+A conservatory
+Any structural addition visible from outside`,
+  "Will occupants share kitchen/bathroom?": `No problem, I'll help clarify 👍
+In an HMO:
+Shared facilities mean tenants use the same kitchen or bathroom
+Self-contained units mean each tenant has their own kitchen and bathroom`,
+  "Will occupants share kitchen and/or bathroom?": `No problem, I'll help clarify 👍
+In an HMO:
+Shared facilities mean tenants use the same kitchen or bathroom
+Self-contained units mean each tenant has their own kitchen and bathroom`,
+  "Will rooms be rented individually?": `No problem, I'll help clarify 👍
+This is a key trigger for HMO classification and licensing intent. It helps confirm whether the property operates as a true HMO (room-by-room letting) versus a single tenancy
+Renting rooms individually means each tenant has their own agreement and rents a separate room.
+Letting the property as a whole means one household (family or group) rents the entire property under a single agreement.`,
+  "Is there a communal kitchen?": `No problem, I'll help clarify 👍
+A communal kitchen is a shared space where all or multiple tenants prepare and cook food.
+If each room has its own private kitchen, then it's not communal and may be considered self-contained units instead.
+Do your tenants use one shared kitchen, or does each have their own cooking space?`,
+  "Need help with dimensions?": `No problem, I'll help you with dimensions 👍
+Recommended Action: Book a Site Measurement Survey
+Because accurate dimensions are required for:
+Floor plans
+HMO compliance
+Kitchen adequacy checks
+Planning drawings
+Occupancy calculations
+Standard Survey Cost (London & Surrounding Areas)
+London Zones 1-4: £180 - £250
+Greater London / M25 Ring: £220 - £300
+Home Counties (Essex, Kent, Surrey, Herts, Berkshire): £250 - £350
+(Prices vary based on property size and travel distance.)`,
+  "Wall Materials": `Agent Z Smart Response (Conversational)
+The type of wall you choose is important for fire safety, sound insulation, and HMO compliance.
+Brick/Block walls -> Strong and durable, but less flexible
+Stud walls (plasterboard) -> Common for internal layouts, quicker to install
+Fire-rated walls -> Required in HMOs for safety and compliance`,
+  "Roof Materials": `Agent Z Smart Response (Conversational)
+The choice of roof material depends on the type of work you're planning:
+Tiles or slate -> Common for pitched roofs and maintaining the look of the property
+Flat roofs (felt/GRP) -> Typically used for rear extensions
+GRP/Fibreglass -> Durable and low maintenance for modern extensions`,
+  "Materials match existing?": `Agent Z Smart Response (Conversational)
+In most cases, councils prefer new work to match the existing property, especially for:
+Brickwork
+Roof tiles
+External finishes
+
+This helps the extension or alteration blend in with the original building.`,
+  "Conservation Area or Near Listed Building?": `Agent Z Smart Response (Conversational)
+A conservation area is a location where the council protects the character and appearance of buildings.
+A listed building is officially recognised as historically important and has strict rules for any changes.
+
+If your property is in one of these areas, even small changes may require planning permission.`,
+  "Trees with TPO (Tree Preservation Order) on or near site?": `Agent Z Smart Response (Conversational)
+Trees are important in planning, especially if they are:
+Large or mature
+Close to your proposed extension
+Protected by a Tree Preservation Order (TPO)
+
+A simple way to think about it:
+If a tree is tall enough to potentially fall onto your proposed structure, it may be relevant.`,
+  "Trees within falling distance of works?": `Agent Z Smart Response (Conversational)
+Trees are important in planning, especially if they are:
+Large or mature
+Close to your proposed extension
+Protected by a Tree Preservation Order (TPO)
+
+A simple way to think about it:
+If a tree is tall enough to potentially fall onto your proposed structure, it may be relevant.`,
+  "Is the site in Flood Zone 2 or 3?": `Agent Z Smart Response (Conversational)
+Flood Zones are defined as:
+Zone 1 -> Low risk
+Zone 2 -> Medium risk
+Zone 3 -> High risk
+
+If your property is in Zone 2 or 3, the council may require a Flood Risk Assessment (FRA) before approval.`,
+  "Any known contamination on site?": `Agent Z Smart Response (Conversational)
+Contamination usually relates to past uses of the land that may have left harmful substances in the ground, such as:
+Old industrial or factory use
+Petrol stations or garages
+Waste disposal or landfill
+Chemical storage or heavy construction activity
+
+If your property has always been residential, contamination is unlikely.`,
+  "Do you currently have smoke alarms installed?": `AGENT Z - Newham Council Ready Interpretation
+Newham Council Compliance Logic
+Newham requires:
+Interlinked smoke alarms on every storey
+Heat alarm in the kitchen
+All alarms must be mainswired with battery backup
+Must comply with BS 5839-6 Grade D1/D2 standards`,
+  "Do you have a valid Gas Safety Certificate?": `AGENT Z - Newham Council Ready Interpretation
+Newham Council Compliance Logic
+Newham requires an annual Gas Safety Certificate (CP12) for any property with:
+A gas boiler
+Gas hob/cooker
+Gas fire
+Any gas appliance
+
+The certificate must be:
+Issued within the last 12 months
+Completed by a Gas Safe Registered Engineer
+Uploaded as part of the HMO or planning compliance pack`,
+  "Do you have a valid Electrical Report (EICR)?": `AGENT Z - Newham Council Ready Interpretation
+Newham Council Compliance Logic
+Newham requires a valid Electrical Installation Condition Report (EICR) for all rented or HMO properties.
+
+The EICR must:
+Be issued within the last 5 years
+Be completed by a qualified NICEIC or NAPIT electrician
+Clearly state the outcome:
+Satisfactory (acceptable)
+Unsatisfactory (requires remedial work)
+
+Include:
+Circuit test results
+Observations & recommendations
+Remedial actions (if any)`,
+  "Energy Performance Certificate (EPC) available?": `AGENT Z - Newham Council Ready Interpretation
+Newham Council Compliance Logic
+Newham requires an Energy Performance Certificate (EPC) for all rented properties and HMO applications.
+
+The EPC must:
+Be valid for 10 years
+Show a rating of E or above (minimum legal standard)
+Be issued by an accredited domestic energy assessor
+Be included in the compliance pack`,
+  "Water Supply": `AGENT Z - Newham Council Ready Interpretation
+Newham Council Compliance Logic
+Newham requires that all HMOs and rental properties have:
+A constant, potable (drinkable) water supply
+Adequate cold and hot water to all fixtures
+Water systems free from contamination
+Compliance with Legionella risk management
+No shared external taps as the primary supply
+Sufficient pressure for all occupants`,
+  "Sewage / Drainage": `AGENT Z - Newham Council Ready Interpretation
+Newham Council Compliance Logic
+Newham requires all HMOs and rental properties to have:
+A safe, functional connection to the public sewer or an approved private system
+No blockages, leaks, or backflow issues
+Proper drainage for:
+Kitchens
+Bathrooms
+Toilets
+External areas
+Compliance with Building Regulations Part H (Drainage & Waste Disposal)`,
+  "Surface Water Drainage": `AGENT Z - Newham Council Ready Interpretation
+Newham Council Compliance Logic
+Newham requires all HMOs and rental properties to have adequate surface water drainage to prevent:
+Flooding
+Water pooling
+Damp and mould
+Structural damage
+Neighbouring property impact
+
+Surface water must drain into:
+Public surface water sewer, OR
+Soakaway system, OR
+Sustainable Drainage System (SuDS)
+
+It must NOT drain into the foul sewer unless explicitly permitted.`,
+  "Existing Waste Arrangements": `AGENT Z - Newham Council Ready Interpretation
+Newham Council Compliance Logic
+Newham requires all HMOs and rental properties to have:
+Adequate waste storage capacity for the number of occupants
+Correct bin types (general waste, recycling, food waste)
+Secure, pestproof storage areas
+Clear access routes for waste collection
+No accumulation of rubbish in front or rear gardens
+Compliance with Newham Waste & Recycling Standards`,
+  "Renewable energy installations proposed?": `AGENT Z - Newham Council Ready Interpretation
+Newham Council Planning & HMO Compliance Logic
+Newham strongly supports renewable energy installations but requires proper classification and documentation, especially for HMOs or properties undergoing planning review.
+
+Renewable systems include:
+Solar PV panels
+Solar thermal (hot water)
+Air source heat pumps (ASHP)
+Ground source heat pumps (GSHP)
+Battery storage systems
+Microwind turbines
+EV charging points (lowcarbon infrastructure)`,
+  "Additional Consents": `AGENT Z - Newham Council Ready Interpretation
+What "Additional Consents" Means in Newham
+Newham Council may require extra consents depending on the property type, location, and proposed use. These may include:
+
+Common Additional Consents
+Freeholder Consent Required if the property is leasehold.
+Mortgage Lender Consent Required if the property is mortgaged and being converted to HMO.
+Building Control Approval Needed for structural changes, fire doors, partitions, bathrooms, etc.
+Planning Permission / Lawful Development Certificate Required for:
+Change of use (C3 -> C4 or Sui Generis)
+Extensions
+Loft conversions
+Outbuildings
+External alterations
+Party Wall Agreements Required if works affect shared walls or boundaries.
+Conservation Area Consent If the property is in a conservation area.
+Listed Building Consent If the property is listed.
+Environmental Health Approval For large HMOs or properties with previous enforcement history.`,
+}
+const getEligibilityAgentZDocumentResponse = (fieldLabel: string) =>
+  ELIGIBILITY_AGENT_Z_DOCUMENT_RESPONSES[fieldLabel]
 const PROPERTY_TYPE_AGENT_MESSAGE =
   "No problem, I can help you identify this 👍\nA terraced house is part of a row of similar houses sharing side walls.\nA semi-detached house is attached to one other house.\nA detached house stands alone.\nA flat or maisonette is part of a building with shared or separate access."
 
@@ -621,6 +854,33 @@ const OWNERSHIP_CERTIFICATE_RELATED_ANSWERS: AgentInsight[] = [
     confidence: "high",
   },
 ]
+const SURFACE_WATER_NEWHAM_AGENT_INTRO = "No problem, I can help you identify this 👍"
+const SURFACE_WATER_NEWHAM_RELATED_ANSWERS: AgentInsight[] = [
+  {
+    label: "Newham Council Ready Interpretation",
+    value:
+      "Newham requires HMOs and rental properties to have adequate surface water drainage to prevent flooding, water pooling, damp and mould, structural damage, and impact on neighbouring properties.",
+    confidence: "high",
+  },
+  {
+    label: "Accepted Drainage Routes",
+    value:
+      "Surface water should drain to a public surface water sewer, a soakaway system, or a Sustainable Drainage System (SuDS).",
+    confidence: "high",
+  },
+  {
+    label: "Not Allowed",
+    value:
+      "Surface water must not drain into the foul sewer unless there is explicit permission to do so.",
+    confidence: "high",
+  },
+  {
+    label: "What Can Block Approval",
+    value:
+      "Newham is unlikely to approve an HMO or planning application if rainwater has nowhere to drain, water pools near the building, gutters or downpipes are missing or broken, or surface water drains into the foul sewer illegally.",
+    confidence: "high",
+  },
+]
 const CONVERSATIONAL_AGENT_INTROS: Record<string, string> = {
   "Property Type": PROPERTY_TYPE_AGENT_INTRO,
   "Ownership Status": OWNERSHIP_STATUS_AGENT_INTRO,
@@ -635,7 +895,7 @@ const CONVERSATIONAL_AGENT_INTROS: Record<string, string> = {
   "Roof Materials": ROOF_MATERIALS_AGENT_INTRO,
   "Materials match existing?": MATERIALS_MATCH_AGENT_INTRO,
   "Conservation Area or Near Listed Building?": CONSERVATION_AREA_AGENT_INTRO,
-  "Trees with TPO on or near site?": Tree_TPO_AGENT_INTRO,
+  "Trees with TPO (Tree Preservation Order) on or near site?": Tree_TPO_AGENT_INTRO,
   "Trees within falling distance of works?": Tree_FALLING_DISTANCE_AGENT_INTRO,
   "Is the site in Flood Zone 2 or 3?": FLOOD_ZONE_AGENT_INTRO,
   "Any known contamination on site?": CONTAMINATION_AGENT_INTRO,
@@ -645,7 +905,7 @@ const CONVERSATIONAL_AGENT_INTROS: Record<string, string> = {
   "Energy Performance Certificate (EPC) available?": EPC_AGENT_INTRO,
   "Water Supply": WATER_SUPPLY_AGENT_INTRO,
   "Sewage / Drainage": SEWAGE_DRAINAGE_AGENT_INTRO,
-  "Surface Water Drainage": SURFACE_WATER_AGENT_INTRO,
+  "Surface Water Drainage": SURFACE_WATER_NEWHAM_AGENT_INTRO,
   "Existing Waste Arrangements": WASTE_ARRANGEMENTS_AGENT_INTRO,
   "Renewable energy installations proposed?": RENEWABLES_AGENT_INTRO,
   // "Which Ownership Certificate applies?": OWNERSHIP_CERTIFICATE_AGENT_INTRO,
@@ -665,7 +925,7 @@ const CONVERSATIONAL_AGENT_RELATED_ANSWERS: Record<string, AgentInsight[]> = {
   "Roof Materials": ROOF_MATERIALS_RELATED_ANSWERS,
   "Materials match existing?": MATERIALS_MATCH_RELATED_ANSWERS,
   "Conservation Area or Near Listed Building?": CONSERVATION_AREA_RELATED_ANSWERS,
-  "Trees with TPO on or near site?": Tree_TPO_RELATED_ANSWERS,
+  "Trees with TPO (Tree Preservation Order) on or near site?": Tree_TPO_RELATED_ANSWERS,
   "Trees within falling distance of works?": Tree_FALLING_DISTANCE_RELATED_ANSWERS,
   "Is the site in Flood Zone 2 or 3?": FLOOD_ZONE_RELATED_ANSWERS,
   "Any known contamination on site?": CONTAMINATION_RELATED_ANSWERS,
@@ -675,7 +935,7 @@ const CONVERSATIONAL_AGENT_RELATED_ANSWERS: Record<string, AgentInsight[]> = {
   "Energy Performance Certificate (EPC) available?": EPC_RELATED_ANSWERS,
   "Water Supply": WATER_SUPPLY_RELATED_ANSWERS,
   "Sewage / Drainage": SEWAGE_DRAINAGE_RELATED_ANSWERS,
-  "Surface Water Drainage": SURFACE_WATER_RELATED_ANSWERS,
+  "Surface Water Drainage": SURFACE_WATER_NEWHAM_RELATED_ANSWERS,
   "Existing Waste Arrangements": WASTE_ARRANGEMENTS_RELATED_ANSWERS,
   "Renewable energy installations proposed?": RENEWABLES_RELATED_ANSWERS,
   // "Which Ownership Certificate applies?": OWNERSHIP_CERTIFICATE_RELATED_ANSWERS,
@@ -809,6 +1069,16 @@ const formatAgentInsightText = (insight: AgentInsight) =>
     : insight.value
 
 const getAgentOpeningMessage = (fieldLabel: string, message?: string) => {
+  const documentResponse = getEligibilityAgentZDocumentResponse(fieldLabel)
+
+  if (documentResponse) {
+    if (ELIGIBILITY_AGENT_Z_STANDALONE_RESPONSE_FIELDS.has(fieldLabel)) {
+      return documentResponse
+    }
+
+    return `${DEFAULT_ELIGIBILITY_AGENT_Z_INTRO}\n\n${documentResponse}`
+  }
+
   const intro = CONVERSATIONAL_AGENT_INTROS[fieldLabel]
   const relatedAnswers = CONVERSATIONAL_AGENT_RELATED_ANSWERS[fieldLabel]
 
@@ -1268,8 +1538,10 @@ export function FloatingAgentWidget({
             status: "done",
           },
         ]
-        const finalInsights: AgentInsight[] =
-          CONVERSATIONAL_AGENT_RELATED_ANSWERS[fieldLabel] ?? []
+        const documentResponse = getEligibilityAgentZDocumentResponse(fieldLabel)
+        const finalInsights: AgentInsight[] = documentResponse
+          ? getMessageDrivenAgentInsights(documentResponse)
+          : CONVERSATIONAL_AGENT_RELATED_ANSWERS[fieldLabel] ?? []
 
         setTasks(shouldHideAgentActivity ? [] : finalTasks)
         setInsights(finalInsights)
@@ -1502,7 +1774,7 @@ export function FloatingAgentWidget({
               result = (await response.json()) as RightsOfWayResponse
               break
             }
-            case "Trees with TPO on or near site?": {
+            case "Trees with TPO (Tree Preservation Order) on or near site?": {
               const url = new URL(RIGHTS_OF_WAY_ENDPOINT, window.location.origin)
               url.searchParams.set("lat", String(latitude))
               url.searchParams.set("lng", String(longitude))
