@@ -97,22 +97,9 @@ type DashboardEligibilitySummary = {
 const SELECTED_PROJECT_STORAGE_KEY = "selectedProjectId"
 const SELECTED_PROJECT_STAGE_STORAGE_KEY = "selectedProjectStageId"
 const DASHBOARD_ELIGIBILITY_SUMMARY_STORAGE_PREFIX = "dashboardEligibilitySummary:"
-const PLANS_STAGE_ROUTE = "/dashboard?stage=plans"
 const ELIGIBILITY_REVIEW_ROUTE = "/dashboard?stage=eligibility&readonly=1"
 const ENERGY_PERFORMANCE_CERTIFICATE_LABEL = "Energy Performance Certificate (EPC) available?"
 const LEGACY_ENERGY_PERFORMANCE_CERTIFICATE_LABEL = "EPC available?"
-const DASHBOARD_CART_PREVIEW_ITEMS = [
-  "Location Plan",
-  "Site Measurement Survey",
-  "Existing & Proposed Plans",
-  "Tree / BS5837 Report",
-  "Flood Risk Assessment",
-  "Smoke Alarms Compliance",
-  "Gas Safety Certificate",
-  "Electrical Report (EICR)",
-  "Energy Performance Certificate (EPC)",
-] as const
-
 const DASHBOARD_CART_SUPPORT_CONFIG = [
   { fieldLabels: ["Need help with dimensions?"], cartLabel: "Site Measurement Survey", activeValue: "Yes" },
   { fieldLabels: ["Need help with location plan?"], cartLabel: "Location Plan", activeValue: "Yes" },
@@ -365,6 +352,16 @@ const DASHBOARD_PENDING_DOCUMENTS = [
   "EICR certificate",
 ] as const
 
+const POST_ELIGIBILITY_STAGE_ROUTES = new Set([
+  "consultant",
+  "agent-response",
+  "initial-quotation",
+  "upload",
+  "upload-documents",
+  "final-quotation",
+  "review",
+])
+
 const DASHBOARD_CHAT_MESSAGES = [
   {
     id: "customer-1",
@@ -571,7 +568,9 @@ function DashboardOverview() {
   const clearServiceSelection = useServiceSelectionStore((state) => state.clearSelection)
 
   const displayName = fullName || "User"
-  const [storedSelectedProjectId, setStoredSelectedProjectId] = useState<string | null>(null)
+  const [storedSelectedProjectId, setStoredSelectedProjectId] = useState<string | null>(() =>
+    readStoredSelectedProjectId()
+  )
   const [projects, setProjects] = useState<UserProject[]>([])
   const [isLoadingProjects, setIsLoadingProjects] = useState(false)
   const [projectsError, setProjectsError] = useState<string | null>(null)
@@ -594,8 +593,6 @@ function DashboardOverview() {
     const storedProjectStageId =
       window.localStorage.getItem(SELECTED_PROJECT_STAGE_STORAGE_KEY) ||
       window.sessionStorage.getItem(SELECTED_PROJECT_STAGE_STORAGE_KEY)
-
-    setStoredSelectedProjectId(storedProjectId)
 
     if (data.eligibility?.projectId) return
     if (!storedProjectId) return
@@ -683,15 +680,16 @@ function DashboardOverview() {
     [data.eligibility, serviceLabelMap, setServiceSelection, updateSection]
   )
 
+  const selectedProject = useMemo(
+    () => projects.find((project) => project.projectId === selectedProjectId) ?? null,
+    [projects, selectedProjectId]
+  )
+  const activeProjectId = selectedProject?.projectId ?? null
+
   useEffect(() => {
-    if (!selectedProjectId) return
+    if (!activeProjectId) return
 
-    const matchingProject = projects.find(
-      (project) => project.projectId === selectedProjectId
-    )
-    if (!matchingProject) return
-
-    const service = getPrimaryProjectService(matchingProject)
+    const service = getPrimaryProjectService(selectedProject)
     if (!service) return
 
     const resolvedServiceName = resolveProjectServiceName(service, serviceLabelMap)
@@ -701,13 +699,10 @@ function DashboardOverview() {
 
     updateSection("service", nextSelection)
     setServiceSelection(nextSelection)
-  }, [projects, selectedProjectId, serviceLabelMap, setServiceSelection, updateSection])
+  }, [activeProjectId, selectedProject, serviceLabelMap, setServiceSelection, updateSection])
 
   useEffect(() => {
-    if (!selectedProjectId) {
-      setEligibilitySummary(null)
-      return
-    }
+    if (!activeProjectId) return
 
     let isCancelled = false
 
@@ -715,22 +710,22 @@ function DashboardOverview() {
       setIsLoadingEligibilitySummary(true)
 
       const localFallbackSummary =
-        data.eligibility?.projectId === selectedProjectId && data.eligibility?.formData
+        data.eligibility?.projectId === activeProjectId && data.eligibility?.formData
           ? {
-              projectId: selectedProjectId,
+              projectId: activeProjectId,
               formData: data.eligibility.formData,
               completedAt: data.eligibility?.completedAt,
               isEligible: data.eligibility?.isEligible,
             }
           : null
-      const storedFallbackSummary = readStoredDashboardEligibilitySummary(selectedProjectId)
+      const storedFallbackSummary = readStoredDashboardEligibilitySummary(activeProjectId)
 
       try {
-        const response = await axiosInstance.get(`/eligibility/${encodeURIComponent(selectedProjectId)}`)
+        const response = await axiosInstance.get(`/eligibility/${encodeURIComponent(activeProjectId)}`)
 
         if (isCancelled) return
 
-        const normalized = normalizeDashboardEligibilitySummary(response.data, selectedProjectId)
+        const normalized = normalizeDashboardEligibilitySummary(response.data, activeProjectId)
         const fallbackSummary =
           getEligibilityFormFieldCount(localFallbackSummary) >=
           getEligibilityFormFieldCount(storedFallbackSummary)
@@ -771,29 +766,22 @@ function DashboardOverview() {
     return () => {
       isCancelled = true
     }
-  }, [data.eligibility, selectedProjectId])
+  }, [activeProjectId, data.eligibility])
 
   useEffect(() => {
-    if (!selectedProjectId || !userId) {
-      setServiceCart(null)
-      return
-    }
+    if (!activeProjectId || !userId) return
 
     let isCancelled = false
-    const storedCart = readStoredServiceCart(selectedProjectId)
-
-    if (storedCart?.userId === userId) {
-      setServiceCart(storedCart)
-    } else {
-      setServiceCart(null)
-    }
+    const storedCart = readStoredServiceCart(activeProjectId)
+    const storedCartForUser = storedCart?.userId === userId ? storedCart : null
 
     const loadServiceCart = async () => {
       setIsLoadingServiceCart(true)
+      setServiceCart(storedCartForUser)
 
       try {
         const normalized = await fetchServiceCart({
-          projectId: selectedProjectId,
+          projectId: activeProjectId,
           userId,
         })
 
@@ -804,10 +792,10 @@ function DashboardOverview() {
           return
         }
 
-        setServiceCart(storedCart?.userId === userId ? storedCart : null)
+        setServiceCart(storedCartForUser)
       } catch {
         if (isCancelled) return
-        setServiceCart(storedCart?.userId === userId ? storedCart : null)
+        setServiceCart(storedCartForUser)
       } finally {
         if (!isCancelled) {
           setIsLoadingServiceCart(false)
@@ -820,13 +808,10 @@ function DashboardOverview() {
     return () => {
       isCancelled = true
     }
-  }, [selectedProjectId, userId])
+  }, [activeProjectId, userId])
 
   useEffect(() => {
-    if (!selectedProjectId || !userId) {
-      setQuotations([])
-      return
-    }
+    if (!activeProjectId || !userId) return
 
     let isCancelled = false
 
@@ -835,7 +820,7 @@ function DashboardOverview() {
 
       try {
         const nextQuotations = await fetchServiceCartQuotations({
-          projectId: selectedProjectId,
+          projectId: activeProjectId,
           userId,
         })
 
@@ -856,7 +841,7 @@ function DashboardOverview() {
     return () => {
       isCancelled = true
     }
-  }, [selectedProjectId, userId])
+  }, [activeProjectId, userId])
 
   const handleProjectSelect = useCallback(
     async (project: UserProject) => {
@@ -888,6 +873,13 @@ function DashboardOverview() {
       }
     },
     [persistSelectedProject, router]
+  )
+
+  const handleProjectCardSelect = useCallback(
+    (project: UserProject) => {
+      persistSelectedProject(project)
+    },
+    [persistSelectedProject]
   )
 
   const handleStartNewProject = useCallback(() => {
@@ -964,10 +956,6 @@ function DashboardOverview() {
     router.push("/services")
   }, [clearServiceSelection, router, serviceSelection, setServiceSelection, updateSection])
 
-  const selectedProject = useMemo(
-    () => projects.find((project) => project.projectId === selectedProjectId) ?? null,
-    [projects, selectedProjectId]
-  )
   const orderedProjects = useMemo(() => {
     if (!selectedProjectId) return projects
 
@@ -983,6 +971,7 @@ function DashboardOverview() {
     resolveProjectServiceName(selectedProjectService, serviceLabelMap) ||
     serviceSelection?.plan ||
     serviceSelection?.serviceTitle ||
+    activeProjectId ||
     selectedProjectId ||
     "Project"
   const selectedPlanName = serviceSelection?.pricingPlan || "Bronze"
@@ -993,7 +982,6 @@ function DashboardOverview() {
   const planSelectedDate = "05/05/2026"
   const paymentReference = "PAY-AI4P-050526-7842"
   const fallbackQuotationPageHref = "/dashboard?stage=initial-quotation&readonly=1"
-  const paymentPageHref = "/dashboard?stage=payment"
   const dashboardPaymentItems = [
     { label: "Plan selected date", value: planSelectedDate },
     { label: "Payment reference", value: paymentReference },
@@ -1006,24 +994,24 @@ function DashboardOverview() {
   ]
   const submittedEligibilitySummary = useMemo(
     () =>
-      eligibilitySummary?.projectId === selectedProjectId
+      eligibilitySummary?.projectId === activeProjectId
         ? eligibilitySummary
-        : data.eligibility?.projectId === selectedProjectId && data.eligibility?.formData
+        : data.eligibility?.projectId === activeProjectId && data.eligibility?.formData
           ? {
-              projectId: selectedProjectId,
+              projectId: activeProjectId,
               formData: data.eligibility.formData,
               completedAt: data.eligibility.completedAt,
               isEligible: data.eligibility.isEligible,
             }
           : null,
-    [data.eligibility, eligibilitySummary, selectedProjectId]
+    [activeProjectId, data.eligibility, eligibilitySummary]
   )
   const persistedCartItems = useMemo(
     () =>
-      serviceCart?.projectId === selectedProjectId
+      serviceCart?.projectId === activeProjectId
         ? serviceCart.services.map((service) => service.serviceName).filter(Boolean)
         : [],
-    [selectedProjectId, serviceCart]
+    [activeProjectId, serviceCart]
   )
   const submittedCartItems = useMemo(
     () =>
@@ -1033,7 +1021,7 @@ function DashboardOverview() {
     [persistedCartItems, submittedEligibilitySummary]
   )
   const cartSubmittedAt =
-    serviceCart?.projectId === selectedProjectId
+    serviceCart?.projectId === activeProjectId
       ? serviceCart.updatedAt ?? submittedEligibilitySummary?.completedAt
       : submittedEligibilitySummary?.completedAt
   const recentQuotation = useMemo(
@@ -1075,6 +1063,27 @@ function DashboardOverview() {
   const hasSubmittedCartItems = submittedCartItems.length > 0
   const hasDimensionSurveyBooking = Boolean(dimensionSurveyBookingDate && dimensionSurveyBookingTime)
   const isLoadingSupportSummary = isLoadingEligibilitySummary || isLoadingServiceCart
+  const selectedProjectStageRoute =
+    selectedProject?.currentStage?.route || resolveStageFromStatus(selectedProject?.status)
+  const hasSelectedProject = Boolean(activeProjectId)
+  const hasSubmittedEligibility = Boolean(
+    hasSelectedProject &&
+    submittedEligibilitySummary?.projectId === activeProjectId &&
+    submittedEligibilitySummary?.completedAt
+  )
+  const hasConsultationOrQuotationProgress = Boolean(
+    hasSelectedProject &&
+    (recentQuotation ||
+      (selectedProjectStageRoute && POST_ELIGIBILITY_STAGE_ROUTES.has(selectedProjectStageRoute)))
+  )
+  const shouldShowSupportRequestsSection = Boolean(
+    hasSubmittedEligibility &&
+    hasConsultationOrQuotationProgress &&
+    (hasSubmittedCartItems || hasDimensionSurveyBooking)
+  )
+  const shouldShowProjectOverviewSection = Boolean(
+    hasSubmittedEligibility && hasConsultationOrQuotationProgress
+  )
 
   const handleContinueWithApplication = () => {
     if (selectedProject) {
@@ -1432,10 +1441,17 @@ function DashboardOverview() {
                 "Open this project to continue your planning journey from the latest saved stage."
 
               return (
-                <button
+                <div
                   key={project.projectId}
-                  type="button"
-                  onClick={() => void handleProjectSelect(project)}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleProjectCardSelect(project)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault()
+                      handleProjectCardSelect(project)
+                    }
+                  }}
                   className={`rounded-2xl border p-5 text-left transition ${isSelected
                     ? "border-blue-600 bg-blue-50 shadow-sm"
                     : "border-slate-200 bg-white hover:border-blue-300 hover:bg-slate-50"
@@ -1481,18 +1497,33 @@ function DashboardOverview() {
                     ) : null}
                   </div>
 
-                  <div className="mt-6 flex items-center justify-between text-sm font-semibold text-blue-700">
-                    <span>{isSelected ? "Continue project" : "Open project"}</span>
-                    <ArrowRight className="h-4 w-4" />
+                  <div className="mt-6 flex items-center justify-between gap-3">
+                    <p className="text-sm text-slate-500">
+                      {isSelected
+                        ? "Selected for dashboard view"
+                        : "Click card to select this project"}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        void handleProjectSelect(project)
+                      }}
+                      className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                    >
+                      <span>Open project</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
                   </div>
-                </button>
+                </div>
               )
             })}
           </div>
         )}
       </div>
 
-      <div className="mt-6 rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,16,32,0.92),rgba(11,23,44,0.9))] p-6 shadow-sm backdrop-blur-xl sm:p-8">
+      {shouldShowSupportRequestsSection ? (
+        <div className="mt-6 rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,16,32,0.92),rgba(11,23,44,0.9))] p-6 shadow-sm backdrop-blur-xl sm:p-8">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
@@ -1580,47 +1611,7 @@ function DashboardOverview() {
                   </a>
                 </div>
               </article>
-            ) : (
-              <article className="w-full flex-1 rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,16,32,0.88),rgba(11,23,44,0.86))] p-5 shadow-sm backdrop-blur-xl sm:p-6 lg:min-w-[340px] lg:snap-start">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-700">
-                    <ShoppingCart className="h-5 w-5" />
-                  </div>
-                  <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-slate-200">
-                    Preview
-                  </span>
-                </div>
-
-                <div className="mt-6">
-                  <p className="text-3xl font-semibold tracking-tight text-white">
-                    Cart requests
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-slate-300">
-                    This preview shows how submitted support requests will appear here.
-                  </p>
-                </div>
-
-                <div className="mt-6 space-y-3">
-                  {DASHBOARD_CART_PREVIEW_ITEMS.map((item) => (
-                    <div
-                      key={item}
-                      className="flex items-center justify-between rounded-2xl bg-white/8 px-4 py-3 ring-1 ring-white/10 backdrop-blur-xl"
-                    >
-                      <span className="text-sm font-medium text-white">{item}</span>
-                      <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-slate-200">
-                        Example
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-6 rounded-2xl border border-dashed border-blue-400/25 bg-blue-500/10 px-4 py-3">
-                  <p className="text-sm text-blue-200">
-                    Submit step 5 of eligibility to replace this preview with live cart request data.
-                  </p>
-                </div>
-              </article>
-            )}
+            ) : null}
 
             {hasDimensionSurveyBooking ? (
               <article className="w-full flex-1 rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,16,32,0.88),rgba(11,23,44,0.86))] p-5 shadow-sm backdrop-blur-xl sm:p-6 lg:min-w-[340px] lg:snap-start">
@@ -1682,64 +1673,14 @@ function DashboardOverview() {
                   </a>
                 </div>
               </article>
-            ) : (
-              <article className="w-full flex-1 rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(8,16,32,0.88),rgba(11,23,44,0.86))] p-5 shadow-sm backdrop-blur-xl sm:p-6 lg:min-w-[340px] lg:snap-start">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
-                    <Ruler className="h-5 w-5" />
-                  </div>
-                  <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-slate-200">
-                    Preview
-                  </span>
-                </div>
-
-                <div className="mt-6">
-                  <p className="text-3xl font-semibold tracking-tight text-white">
-                    Site measurement survey
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-slate-300">
-                    This preview shows how a confirmed dimensions survey booking will appear here.
-                  </p>
-                </div>
-
-                <div className="mt-6 grid gap-3">
-                  <div className="flex items-center gap-3 rounded-2xl bg-white/8 px-4 py-4 ring-1 ring-white/10 backdrop-blur-xl">
-                    <CalendarDays className="h-5 w-5 text-emerald-700" />
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                        Survey date
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-white">
-                        14 May 2026
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3 rounded-2xl bg-white/8 px-4 py-4 ring-1 ring-white/10 backdrop-blur-xl">
-                    <Clock3 className="h-5 w-5 text-emerald-700" />
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                        Survey time
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-white">
-                        11:00 AM
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 rounded-2xl border border-dashed border-emerald-400/25 bg-emerald-500/10 px-4 py-3">
-                  <p className="text-sm text-emerald-200">
-                    Book a dimensions survey in eligibility to replace this preview with live booking details.
-                  </p>
-                </div>
-              </article>
-            )}
+            ) : null}
           </div>
         )}
       </div>
+      ) : null}
 
-      <div className="mt-6 rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+      {shouldShowProjectOverviewSection ? (
+        <div className="mt-6 rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
@@ -1986,6 +1927,7 @@ function DashboardOverview() {
         </div>
 
       </div>
+      ) : null}
 
       
     </section>
