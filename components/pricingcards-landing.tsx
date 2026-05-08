@@ -24,7 +24,7 @@ export const plans: PricingPlanOption[] = [
     subsequentCharge: 100,
     features: [
       "~30% Self-Service",
-      "10 'Planning Intelligence' buttons",
+      "15 'Planning Intelligence' buttons",
       "Basic AI guidance",
       "Simple templates & eligibility checks",
       "Basic document upload",
@@ -40,7 +40,7 @@ export const plans: PricingPlanOption[] = [
     subsequentCharge: 170,
     features: [
       "~50–60% Self-Service",
-      "20 'Planning Intelligence' buttons",
+      "30 'Planning Intelligence' buttons",
       "AI auto-fill & smart validation",
       "Structured document support",
       "Active Agent guidance",

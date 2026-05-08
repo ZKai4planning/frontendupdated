@@ -711,3 +711,16 @@
 }
  
  
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a,
+  summary {
+    cursor: pointer;
+  }
+
+  button:disabled,
+  [disabled] {
+    cursor: not-allowed;
+  }
+}
