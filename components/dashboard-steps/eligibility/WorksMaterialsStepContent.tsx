@@ -135,6 +135,7 @@ export function WorksMaterialsStepContent({
             <AgentActionButton
               label="Ask Agent Z to Summarize"
               onClick={handleSummarizeProposedWorks}
+              agentFieldLabel="Description of Proposed Works"
               disabled={!proposedWorksRawValue.trim()}
               className="mt-0 shrink-0"
             />

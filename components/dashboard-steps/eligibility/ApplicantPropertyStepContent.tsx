@@ -236,6 +236,7 @@ export function ApplicantPropertyStepContent({
     asStringValue(savedFormData["Are you using a planning agent?"]).trim() === "Yes"
   const siteAddressLine1 = asStringValue(savedFormData["Site Address Line 1"]).trim()
   const postcode = asStringValue(savedFormData["Postcode"]).trim()
+  const correspondencePostcode = asStringValue(savedFormData["Correspondence Postcode"]).trim()
   const planningReferenceNumber = asStringValue(savedFormData["Planning Reference Number *"]).trim()
 
   const updateFormData = (nextValues: Record<string, string>) => {
@@ -313,6 +314,29 @@ export function ApplicantPropertyStepContent({
       },
     })
   }, [asStringValue, postcode, resolveCouncilFromPostcode, savedFormData, updateSection])
+
+  useEffect(() => {
+    if (!correspondencePostcode) return
+
+    const currentCorrespondenceCouncil = asStringValue(savedFormData["Correspondence Council"]).trim()
+    if (currentCorrespondenceCouncil) return
+
+    const resolvedCouncil = resolveCouncilFromPostcode(correspondencePostcode).trim()
+    if (!resolvedCouncil) return
+
+    updateSection("eligibility", {
+      formData: {
+        ...savedFormData,
+        "Correspondence Council": resolvedCouncil,
+      },
+    })
+  }, [
+    asStringValue,
+    correspondencePostcode,
+    resolveCouncilFromPostcode,
+    savedFormData,
+    updateSection,
+  ])
 
   const handleGetAddress = () => {
     if (!siteAddressLine1 || !postcode || isGettingAddress) return

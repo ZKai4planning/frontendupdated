@@ -144,7 +144,7 @@ const DASHBOARD_ELIGIBILITY_SUMMARY_STORAGE_PREFIX = "dashboardEligibilitySummar
 const MAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024
 const MAX_UPLOAD_FILE_SIZE_LABEL = "10 MB"
 const ASK_AGENT_USAGE_LIMIT = Number.parseInt(
-  process.env.NEXT_PUBLIC_ASK_AGENT_USAGE_LIMIT ?? "10",
+  process.env.NEXT_PUBLIC_ASK_AGENT_USAGE_LIMIT ?? "15",
   10
 )
 const ASK_AGENT_USAGE_STORAGE_PREFIX = "eligibilityAskAgentUsage:"
@@ -161,8 +161,18 @@ const POSTCODE_LOOKUP_QUERY_PARAM =
   process.env.NEXT_PUBLIC_POSTCODE_LOOKUP_QUERY_PARAM ?? "q"
 const FULL_UK_POSTCODE_PATTERN = /^([A-Z]{1,2}\d[A-Z\d]?|GIR)\s*\d[A-Z]{2}$/i
 
-const KNOWN_ELIGIBILITY_AGENT_TOUCHPOINTS = [
+const ASK_AGENT_USAGE_EXCLUDED_FIELD_LABELS = new Set<string>([
   "Planning Reference Number *",
+  "Need help with location plan?",
+  "Need help with site plan?",
+  "Need help with elevations?",
+  "Need help with site photographs?",
+  "Need help with additional drawings?",
+  "Need help with Tree report?",
+  "Need help with flood risk assessment?",
+])
+
+const KNOWN_ELIGIBILITY_AGENT_TOUCHPOINTS = [
   "Property Type",
   "Ownership Status",
   "Are you planning any building works?",
@@ -175,17 +185,10 @@ const KNOWN_ELIGIBILITY_AGENT_TOUCHPOINTS = [
   "Wall Materials",
   "Roof Materials",
   "Materials match existing?",
-  "Need help with location plan?",
-  "Need help with site plan?",
-  "Need help with elevations?",
-  "Need help with site photographs?",
-  "Need help with additional drawings?",
   "Conservation Area or Near Listed Building?",
   "Trees within falling distance of works?",
-  "Need help with Tree report?",
   "Is the site in Flood Zone 2 or 3?",
   "Any known contamination on site?",
-  "Need help with flood risk assessment?",
   "Do you currently have smoke alarms installed?",
   "Do you have a valid Gas Safety Certificate?",
   "Do you have a valid Electrical Report (EICR)?",
@@ -601,6 +604,26 @@ const extractProjectId = (payload: unknown): string | null => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value)
 
+const normalizeAskAgentFieldLabel = (fieldLabel: string) => {
+  const normalizedFieldLabel = fieldLabel.trim()
+
+  if (normalizedFieldLabel === "Ask Agent Z to Summarize") {
+    return "Description of Proposed Works"
+  }
+
+  return normalizedFieldLabel
+}
+
+const shouldTrackAskAgentUsage = (fieldLabel: string) => {
+  const normalizedFieldLabel = normalizeAskAgentFieldLabel(fieldLabel)
+  return Boolean(normalizedFieldLabel) && !ASK_AGENT_USAGE_EXCLUDED_FIELD_LABELS.has(normalizedFieldLabel)
+}
+
+const createAskAgentUsageRecord = (lastUsedAt: string): EligibilityAskAgentUsageRecord => ({
+  count: 1,
+  lastUsedAt,
+})
+
 const createEmptyAskAgentUsageState = (): EligibilityAskAgentUsageState => ({
   usedCount: 0,
   questionUsageMap: {},
@@ -612,25 +635,25 @@ const normalizeAskAgentUsageState = (value: unknown): EligibilityAskAgentUsageSt
     return createEmptyAskAgentUsageState()
   }
 
-  const usedCount = typeof value.usedCount === "number" && value.usedCount >= 0
-    ? value.usedCount
-    : 0
-
   const questionUsageMap = isRecord(value.questionUsageMap)
     ? Object.entries(value.questionUsageMap).reduce<Record<string, EligibilityAskAgentUsageRecord>>(
-        (accumulator, [fieldLabel, entry]) => {
+        (accumulator, [rawFieldLabel, entry]) => {
           if (!isRecord(entry)) return accumulator
 
+          const fieldLabel = normalizeAskAgentFieldLabel(rawFieldLabel)
           const count = typeof entry.count === "number" && entry.count >= 0 ? entry.count : 0
           const lastUsedAt = typeof entry.lastUsedAt === "string" ? entry.lastUsedAt : ""
 
-          if (!fieldLabel.trim() || count < 1 || !lastUsedAt.trim()) {
+          if (!shouldTrackAskAgentUsage(fieldLabel) || count < 1 || !lastUsedAt.trim()) {
             return accumulator
           }
 
-          accumulator[fieldLabel] = {
-            count,
-            lastUsedAt,
+          const existingRecord = accumulator[fieldLabel]
+          if (
+            !existingRecord ||
+            Date.parse(lastUsedAt) >= Date.parse(existingRecord.lastUsedAt)
+          ) {
+            accumulator[fieldLabel] = createAskAgentUsageRecord(lastUsedAt)
           }
           return accumulator
         },
@@ -638,21 +661,30 @@ const normalizeAskAgentUsageState = (value: unknown): EligibilityAskAgentUsageSt
       )
     : {}
 
+  const seenHistoryLabels = new Set<string>()
   const history = Array.isArray(value.history)
     ? value.history.reduce<EligibilityAskAgentUsageHistoryEntry[]>((accumulator, entry) => {
         if (!isRecord(entry)) return accumulator
 
-        const fieldLabel = typeof entry.fieldLabel === "string" ? entry.fieldLabel : ""
+        const fieldLabel = normalizeAskAgentFieldLabel(
+          typeof entry.fieldLabel === "string" ? entry.fieldLabel : ""
+        )
         const usedAt = typeof entry.usedAt === "string" ? entry.usedAt : ""
         const requestType =
           entry.requestType === "ask-agent" || entry.requestType === "action"
             ? entry.requestType
             : null
 
-        if (!fieldLabel.trim() || !usedAt.trim() || !requestType) {
+        if (
+          !shouldTrackAskAgentUsage(fieldLabel) ||
+          !usedAt.trim() ||
+          !requestType ||
+          seenHistoryLabels.has(fieldLabel)
+        ) {
           return accumulator
         }
 
+        seenHistoryLabels.add(fieldLabel)
         accumulator.push({
           id:
             typeof entry.id === "string" && entry.id.trim()
@@ -663,14 +695,36 @@ const normalizeAskAgentUsageState = (value: unknown): EligibilityAskAgentUsageSt
           requestType,
           usedAt,
         })
+
+        const existingRecord = questionUsageMap[fieldLabel]
+        if (
+          !existingRecord ||
+          Date.parse(usedAt) >= Date.parse(existingRecord.lastUsedAt)
+        ) {
+          questionUsageMap[fieldLabel] = createAskAgentUsageRecord(usedAt)
+        }
+
         return accumulator
       }, [])
     : []
 
+  const historyWithFallbackEntries = [
+    ...history,
+    ...Object.entries(questionUsageMap)
+      .filter(([fieldLabel]) => !seenHistoryLabels.has(fieldLabel))
+      .sort(([, leftEntry], [, rightEntry]) => Date.parse(rightEntry.lastUsedAt) - Date.parse(leftEntry.lastUsedAt))
+      .map(([fieldLabel, entry]) => ({
+        id: `${entry.lastUsedAt}-${fieldLabel}`,
+        fieldLabel,
+        requestType: "ask-agent" as const,
+        usedAt: entry.lastUsedAt,
+      })),
+  ].slice(0, ASK_AGENT_HISTORY_LIMIT)
+
   return {
-    usedCount,
+    usedCount: Object.keys(questionUsageMap).length,
     questionUsageMap,
-    history,
+    history: historyWithFallbackEntries,
   }
 }
 
@@ -2874,10 +2928,10 @@ function AskAgentUsageSummaryButton({
             </div>
             <div className="text-left">
               <p className="text-sm font-semibold text-white">
-                Ask Agent Z {usedAskAgentCount}/{maxAskAgentUses}
+                Ask Agent Z credits {usedAskAgentCount}/{maxAskAgentUses}
               </p>
               <p className="text-[11px] text-slate-300">
-                {remainingAskAgentUses} remaining / {totalAskAgentTouchpoints} available
+                {totalAskAgentTouchpoints} buttons in this form
               </p>
             </div>
           </button>
@@ -2893,22 +2947,20 @@ function AskAgentUsageSummaryButton({
               Ask Agent Z
             </p>
             <h3 className="mt-2 text-lg font-semibold text-white">
-              {usedAskAgentCount} / {maxAskAgentUses} used
+              {usedAskAgentCount} / {maxAskAgentUses} credits used
             </h3>
             <p className="mt-1 text-sm text-slate-300">
-              {remainingAskAgentUses > 0
-                ? `${remainingAskAgentUses} assists remaining for this project`
-                : "Limit reached for this project"}
+              {totalAskAgentTouchpoints} Ask Agent Z buttons are available in this form.
             </p>
 
             <div className="mt-4 grid grid-cols-2 gap-3">
               <div className="rounded-2xl border border-white/8 bg-[#0f1a32] px-3 py-3 text-white shadow-inner shadow-black/20">
                 <p className="text-2xl font-semibold">{totalAskAgentTouchpoints}</p>
-                <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-slate-300">Available</p>
+                <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-slate-300">Buttons</p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/6 px-3 py-3">
                 <p className="text-2xl font-semibold text-white">{remainingAskAgentUses}</p>
-                <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-slate-300">Remaining</p>
+                <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-slate-300">Credits left</p>
               </div>
             </div>
 
@@ -3039,18 +3091,21 @@ function MissingUploadDecision({
   const {
     showAgentSidebar,
     hasRemainingAskAgentUses,
+    getAskAgentUsageForQuestion,
     notifyAskAgentLimitReached,
     registerAskAgentTouchpoint,
   } = useEligibilityAgent()
   const selectedValue = asStringValue(data.eligibility?.formData?.[fieldLabel])
+  const tracksAskAgentUsage = triggerAgent && shouldTrackAskAgentUsage(fieldLabel)
+  const hasUsedAskAgentForField = tracksAskAgentUsage && Boolean(getAskAgentUsageForQuestion(fieldLabel))
 
   useEffect(() => {
-    if (!triggerAgent) return
+    if (!tracksAskAgentUsage) return
     registerAskAgentTouchpoint(fieldLabel)
-  }, [fieldLabel, registerAskAgentTouchpoint, triggerAgent])
+  }, [fieldLabel, registerAskAgentTouchpoint, tracksAskAgentUsage])
 
   const handleSelect = (value: "Yes" | "No") => {
-    if (value === "Yes" && triggerAgent && !hasRemainingAskAgentUses) {
+    if (value === "Yes" && tracksAskAgentUsage && !hasRemainingAskAgentUses && !hasUsedAskAgentForField) {
       notifyAskAgentLimitReached(fieldLabel)
       return
     }
@@ -3072,7 +3127,7 @@ function MissingUploadDecision({
         createAgentSidebarPayload(fieldLabel, message, {
           requestType: "ask-agent",
           responseMode: "info",
-          consumesUsage: value === "Yes",
+          consumesUsage: value === "Yes" && tracksAskAgentUsage,
         })
       )
     }
@@ -3086,7 +3141,7 @@ function MissingUploadDecision({
           : "relative mt-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3"
       }
     >
-      <InlineAskAgentUsageNotice fieldLabel={fieldLabel} />
+      {tracksAskAgentUsage && <InlineAskAgentUsageNotice fieldLabel={fieldLabel} />}
       <p className={`text-xs font-medium ${embedded ? "text-amber-900" : "text-blue-900"}`}>
         {prompt}
       </p>
@@ -3096,7 +3151,12 @@ function MissingUploadDecision({
             key={option}
             type="button"
             onClick={() => handleSelect(option)}
-            disabled={option === "Yes" && triggerAgent && !hasRemainingAskAgentUses}
+            disabled={
+              option === "Yes" &&
+              tracksAskAgentUsage &&
+              !hasRemainingAskAgentUses &&
+              !hasUsedAskAgentForField
+            }
             className={`rounded-xl border px-4 py-2 text-sm font-medium transition-all ${
               selectedValue === option
                 ? embedded
@@ -3212,10 +3272,12 @@ function AgentActionButton({
   const {
     showAgentSidebar,
     hasRemainingAskAgentUses,
+    getAskAgentUsageForQuestion,
     recordAskAgentUsage,
     notifyAskAgentLimitReached,
     registerAskAgentTouchpoint,
   } = useEligibilityAgent()
+  const agentUsageFieldLabel = agentFieldLabel ?? label
   const isCountableAgentAction =
     !agentUsageHandledExternally &&
     (
@@ -3223,22 +3285,26 @@ function AgentActionButton({
       label.trim().toLowerCase().includes("agent z") ||
       Boolean(agentMessage?.toLowerCase().includes("agent z"))
     )
+  const tracksAskAgentUsage =
+    isCountableAgentAction && shouldTrackAskAgentUsage(agentUsageFieldLabel)
+  const hasUsedAskAgentForField =
+    tracksAskAgentUsage && Boolean(getAskAgentUsageForQuestion(agentUsageFieldLabel))
 
   useEffect(() => {
-    if (!isCountableAgentAction) return
-    registerAskAgentTouchpoint(agentFieldLabel ?? label)
-  }, [agentFieldLabel, isCountableAgentAction, label, registerAskAgentTouchpoint])
+    if (!tracksAskAgentUsage) return
+    registerAskAgentTouchpoint(agentUsageFieldLabel)
+  }, [agentUsageFieldLabel, registerAskAgentTouchpoint, tracksAskAgentUsage])
 
   return (
     <div className={className === "mt-3" ? "relative mt-3" : "relative"}>
-      {isCountableAgentAction && (
-        <InlineAskAgentUsageNotice fieldLabel={agentFieldLabel ?? label} />
+      {tracksAskAgentUsage && (
+        <InlineAskAgentUsageNotice fieldLabel={agentUsageFieldLabel} />
       )}
       <button
         type="button"
         onClick={() => {
-          if (isCountableAgentAction && !hasRemainingAskAgentUses) {
-            notifyAskAgentLimitReached(agentFieldLabel ?? label)
+          if (tracksAskAgentUsage && !hasRemainingAskAgentUses && !hasUsedAskAgentForField) {
+            notifyAskAgentLimitReached(agentUsageFieldLabel)
             return
           }
 
@@ -3249,12 +3315,13 @@ function AgentActionButton({
               createAgentSidebarPayload(agentFieldLabel, agentMessage, {
                 requestType: agentRequestType,
                 responseMode: agentResponseMode,
+                consumesUsage: tracksAskAgentUsage,
               })
             )
             return
           }
 
-          if (isCountableAgentAction) {
+          if (tracksAskAgentUsage) {
             recordAskAgentUsage({
               fieldLabel: label,
               message: agentMessage,
@@ -3262,11 +3329,14 @@ function AgentActionButton({
             })
           }
         }}
-        disabled={disabled || (isCountableAgentAction && !hasRemainingAskAgentUses)}
+        disabled={
+          disabled ||
+          (tracksAskAgentUsage && !hasRemainingAskAgentUses && !hasUsedAskAgentForField)
+        }
         className={`eligibility-agent-button inline-flex items-center justify-center rounded-xl border border-blue-900/60 bg-gradient-to-r from-slate-800/92 via-[#1f3d9a]/86 to-blue-800/84 px-3 py-2 text-xs font-semibold text-white transition-all hover:from-slate-800 hover:via-[#1d388f]/92 hover:to-blue-800/90 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-none disabled:bg-slate-100 disabled:text-slate-400 ${className}`}
       >
         <span className="relative z-10">{label}</span>
-        {!disabled && (!isCountableAgentAction || hasRemainingAskAgentUses) && (
+        {!disabled && (!tracksAskAgentUsage || hasRemainingAskAgentUses || hasUsedAskAgentForField) && (
           <EligibilityAgentMovingBorder size={54} />
         )}
       </button>
@@ -3867,6 +3937,7 @@ function SignaturePad({
   strokeWidth = 1.5, // Default set to 1.5 (Fine point) instead of 2.5
 }: SignaturePadProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const hasLoadedPreviewIntoCanvasRef = useRef(false)
   const { signatureFile, setSignatureFile, signaturePreviewUrl, setSignaturePreviewUrl } = useEligibilityAssets()
   const [isDrawing, setIsDrawing] = useState(false)
   const [hasInkStroke, setHasInkStroke] = useState(false)
@@ -3894,6 +3965,31 @@ function SignaturePad({
       )
     }, "image/png")
   }
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return
+
+    if (!signaturePreviewUrl) return
+
+    if (hasLoadedPreviewIntoCanvasRef.current || hasInkStroke) return
+
+    const image = new Image()
+    image.onload = () => {
+      const currentCanvas = canvasRef.current
+      if (!currentCanvas) return
+      const currentCtx = currentCanvas.getContext("2d")
+      if (!currentCtx) return
+
+      currentCtx.clearRect(0, 0, currentCanvas.width, currentCanvas.height)
+      currentCtx.drawImage(image, 0, 0, currentCanvas.width, currentCanvas.height)
+      setHasInkStroke(true)
+      hasLoadedPreviewIntoCanvasRef.current = true
+    }
+    image.src = signaturePreviewUrl
+  }, [hasInkStroke, signaturePreviewUrl])
 
   // FIX: Calculate position considering the scale difference between CSS pixels and Canvas pixels
   const getPos = (
@@ -3933,12 +4029,6 @@ function SignaturePad({
     if ("touches" in e) {
        // e.preventDefault() is usually handled in CSS touch-action, 
        // but this ensures safety for older browsers if needed.
-    }
-
-    if (signaturePreviewUrl || signatureFile) {
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
-      setSignaturePreviewUrl(null)
-      setSignatureFile(null)
     }
 
     setIsDrawing(true)
@@ -3983,6 +4073,7 @@ function SignaturePad({
     
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     setHasInkStroke(false)
+    hasLoadedPreviewIntoCanvasRef.current = false
     setSignatureFile(null)
     setSignaturePreviewUrl(null)
   }
@@ -4005,16 +4096,6 @@ function SignaturePad({
           // "touch-none" is critical: it tells the browser "don't scroll when I touch this"
           className="w-full touch-none cursor-crosshair block"
         />
-        {signaturePreviewUrl && (
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/80 p-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={signaturePreviewUrl}
-              alt="Digital signature preview"
-              className="max-h-full max-w-full rounded-md object-contain"
-            />
-          </div>
-        )}
         {!isSigned && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
             <div className="flex items-center gap-2 text-slate-300">
@@ -4082,6 +4163,7 @@ function CheckboxGroup({
   const {
     showAgentSidebar,
     hasRemainingAskAgentUses,
+    getAskAgentUsageForQuestion,
     notifyAskAgentLimitReached,
     registerAskAgentTouchpoint,
   } = useEligibilityAgent()
@@ -4090,6 +4172,7 @@ function CheckboxGroup({
   : []
   const fieldId = getFieldId(label)
   const hasAskAgentOption = options.some(isAgentOptionLabel)
+  const hasUsedAskAgentForField = Boolean(getAskAgentUsageForQuestion(label))
 
   useEffect(() => {
     if (!hasAskAgentOption) return
@@ -4100,7 +4183,7 @@ function CheckboxGroup({
   const toggle = (option: string) => {
     const isAgentOption = isAgentOptionLabel(option)
     const isAlreadySelected = selected.includes(option)
-    if (isAgentOption && !isAlreadySelected && !hasRemainingAskAgentUses) {
+    if (isAgentOption && !isAlreadySelected && !hasRemainingAskAgentUses && !hasUsedAskAgentForField) {
       notifyAskAgentLimitReached(label)
       return
     }
@@ -4154,7 +4237,12 @@ function CheckboxGroup({
               key={o}
               type="button"
               onClick={() => toggle(o)}
-              disabled={isAgentOption && !hasRemainingAskAgentUses && !isSelected}
+              disabled={
+                isAgentOption &&
+                !hasRemainingAskAgentUses &&
+                !hasUsedAskAgentForField &&
+                !isSelected
+              }
               className={`${
                 isAgentOption ? "eligibility-agent-button" : ""
               } flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm transition-all ${
@@ -4300,6 +4388,7 @@ function EligibilityCheckPage() {
   const [uploadedFiles, setUploadedFiles] = useState<EligibilityFileMap>({})
   const [signatureFile, setSignatureFile] = useState<File | null>(null)
   const [signaturePreviewUrl, setSignaturePreviewUrl] = useState<string | null>(null)
+  const [showEligibilitySuccessModal, setShowEligibilitySuccessModal] = useState(false)
   const [askAgentUsage, setAskAgentUsage] = useState<EligibilityAskAgentUsageState>(
     createEmptyAskAgentUsageState()
   )
@@ -4337,7 +4426,7 @@ function EligibilityCheckPage() {
   const isDeclarationsComplete = missingDeclarationFields.length === 0
   const maxAskAgentUses = Number.isFinite(ASK_AGENT_USAGE_LIMIT) && ASK_AGENT_USAGE_LIMIT > 0
     ? ASK_AGENT_USAGE_LIMIT
-    : 10
+    : 15
   const askAgentUsageStorageKey = useMemo(() => {
     const userScope = userId?.trim() || "anonymous"
     const projectScope =
@@ -4351,7 +4440,7 @@ function EligibilityCheckPage() {
   const usedAskAgentCount = askAgentUsage.usedCount
   const remainingAskAgentUses = Math.max(0, maxAskAgentUses - usedAskAgentCount)
   const hasRemainingAskAgentUses = remainingAskAgentUses > 0
-  const totalAskAgentTouchpoints = registeredAgentTouchpoints.length
+  const totalAskAgentTouchpoints = registeredAgentTouchpoints.filter(shouldTrackAskAgentUsage).length
 
   const nextStep = () => setStep(prev => (prev < TOTAL_STEPS ? ((prev + 1) as Step) : prev))
   const prevStep = () => setStep(prev => (prev > 1 ? ((prev - 1) as Step) : prev))
@@ -4442,7 +4531,7 @@ function EligibilityCheckPage() {
 
   const registerAskAgentTouchpoint = React.useCallback((fieldLabel: string) => {
     const normalizedLabel = fieldLabel.trim()
-    if (!normalizedLabel) return
+    if (!shouldTrackAskAgentUsage(normalizedLabel)) return
 
     setRegisteredAgentTouchpoints((currentLabels) => (
       currentLabels.includes(normalizedLabel)
@@ -4454,13 +4543,19 @@ function EligibilityCheckPage() {
   const recordAskAgentUsage = React.useCallback((
     entry: Omit<EligibilityAskAgentUsageHistoryEntry, "id" | "usedAt">
   ) => {
-    if (askAgentUsageRef.current.usedCount >= maxAskAgentUses) {
-      notifyAskAgentLimitReached(entry.fieldLabel)
+    const fieldLabel = normalizeAskAgentFieldLabel(entry.fieldLabel)
+    if (!fieldLabel) {
       return false
     }
 
-    const fieldLabel = entry.fieldLabel.trim()
-    if (!fieldLabel) {
+    if (!shouldTrackAskAgentUsage(fieldLabel)) {
+      setSubmitError(null)
+      return true
+    }
+
+    const existingQuestionUsage = askAgentUsageRef.current.questionUsageMap[fieldLabel]
+    if (!existingQuestionUsage && askAgentUsageRef.current.usedCount >= maxAskAgentUses) {
+      notifyAskAgentLimitReached(fieldLabel)
       return false
     }
 
@@ -4473,16 +4568,20 @@ function EligibilityCheckPage() {
       usedAt,
     }
 
+    const nextHistory = [
+      historyEntry,
+      ...askAgentUsageRef.current.history.filter((item) => item.fieldLabel !== fieldLabel),
+    ].slice(0, ASK_AGENT_HISTORY_LIMIT)
+
     const nextUsageState: EligibilityAskAgentUsageState = {
-      usedCount: askAgentUsageRef.current.usedCount + 1,
+      usedCount: existingQuestionUsage
+        ? askAgentUsageRef.current.usedCount
+        : askAgentUsageRef.current.usedCount + 1,
       questionUsageMap: {
         ...askAgentUsageRef.current.questionUsageMap,
-        [fieldLabel]: {
-          count: (askAgentUsageRef.current.questionUsageMap[fieldLabel]?.count ?? 0) + 1,
-          lastUsedAt: usedAt,
-        },
+        [fieldLabel]: createAskAgentUsageRecord(usedAt),
       },
-      history: [historyEntry, ...askAgentUsageRef.current.history].slice(0, ASK_AGENT_HISTORY_LIMIT),
+      history: nextHistory,
     }
 
     askAgentUsageRef.current = nextUsageState
@@ -4493,7 +4592,9 @@ function EligibilityCheckPage() {
       id: historyEntry.id,
       tone: "info",
       title: `Ask Agent Z used: ${nextUsageState.usedCount}/${maxAskAgentUses}`,
-      message: `${remainingUses} assist${remainingUses === 1 ? "" : "s"} remaining for this project.`,
+      message: existingQuestionUsage
+        ? "This question was already counted. You can ask Agent Z about it again without using another assist."
+        : `${remainingUses} assist${remainingUses === 1 ? "" : "s"} remaining for this project.`,
       fieldLabel,
     })
     return true
@@ -4518,7 +4619,10 @@ function EligibilityCheckPage() {
   }, [recordAskAgentUsage])
 
   const getAskAgentUsageForQuestion = React.useCallback(
-    (fieldLabel: string) => askAgentUsage.questionUsageMap[fieldLabel],
+    (fieldLabel: string) => {
+      const normalizedLabel = normalizeAskAgentFieldLabel(fieldLabel)
+      return normalizedLabel ? askAgentUsage.questionUsageMap[normalizedLabel] : undefined
+    },
     [askAgentUsage.questionUsageMap]
   )
 
@@ -4860,6 +4964,7 @@ function EligibilityCheckPage() {
       setAgentSidebar(null)
       setShowVerification(true)
       setIsEligibilityFormVisible(false)
+      setShowEligibilitySuccessModal(true)
       updateSection("eligibility", {
         ...(data.eligibility || {}),
         isEligible: true,
@@ -5353,6 +5458,18 @@ function EligibilityCheckPage() {
         </EligibilityAgentContext.Provider>
       </EligibilityStepContext.Provider>
 
+      {showEligibilitySuccessModal && (
+        <EligibilitySubmissionSuccessModal
+          serviceName={selectedServiceAppliedName}
+          onClose={() => setShowEligibilitySuccessModal(false)}
+          onScheduleConsultation={() => setShowEligibilitySuccessModal(false)}
+          onReviewSubmission={() => {
+            setShowEligibilitySuccessModal(false)
+            setIsEligibilityFormVisible(true)
+          }}
+        />
+      )}
+
       {isAnalyzing && <AnalysisModal />}
     </main>
   )
@@ -5471,6 +5588,105 @@ function EligibilitySubmittedCard({
       >
         Review Submitted Form
       </button>
+    </div>
+  )
+}
+
+function EligibilitySubmissionSuccessModal({
+  serviceName,
+  onClose,
+  onScheduleConsultation,
+  onReviewSubmission,
+}: {
+  serviceName: string
+  onClose: () => void
+  onScheduleConsultation: () => void
+  onReviewSubmission: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/70 px-4 py-8 backdrop-blur-sm"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Eligibility form submitted successfully"
+    >
+      <div
+        className="relative w-full max-w-2xl overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,26,46,0.98),rgba(10,16,30,0.98))] p-6 text-white shadow-[0_36px_90px_rgba(2,8,20,0.58)] sm:p-8"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-200 transition hover:bg-white/10"
+          aria-label="Close confirmation"
+        >
+          <X className="h-4 w-4" />
+        </button>
+
+        <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-200">
+          <CheckCircle className="h-3.5 w-3.5" />
+          Submission Received
+        </div>
+
+        <h2 className="mt-5 max-w-xl text-2xl font-semibold leading-tight text-white sm:text-3xl">
+          Thank you for completing your eligibility form
+        </h2>
+        <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-[15px]">
+          We have received your details for <span className="font-semibold text-white">{serviceName}</span>.
+          Our team will review your responses so your consultation can be focused, practical, and tailored to your project.
+        </p>
+        <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300 sm:text-[15px]">
+          The next step is to choose a convenient consultation slot. You can do that now using the calendar on this page.
+        </p>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-white/10 bg-white/6 p-4">
+            <p className="text-sm font-semibold text-white">Form received</p>
+            <p className="mt-2 text-sm leading-6 text-slate-300">
+              Your eligibility answers and uploaded details have been saved successfully.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/6 p-4">
+            <p className="text-sm font-semibold text-white">Consultant review</p>
+            <p className="mt-2 text-sm leading-6 text-slate-300">
+              A consultant will use this information to prepare for your next discussion.
+            </p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/6 p-4">
+            <p className="text-sm font-semibold text-white">Choose a slot</p>
+            <p className="mt-2 text-sm leading-6 text-slate-300">
+              Select a suitable time from the consultation calendar whenever you are ready.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-cyan-400/15 bg-cyan-400/8 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">
+            What you can do next
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-200">
+            Continue to consultation scheduling now, or reopen your submitted form if you would like to review what you entered first.
+          </p>
+        </div>
+
+        <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+          <button
+            type="button"
+            onClick={onScheduleConsultation}
+            className="rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:from-cyan-400 hover:to-blue-500"
+          >
+            Schedule Consultation
+          </button>
+          <button
+            type="button"
+            onClick={onReviewSubmission}
+            className="rounded-2xl border border-white/12 bg-white/5 px-6 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10"
+          >
+            Review Submitted Form
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
@@ -5858,6 +6074,7 @@ function Input({
   const {
     showAgentSidebar,
     hasRemainingAskAgentUses,
+    getAskAgentUsageForQuestion,
     recordAskAgentUsage,
     notifyAskAgentLimitReached,
     registerAskAgentTouchpoint,
@@ -5869,6 +6086,9 @@ function Input({
     Boolean(actionLabel && actionOpensAgentSidebar) ||
     Boolean(actionLabel?.toLowerCase().includes("agent z")) ||
     Boolean(actionMessage?.toLowerCase().includes("agent z"))
+  const tracksAskAgentUsage = isAgentAction && shouldTrackAskAgentUsage(label)
+  const hasUsedAskAgentForField =
+    tracksAskAgentUsage && Boolean(getAskAgentUsageForQuestion(label))
   const [suggestions, setSuggestions] = useState<AutocompleteSuggestion[]>([])
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false)
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
@@ -6033,9 +6253,9 @@ function Input({
   }, [data.eligibility?.location, isPostcodeAutocomplete, updateSection, value])
 
   useEffect(() => {
-    if (!isAgentAction) return
+    if (!tracksAskAgentUsage) return
     registerAskAgentTouchpoint(label)
-  }, [isAgentAction, label, registerAskAgentTouchpoint])
+  }, [label, registerAskAgentTouchpoint, tracksAskAgentUsage])
 
   useEffect(() => {
     if (!isPostcodeAutocomplete) return
@@ -6081,7 +6301,7 @@ function Input({
   const handleActionClick = () => {
     if (!onAction) return
 
-    if (isAgentAction && !hasRemainingAskAgentUses) {
+    if (tracksAskAgentUsage && !hasRemainingAskAgentUses && !hasUsedAskAgentForField) {
       notifyAskAgentLimitReached(label)
       return
     }
@@ -6090,7 +6310,7 @@ function Input({
       try {
         await onAction()
 
-        if (isAgentAction) {
+        if (tracksAskAgentUsage) {
           recordAskAgentUsage({
             fieldLabel: label,
             message: actionMessage ?? `${actionLabel} requested for ${label}.`,
@@ -6121,7 +6341,7 @@ function Input({
 
   return (
     <div className="relative" id={fieldId}>
-      {isAgentAction && <InlineAskAgentUsageNotice fieldLabel={label} />}
+      {tracksAskAgentUsage && <InlineAskAgentUsageNotice fieldLabel={label} />}
       <FieldLabel
         label={label}
         tooltip={tooltip}
@@ -6193,7 +6413,10 @@ function Input({
         {actionLabel && onAction && (
           <AgentActionButton
             label={actionLabel}
-            disabled={actionDisabled || (isAgentAction && !hasRemainingAskAgentUses)}
+            disabled={
+              actionDisabled ||
+              (tracksAskAgentUsage && !hasRemainingAskAgentUses && !hasUsedAskAgentForField)
+            }
             className="w-full xl:mt-0 xl:w-auto xl:min-w-[110px]"
             onClick={handleActionClick}
             agentUsageHandledExternally
@@ -6268,6 +6491,7 @@ function SelectField({
   const {
     showAgentSidebar,
     hasRemainingAskAgentUses,
+    getAskAgentUsageForQuestion,
     notifyAskAgentLimitReached,
     registerAskAgentTouchpoint,
   } = useEligibilityAgent()
@@ -6276,6 +6500,7 @@ function SelectField({
   const isAgentValue = isAgentOptionLabel(value)
   const fieldId = getFieldId(label)
   const hasAskAgentOption = options.some(isAgentOptionLabel)
+  const hasUsedAskAgentForField = Boolean(getAskAgentUsageForQuestion(label))
 
   useEffect(() => {
     if (!hasAskAgentOption) return
@@ -6298,7 +6523,7 @@ function SelectField({
             const nextValue = e.target.value
             const nextValueConsumesUsage = isAgentOptionLabel(nextValue)
 
-            if (nextValueConsumesUsage && !hasRemainingAskAgentUses) {
+            if (nextValueConsumesUsage && !hasRemainingAskAgentUses && !hasUsedAskAgentForField) {
               notifyAskAgentLimitReached(label)
               return
             }
@@ -6334,7 +6559,12 @@ function SelectField({
               key={o}
               value={o}
               style={getNativeSelectOptionStyle(o)}
-              disabled={isAgentOptionLabel(o) && !hasRemainingAskAgentUses && value !== o}
+              disabled={
+                isAgentOptionLabel(o) &&
+                !hasRemainingAskAgentUses &&
+                !hasUsedAskAgentForField &&
+                value !== o
+              }
             >
               {o}
             </option>
@@ -6366,6 +6596,7 @@ function RadioGroupField({
   const {
     showAgentSidebar,
     hasRemainingAskAgentUses,
+    getAskAgentUsageForQuestion,
     notifyAskAgentLimitReached,
     registerAskAgentTouchpoint,
   } = useEligibilityAgent()
@@ -6375,6 +6606,7 @@ function RadioGroupField({
   const fieldId = getFieldId(label)
   const showAgentButton = isAgentSidebarTriggerValue(selected)
   const hasAskAgentOption = options.some(isAgentOptionLabel)
+  const hasUsedAskAgentForField = Boolean(getAskAgentUsageForQuestion(label))
 
   useEffect(() => {
     if (!hasAskAgentOption) return
@@ -6395,7 +6627,7 @@ function RadioGroupField({
               key={o}
               type="button"
               onClick={() => {
-                if (isAgentOption && !hasRemainingAskAgentUses && selected !== o) {
+                if (isAgentOption && !hasRemainingAskAgentUses && !hasUsedAskAgentForField && selected !== o) {
                   notifyAskAgentLimitReached(label)
                   return
                 }
@@ -6418,7 +6650,12 @@ function RadioGroupField({
                   )
                 }
               }}
-              disabled={isAgentOption && !hasRemainingAskAgentUses && selected !== o}
+              disabled={
+                isAgentOption &&
+                !hasRemainingAskAgentUses &&
+                !hasUsedAskAgentForField &&
+                selected !== o
+              }
               className={`${
                 isAgentOption ? "eligibility-agent-button" : ""
               } flex-1 min-w-fit rounded-xl border px-4 py-2 text-sm transition-all ${
