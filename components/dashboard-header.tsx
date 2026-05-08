@@ -449,7 +449,8 @@ export default function DashboardHeader({
       window.sessionStorage.removeItem(SELECTED_PROJECT_STAGE_STORAGE_KEY)
     }
 
-    router.push(preservedServiceSelection ? PLANS_STAGE_ROUTE : "/services")
+    // router.push(preservedServiceSelection ? PLANS_STAGE_ROUTE : "/services")
+    router.push("/services")
   }
 
   const handleLogout = () => {
