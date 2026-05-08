@@ -23,8 +23,14 @@ export type ProjectData = {
   service?: {
     serviceId?: string
     parentServiceId?: string
+    subServiceId?: string
+    serviceTitle?: string
     plan?: string
+    pricingPlan?: string
+    pricingPlanDescription?: string
     price?: number
+    initialCharge?: number
+    subsequentCharge?: number
     category?: string
     description?: string
     image?: string
@@ -77,6 +83,25 @@ export type ProjectData = {
   }
 
   payment?: {
+    customerDetails?: {
+      fullName?: string
+      phoneCountryCode?: string
+      phoneNumber?: string
+      email?: string
+      fullAddress?: string
+      postalCode?: string
+      addressDetails?: {
+        doorNo?: string
+        sTreet?: string
+        locality?: string
+        city?: string
+        state?: string
+        country?: string
+        postalCode?: string
+      }
+      serviceLocationType?: "same" | "different"
+      servicePostalCode?: string
+    }
     transactionRef?: string
     proofFileName?: string | null
     status?: "pending" | "submitted" | "approved"

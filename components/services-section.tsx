@@ -51,7 +51,7 @@ const services: Service[] = [
         title: "Works to Trees (TPO & Conservation)",
         header: "Works to Trees (TPO & Conservation)",
         description:
-          "As a homeowner with a protected tree in my garden, I want to prune or remove dangerous branches so that my family and property are safe."
+          "As a homeowner with a protected Tree in my garden, I want to prune or remove dangerous branches so that my family and property are safe."
       },
       {
         title: "Lawful Development Certificate (LDC)",

@@ -13,12 +13,12 @@ import { useUserIdentity } from "@/lib/use-user-identity"
 /* ---------------- Divider ---------------- */
 function SidebarDivider({ label }: { label: string }) {
   return (
-    <div className="flex items-center gap-3 my-4 px-4">
-      <div className="flex-1 h-px bg-slate-800" />
-      <span className="text-[10px] uppercase font-medium tracking-widest text-black-400">
+    <div className="my-4 flex items-center gap-3 px-4">
+      <div className="h-px flex-1 bg-white/10" />
+      <span className="text-[10px] font-medium uppercase tracking-widest text-slate-400">
         {label}
       </span>
-      <div className="flex-1 h-px bg-slate-800" />
+      <div className="h-px flex-1 bg-white/10" />
     </div>
   )
 }
@@ -26,11 +26,9 @@ function SidebarDivider({ label }: { label: string }) {
 /* ---------------- Sidebar ---------------- */
 export default function Sidebar({
   collapsed,
-  onToggle,
   onGetStarted,
 }: {
   collapsed: boolean
-  onToggle: () => void
   onGetStarted: () => void
 }) {
   const [openGroup, setOpenGroup] = useState<string | null>(null)
@@ -46,12 +44,14 @@ export default function Sidebar({
   return (
     <aside
       className={cn(
-        "h-full bg-white text-slate-700 flex flex-col transition-all duration-300 border-r border-slate-200",
-        collapsed ? "w-20" : "w-64"
+        "fixed inset-y-0 left-0 z-40 flex h-full flex-col border-r border-white/10 bg-[linear-gradient(180deg,rgba(5,11,24,0.98),rgba(9,18,38,0.95))] text-slate-200 shadow-[18px_0_48px_rgba(2,6,23,0.38)] backdrop-blur-xl transition-all duration-300 lg:static lg:z-auto",
+        collapsed
+          ? "-translate-x-full lg:translate-x-0 lg:w-20"
+          : "translate-x-0 w-[85vw] max-w-xs lg:w-64"
       )}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 h-16 border-b border-slate-200 mt-2">
+      <div className="mt-2 flex h-16 items-center justify-between border-b border-white/10 px-4">
         <Logo collapsed={collapsed} />
       
       </div>
@@ -95,20 +95,20 @@ export default function Sidebar({
                     ? "justify-center px-3 py-3"
                     : "gap-3 px-4 py-2",
                   isActive
-                    ? "bg-blue-50 text-blue-600"
-                    : "hover:bg-slate-100"
+                    ? "bg-[#135BEC]/18 text-blue-200"
+                    : "hover:bg-white/5"
                 )}
               >
                 {isActive && (
-                  <span className="absolute right-0 top-0 h-full w-1 bg-blue-600 rounded-r-md" />
+                  <span className="absolute right-0 top-0 h-full w-1 rounded-r-md bg-[#4F8DFF]" />
                 )}
  
                 <Icon
                   className={cn(
                     "text-lg",
                     isActive
-                      ? "text-blue-600"
-                      : "text-slate-500 group-hover:text-slate-700"
+                      ? "text-blue-200"
+                      : "text-slate-400 group-hover:text-slate-200"
                   )}
                 />
  
@@ -126,14 +126,15 @@ export default function Sidebar({
             return (
               <button
                 key={item.id}
+                onClick={() => undefined}
                 className={cn(
-                  "w-full flex items-center rounded-md transition hover:bg-slate-100",
+                  "w-full flex items-center rounded-md transition hover:bg-white/5",
                   collapsed
                     ? "justify-center px-3 py-3"
                     : "gap-3 px-4 py-2"
                 )}
               >
-                <Icon className="text-lg text-slate-500" />
+                <Icon className="text-lg text-slate-400" />
                 {!collapsed && (
                   <span className="text-sm font-medium">
                     {item.label}
@@ -151,13 +152,13 @@ export default function Sidebar({
                   setOpenGroup(isOpen ? null : item.id)
                 }
                 className={cn(
-                  "w-full flex items-center rounded-md transition hover:bg-slate-100",
+                  "w-full flex items-center rounded-md transition hover:bg-white/5",
                   collapsed
                     ? "justify-center px-3 py-3"
                     : "gap-3 px-4 py-2"
                 )}
               >
-                <Icon className="text-lg text-slate-500" />
+                <Icon className="text-lg text-slate-400" />
                 {!collapsed && (
                   <span className="text-sm font-medium">
                     {item.label}
@@ -179,12 +180,12 @@ export default function Sidebar({
                         className={cn(
                           "relative block px-3 py-2 rounded-md text-sm transition",
                           childActive
-                            ? "bg-blue-100 text-blue-600"
-                            : "text-slate-500 hover:bg-slate-100"
+                            ? "bg-[#135BEC]/18 text-blue-200"
+                            : "text-slate-400 hover:bg-white/5"
                         )}
                       >
                         {childActive && (
-                          <span className="absolute right-0 top-0 h-full w-1 bg-blue-600 rounded-r-md" />
+                          <span className="absolute right-0 top-0 h-full w-1 rounded-r-md bg-[#4F8DFF]" />
                         )}
                         {child.label}
                       </Link>
@@ -198,27 +199,27 @@ export default function Sidebar({
       </nav>
  
       {/* -------- Bottom Section -------- */}
-      <div className="mt-auto border-t border-slate-200">
+      <div className="mt-auto border-t border-white/10">
         <div className="p-3">
           <Link
             href="/profile-section"
             className={cn(
-              "block rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50 transition hover:border-blue-200 hover:shadow-sm",
+              "block rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl transition hover:border-blue-400/40 hover:bg-white/10",
               collapsed ? "p-3" : "p-4"
             )}
           >
             {collapsed ? (
               <div className="flex flex-col items-center gap-2">
-                <div className="relative flex h-11 w-11 items-center justify-center rounded-full bg-white shadow-sm">
+                <div className="relative flex h-11 w-11 items-center justify-center rounded-full bg-white/10 shadow-sm">
                   {isProfileStatusLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                    <Loader2 className="h-4 w-4 animate-spin text-blue-300" />
                   ) : (
-                    <span className="text-xs font-semibold text-blue-700">
+                    <span className="text-xs font-semibold text-blue-200">
                       {completionPercentage}%
                     </span>
                   )}
                 </div>
-                <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-700">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-blue-200">
                   Profile
                 </span>
               </div>
@@ -226,18 +227,18 @@ export default function Sidebar({
               <>
                 <div>
                   <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-700">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-200">
                       Profile Completion
                     </p>
-                    <p className="mt-1 text-sm font-semibold text-slate-900">
+                    <p className="mt-1 text-sm font-semibold text-white">
                       {completionPercentage}% complete
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/90">
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
                   <div
-                    className="h-full rounded-full bg-blue-600 transition-all duration-300"
+                    className="h-full rounded-full bg-[#4F8DFF] transition-all duration-300"
                     style={{ width: `${completionPercentage}%` }}
                   />
                 </div>
@@ -249,20 +250,20 @@ export default function Sidebar({
         <div className="p-3">
           <button
             onClick={onGetStarted}
-            className="w-full px-3 py-2 rounded-md bg-slate-100 hover:bg-slate-200 text-sm"
+            className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm text-slate-200 transition hover:bg-white/10"
           >
             💬 {!collapsed && "Got Feedback?"}
           </button>
         </div>
  
         {!collapsed && (
-          <div className="px-4 py-3 border-t border-slate-200">
+          <div className="border-t border-white/10 px-4 py-3">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-semibold text-sm">
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#135BEC] text-sm font-semibold text-white">
                 {initials}
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-medium truncate">
+                <p className="truncate text-sm font-medium text-white">
                   {userName}
                 </p>
                 <p className="text-xs text-slate-400 truncate">

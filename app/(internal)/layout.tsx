@@ -5,6 +5,7 @@ import Sidebar from "../../components/sidebar"
 import DashboardHeader from "../../components/dashboard-header"
 import GetStarted from "../../components/onGetStarted"
 import HelpWidget from "../../components/helpwidget"
+import WhatsAppButton from "../../components/whatsppp-button"
 import { DashboardFooter } from "../../components/dashboard-footer"
 import { FiX } from "react-icons/fi"
 import { hydrateProjectFlowFromApi } from "@/lib/project-flow"
@@ -31,18 +32,41 @@ export default function DashboardLayout({
       mounted = false
     }
   }, [])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const syncSidebarForViewport = () => {
+      setCollapsed(window.innerWidth < 1024)
+    }
+
+    syncSidebarForViewport()
+    window.addEventListener("resize", syncSidebarForViewport)
+
+    return () => {
+      window.removeEventListener("resize", syncSidebarForViewport)
+    }
+  }, [])
  
   return (
-    <div className="h-screen flex bg-gray-100 overflow-hidden">
+    <div className="internal-shell flex h-screen overflow-hidden">
       {/* Sidebar */}
+      {!collapsed ? (
+        <button
+          type="button"
+          aria-label="Close sidebar overlay"
+          onClick={() => setCollapsed(true)}
+          className="fixed inset-0 z-30 bg-black/40 lg:hidden"
+        />
+      ) : null}
+
       <Sidebar
         collapsed={collapsed}
-        onToggle={() => setCollapsed((p) => !p)}
         onGetStarted={() => setShowGetStarted(true)}
       />
  
       {/* Content wrapper */}
-      <div className="flex flex-col flex-1 overflow-hidden">
+      <div className="relative flex flex-1 flex-col overflow-hidden">
  
  
  
@@ -59,12 +83,24 @@ export default function DashboardLayout({
  
 
         {/* Page Content testing */}
-        <main className="flex-1 overflow-y-auto transition-all duration-300">
+        <main
+          id="dashboard-scroll-root"
+          className="relative flex-1 overflow-y-auto transition-all duration-300"
+        >
           {children}
         </main>
  
         {/* Footer */}
         <DashboardFooter />
+
+        <div className="pointer-events-none absolute bottom-6 right-4 z-[80] flex flex-col items-end gap-3 sm:right-6">
+          <div className="pointer-events-auto">
+            <WhatsAppButton inline />
+          </div>
+          <div className="pointer-events-auto relative">
+            <HelpWidget inline />
+          </div>
+        </div>
       </div>
  
       {/* Get Started Modal */}
@@ -75,11 +111,11 @@ export default function DashboardLayout({
             onClick={() => setShowGetStarted(false)}
           />
  
-          <div className="fixed inset-0 z-50 flex items-center justify-center">
-            <div className="relative">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="relative w-full max-w-xl">
               <button
                 onClick={() => setShowGetStarted(false)}
-                className="absolute -top-3 -right-3 bg-black text-white p-2 rounded-full"
+                className="absolute -top-3 right-3 rounded-full bg-black p-2 text-white sm:-right-3"
               >
                 <FiX size={14} />
               </button>
@@ -88,8 +124,6 @@ export default function DashboardLayout({
           </div>
         </>
       )}
- 
-      <HelpWidget />
     </div>
   )
 }

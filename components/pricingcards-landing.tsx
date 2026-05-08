@@ -5,13 +5,26 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
 
-const plans = [
+export type PricingPlanOption = {
+  name: string
+  description: string
+  button: string
+  initialCharge: number
+  subsequentCharge: number
+  features: string[]
+  badge?: string
+}
+
+export const plans: PricingPlanOption[] = [
   {
     name: "Bronze",
     description: "Essential",
     button: "Get Started",
+    initialCharge: 40,
+    subsequentCharge: 100,
     features: [
       "~30% Self-Service",
+      "10 'Planning Intelligence' buttons",
       "Basic AI guidance",
       "Simple templates & eligibility checks",
       "Basic document upload",
@@ -22,9 +35,12 @@ const plans = [
   {
     name: "Silver",
     description: "Most Popular",
-    button: "Get Access",
+    button: "Get Started",
+    initialCharge: 70,
+    subsequentCharge: 170,
     features: [
       "~50–60% Self-Service",
+      "20 'Planning Intelligence' buttons",
       "AI auto-fill & smart validation",
       "Structured document support",
       "Active Agent guidance",
@@ -36,6 +52,8 @@ const plans = [
     name: "Gold",
     description: "Advanced Support",
     button: "Get Access",
+    initialCharge: 120,
+    subsequentCharge: 280,
     badge: "Most popular",
     features: [
       "~60–70% Self-Service",
@@ -50,6 +68,8 @@ const plans = [
     name: "Platinum",
     description: "Full-Service Concierge",
     button: "Get Started",
+    initialCharge: 200,
+    subsequentCharge: 500,
     features: [
       "10–20% Self-Service (minimal effort required)",
       "Most Advanced AI features",
@@ -61,15 +81,17 @@ const plans = [
   },
 ]
 
-export default function PricingCardsLanding() {
-  const restrictedPlans = new Set(["Silver", "Gold", "Platinum"])
+type PricingCardsLandingProps = {
+  onSelectPlan?: (plan: PricingPlanOption) => void
+}
+
+export default function PricingCardsLanding({
+  onSelectPlan,
+}: PricingCardsLandingProps = {}) {
+  const restrictedPlans = new Set(["Gold", "Platinum"])
   const restrictedCardBlurStyle = {
     filter: "blur(3px)",
     WebkitFilter: "blur(3px)",
-  } as const
-  const disabledButtonBlurStyle = {
-    filter: "blur(1px)",
-    WebkitFilter: "blur(1px)",
   } as const
 
   return (
@@ -87,7 +109,7 @@ export default function PricingCardsLanding() {
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 px-4">
         {plans.map((plan) => {
           const isRestricted = restrictedPlans.has(plan.name)
-          const isBronzeComingSoon = plan.name === "Bronze"
+          // const isBronzeComingSoon = plan.name === "Bronze"
 
           return (
             <Card
@@ -114,18 +136,18 @@ export default function PricingCardsLanding() {
                 </p>
 
                 <Button
-                  disabled={isRestricted || isBronzeComingSoon}
+                  disabled={isRestricted}
+                  onClick={() => {
+                    if (!isRestricted) {
+                      onSelectPlan?.(plan)
+                    }
+                  }}
                   className={`mt-4 w-full rounded-xl ${isRestricted
                       ? "bg-white/20 text-white/60 cursor-not-allowed"
-                      : isBronzeComingSoon
-                        ? "cursor-not-allowed bg-white/70 text-black/80 blur-[1px]"
-                        : "bg-white text-black hover:bg-gray-200"
+                      : "bg-[#135BEC] text-white hover:bg-[#2A6BF0]"
                     }`}
-                  style={isBronzeComingSoon ? disabledButtonBlurStyle : undefined}
                 >
-                  {isBronzeComingSoon
-                    ? "Stay tuned for the full launch!"
-                    : plan.button}
+                  {plan.button}
                 </Button>
               </CardHeader>
 

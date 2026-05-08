@@ -10,17 +10,27 @@ import {
 } from "react-icons/fi"
 import { useUserIdentity } from "@/lib/use-user-identity"
 
-export default function HelpWidget() {
+export default function HelpWidget({
+  inline = false,
+}: {
+  inline?: boolean
+}) {
   const [open, setOpen] = useState(false)
   const { fullName } = useUserIdentity()
   const displayName = fullName || "User"
+  const popupClassName = inline
+    ? "absolute bottom-16 right-0 z-[70] sm:bottom-18"
+    : "fixed bottom-24 right-4 z-[70] sm:bottom-24 sm:right-6"
+  const buttonClassName = inline
+    ? "inline-flex h-11 min-w-[92px] items-center justify-center rounded-full bg-white px-5 text-sm font-medium text-white shadow-lg transition hover:bg-gray-100 sm:h-12 sm:min-w-[104px]"
+    : "fixed bottom-6 right-4 z-[70] inline-flex h-11 min-w-[92px] items-center justify-center rounded-full bg-white px-5 text-sm font-medium text-white shadow-lg transition hover:bg-gray-100 sm:right-6 sm:h-12 sm:min-w-[104px]"
 
   return (
     <>
       {/* Help Card */}
       {open && (
-        <div className="fixed bottom-35 right-6 z-50 ">
-          <div className="w-72 rounded-2xl bg-neutral-900 text-white shadow-2xl p-4">
+        <div className={popupClassName}>
+          <div className="w-72 rounded-2xl bg-neutral-900 p-4 text-white shadow-2xl">
             {/* Header */}
             <div className="flex items-start justify-between mb-4">
               <div>
@@ -52,9 +62,7 @@ export default function HelpWidget() {
       {/* HELP BUTTON */}
       <button
         onClick={() => setOpen((prev) => !prev)}
-        className="fixed bottom-20 right-6 z-50
-        bg-white text-black text-sm px-4 py-2
-        rounded-full shadow-lg hover:bg-gray-100"
+        className={buttonClassName}
       >
         Help
       </button>

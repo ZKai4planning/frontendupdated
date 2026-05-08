@@ -2,10 +2,10 @@
 
 export function DashboardFooter() {
   return (
-    <footer className="px-10 h-15 flex justify-between items-center text-xs text-[#616f89] dark:text-gray-500 border-t border-[#dbdfe6] dark:border-gray-800 bg-white dark:bg-[#101622]">
-      <div className="flex gap-6">
+    <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 bg-[linear-gradient(180deg,rgba(5,11,24,0.96),rgba(9,18,38,0.92))] px-4 py-3 text-xs text-slate-400 backdrop-blur-xl sm:px-6 lg:px-10">
+      <div className="flex flex-wrap gap-4 sm:gap-6">
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-green-500"></span>
+          <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
           System Ready
         </span>
         <span>Region: EU-East-1</span>

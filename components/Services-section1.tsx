@@ -5,6 +5,9 @@ import axiosInstance from "@/lib/axiosinstance";
 import ServiceExpandPanel from "@/components/service-expand-panel";
 import { ApiResponse, ApiServiceData, Service } from "@/types";
 
+const DESKTOP_ACCORDION_BREAKPOINT = 1280;
+const LAPTOP_BREAKPOINT = 1600;
+
 const mapApiServiceToService = (apiService: ApiServiceData): Service => {
   return {
     id: apiService.serviceId,
@@ -18,11 +21,20 @@ const mapApiServiceToService = (apiService: ApiServiceData): Service => {
       header: sub.title,
       description: sub.description,
       subServiceId: sub.subServiceId,
+      status: sub.status,
     })),
     cta: "Select & Apply",
     label: apiService.serviceName || "Service Category",
     status: apiService.status,
   };
+};
+
+const getServicePreview = (description: string, maxLength = 110) => {
+  if (description.length <= maxLength) {
+    return description;
+  }
+
+  return `${description.slice(0, maxLength).trimEnd()}...`;
 };
 
 export default function LandingServicesSection({
@@ -37,13 +49,16 @@ export default function LandingServicesSection({
   const expandedContainerRef = useRef<HTMLDivElement>(null);
   const servicesSectionRef = useRef<HTMLElement>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [isDesktopAccordion, setIsDesktopAccordion] = useState(false);
   const [isLaptop, setIsLaptop] = useState(false);
 
   useEffect(() => {
     const fetchServices = async () => {
       try {
         setLoading(true);
-        const response = await axiosInstance.get<ApiResponse>("/services");
+        const response = await axiosInstance.get<ApiResponse>("/services", {
+          params: { includeDeleted: true },
+        });
 
         if (response.data.success && response.data.data) {
           const mappedServices = response.data.data.map(mapApiServiceToService);
@@ -82,47 +97,25 @@ export default function LandingServicesSection({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const mobileQuery = window.matchMedia("(max-width: 767px)");
-    const laptopQuery = window.matchMedia("(min-width: 1024px) and (max-width: 1600px)");
     const handleChange = () => {
-      setIsMobile(mobileQuery.matches);
-      setIsLaptop(laptopQuery.matches);
+      const width = window.innerWidth;
+      setIsMobile(width < 768);
+      setIsDesktopAccordion(width >= DESKTOP_ACCORDION_BREAKPOINT);
+      setIsLaptop(
+        width >= DESKTOP_ACCORDION_BREAKPOINT && width < LAPTOP_BREAKPOINT
+      );
     };
 
     handleChange();
     window.addEventListener("resize", handleChange);
-
-    if (mobileQuery.addEventListener && laptopQuery.addEventListener) {
-      mobileQuery.addEventListener("change", handleChange);
-      laptopQuery.addEventListener("change", handleChange);
-      return () => {
-        window.removeEventListener("resize", handleChange);
-        mobileQuery.removeEventListener("change", handleChange);
-        laptopQuery.removeEventListener("change", handleChange);
-      };
-    }
-
-    mobileQuery.addListener(handleChange);
-    laptopQuery.addListener(handleChange);
-    return () => {
-      window.removeEventListener("resize", handleChange);
-      mobileQuery.removeListener(handleChange);
-      laptopQuery.removeListener(handleChange);
-    };
+    return () => window.removeEventListener("resize", handleChange);
   }, []);
-
-  useEffect(() => {
-    if (isMobile) {
-      setExpandedServiceId(null);
-    }
-  }, [isMobile]);
 
   useEffect(() => {
     if (!expandedServiceId) return;
     if (typeof window === "undefined") return;
 
-    const mediaQuery = window.matchMedia("(min-width: 768px) and (max-width: 1023px)");
-    if (!mediaQuery.matches) return;
+    if (window.innerWidth >= DESKTOP_ACCORDION_BREAKPOINT) return;
 
     requestAnimationFrame(() => {
       servicesSectionRef.current?.scrollIntoView({
@@ -132,88 +125,127 @@ export default function LandingServicesSection({
     });
   }, [expandedServiceId]);
 
+  const selectedService = expandedServiceId
+    ? services.find((service) => service.id === expandedServiceId) ?? null
+    : null;
+
+  const renderServiceCard = (service: Service) => {
+    const isActive = service.status !== false;
+
+    return (
+      <button
+        key={service.id}
+        type="button"
+        disabled={!isActive}
+        aria-pressed={expandedServiceId === service.id}
+        onClick={() => {
+          if (isActive) {
+            setExpandedServiceId(service.id);
+          }
+        }}
+        className={`group flex min-h-[18rem] flex-col rounded-3xl border p-5 text-left transition-all sm:min-h-[19rem] sm:p-6 ${
+          isActive
+            ? "cursor-pointer border-white/10 bg-white/5 backdrop-blur-xl hover:-translate-y-1 hover:border-blue-400/60 hover:shadow-xl hover:shadow-blue-500/15"
+            : "cursor-not-allowed border-white/10 bg-white/5 opacity-60"
+        }`}
+      >
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-blue-400 sm:text-xs">
+            {service.label}
+          </p>
+          {service.status === false ? (
+            <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-amber-200">
+              Inactive
+            </span>
+          ) : null}
+        </div>
+        <h3 className="mb-4 text-lg font-bold leading-snug text-white xl:text-[1.05rem] 2xl:text-lg">
+          {service.subtitle}
+        </h3>
+        <p className="text-sm leading-relaxed text-white/65 italic sm:text-[0.95rem]">
+          &quot;{getServicePreview(service.description)}&quot;
+        </p>
+        <span
+          className={`relative mt-auto inline-flex items-center gap-1 self-start pt-6 text-sm font-semibold ${
+            isActive ? "text-blue-400" : "text-white/40"
+          }`}
+        >
+          {isActive ? "Get Started" : "Currently Unavailable"}
+          {isActive ? (
+            <>
+              <span className="transition-transform duration-300 group-hover:translate-x-2">
+                -&gt;
+              </span>
+              <span className="absolute left-0 -bottom-1 h-0.5 w-0 bg-blue-400 transition-all duration-300 group-hover:w-full" />
+            </>
+          ) : null}
+        </span>
+      </button>
+    );
+  };
+
+  const renderServicesGrid = () => (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-6 xl:grid-cols-3 2xl:grid-cols-6">
+      {services.map(renderServiceCard)}
+    </div>
+  );
+
   return (
     <section
       id="services"
       ref={servicesSectionRef}
-      className="bg-[#050B18] text-white pt-24 sm:pt-28 md:pt-36 pb-16 lg:pb-0 lg:h-225 relative"
+      className="relative bg-[#050B18] pb-16 pt-20 text-white sm:pt-24 lg:pb-20 lg:pt-28"
     >
       {!expandedServiceId && (
-        <div className="text-center mb-12">
-          <h2 className="text-3xl sm:text-5xl lg:text-8xl font-bold mb-4">
+        <div className="mb-10 text-center sm:mb-12">
+          <h2 className="mb-4 text-3xl font-bold sm:text-5xl xl:text-7xl 2xl:text-8xl">
             Our Services
           </h2>
         </div>
       )}
 
-      <div className="max-w-435 mx-auto px-5 sm:px-6 md:px-10">
+      <div className="mx-auto max-w-[110rem] px-4 sm:px-6 lg:px-8 xl:px-10">
         {loading ? (
           <div className="text-center text-white/60 py-10">Loading services...</div>
         ) : error ? (
           <div className="text-center text-red-400 py-10">{error}</div>
-        ) : isMobile ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-            {services.map((service) => (
-              <div
-                key={service.id}
-                className="group bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-2xl transition-all flex flex-col"
-              >
-                <div>
-                  <p className={`${isLaptop ? "text-[11px]" : "text-xs"} font-bold text-blue-400 mb-2`}>{service.label}</p>
-                  <h3 className={`${isLaptop ? "text-base" : "text-lg"} font-bold mb-3 leading-snug`}>{service.subtitle}</h3>
-                  <p className={`${isLaptop ? "text-xs" : "text-sm"} text-white/60 leading-relaxed italic`}>
-                    &quot;{service.description.substring(0, 80)}...&quot;
-                  </p>
-                </div>
-                <span className="mt-auto pt-6 text-sm text-blue-400 font-semibold inline-flex items-center gap-1 relative self-start">
-                  Get Started
-                  <span className="transition-transform duration-300 group-hover:translate-x-2">-&gt;</span>
-                  <span className="absolute left-0 -bottom-1 h-0.5 w-0 bg-blue-400 transition-all duration-300 group-hover:w-full" />
-                </span>
-              </div>
-            ))}
-          </div>
         ) : expandedServiceId ? (
-          <div
-            ref={expandedContainerRef}
-            className={`flex gap-2 flex-col lg:flex-row ${isLaptop ? "h-140" : "h-162.5"}`}
-          >
-            {services.map((service, index) => (
+          isDesktopAccordion ? (
+            <div
+              ref={expandedContainerRef}
+              className="flex flex-col gap-4 xl:min-h-[48rem] xl:flex-row xl:gap-3 2xl:min-h-[52rem]"
+            >
+              {services.map((service, index) => (
+                <ServiceExpandPanel
+                  key={`${service.id}-${expandedServiceId === service.id ? "open" : "closed"}`}
+                  index={index}
+                  service={service}
+                  applyAction={applyAction}
+                  isLaptop={isLaptop}
+                  isExpanded={expandedServiceId === service.id}
+                  onExpand={() => setExpandedServiceId(service.id)}
+                  onClose={() => setExpandedServiceId(null)}
+                />
+              ))}
+            </div>
+          ) : selectedService ? (
+            <div ref={expandedContainerRef} className="mx-auto max-w-6xl">
               <ServiceExpandPanel
-                key={service.id}
-                index={index}
-                service={service}
+                key={`${selectedService.id}-single-panel`}
+                index={0}
+                service={selectedService}
+                mobile={isMobile}
                 applyAction={applyAction}
-                isLaptop={isLaptop}
-                isExpanded={expandedServiceId === service.id}
-                onExpand={() => setExpandedServiceId(service.id)}
+                isExpanded
+                onExpand={() => setExpandedServiceId(selectedService.id)}
                 onClose={() => setExpandedServiceId(null)}
               />
-            ))}
-          </div>
+            </div>
+          ) : (
+            renderServicesGrid()
+          )
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6">
-            {services.map((service) => (
-              <div
-                key={service.id}
-                onClick={() => setExpandedServiceId(service.id)}
-                className="group bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-2xl cursor-pointer transition-all hover:border-blue-400/60 hover:shadow-xl hover:shadow-blue-500/20 flex flex-col"
-              >
-                <div>
-                  <p className={`${isLaptop ? "text-[11px]" : "text-xs"} font-bold text-blue-400 mb-2`}>{service.label}</p>
-                  <h3 className={`${isLaptop ? "text-[13px]" : "text-lg"} font-bold mb-3 leading-snug`}>{service.subtitle}</h3>
-                  <p className={`${isLaptop ? "text-xs" : "text-sm"} text-white/60 leading-relaxed italic`}>
-                    &quot;{service.description.substring(0, 80)}...&quot;
-                  </p>
-                </div>
-                <span className="mt-auto pt-6 text-sm text-blue-400 font-semibold inline-flex items-center gap-1 relative self-start">
-                  Get Started
-                  <span className="transition-transform duration-300 group-hover:translate-x-2">-&gt;</span>
-                  <span className="absolute left-0 -bottom-1 h-0.5 w-0 bg-blue-400 transition-all duration-300 group-hover:w-full" />
-                </span>
-              </div>
-            ))}
-          </div>
+          renderServicesGrid()
         )}
       </div>
     </section>

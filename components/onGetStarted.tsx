@@ -2,9 +2,9 @@
 
 export default function GetStarted() {
   return (
-    <div className="bg-neutral-900 text-white rounded-2xl p-6 w-full max-w-xl shadow-2xl">
-      <h2 className="text-xl font-semibold mb-1">Get started</h2>
-      <p className="text-sm text-white/60 mb-6">
+    <div className="w-full max-w-xl rounded-2xl bg-white p-5 text-slate-900 shadow-2xl sm:p-6">
+      <h2 className="mb-1 text-xl font-semibold">Get started</h2>
+      <p className="mb-6 text-sm text-slate-500">
         Set up your workspace to start collecting feedback.
       </p>
 
@@ -31,12 +31,12 @@ function Step({
 }) {
   return (
     <li
-      className={`px-4 py-3 rounded-lg flex items-center gap-3
-      ${active ? "bg-white/10" : "bg-white/5"}`}
+      className={`flex items-center gap-3 rounded-lg px-4 py-3 ${
+        active ? "bg-blue-50 text-blue-700" : "bg-slate-100 text-slate-700"
+      }`}
     >
       <span
-        className={`w-2 h-2 rounded-full ${active ? "bg-blue-500" : "bg-white/30"
-          }`}
+        className={`h-2 w-2 rounded-full ${active ? "bg-blue-500" : "bg-slate-400"}`}
       />
       {label}
     </li>

@@ -261,6 +261,331 @@
   }
 }
 
+.internal-shell {
+  position: relative;
+  background:
+    radial-gradient(circle at top left, rgba(19, 91, 236, 0.18), transparent 32%),
+    radial-gradient(circle at top right, rgba(96, 165, 250, 0.12), transparent 28%),
+    linear-gradient(180deg, #050b18 0%, #091226 54%, #0b1224 100%);
+  color: #e2e8f0;
+}
+
+.internal-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.2;
+  background-image:
+    linear-gradient(to right, rgba(148, 163, 184, 0.12) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.12) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.internal-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+.internal-shell .bg-white,
+.internal-shell .bg-slate-50,
+.internal-shell .bg-slate-100,
+.internal-shell .bg-slate-200,
+.internal-shell .bg-gray-50,
+.internal-shell .bg-slate-50,
+.internal-shell .bg-slate-100,
+.internal-shell .bg-gray-100,
+.internal-shell .bg-gray-200,
+.internal-shell .bg-zinc-100,
+.internal-shell .bg-neutral-100 {
+  backdrop-filter: blur(18px);
+}
+
+.internal-shell [class*="bg-white/"],
+.internal-shell [class*="bg-slate-50/"],
+.internal-shell [class*="bg-slate-100/"],
+.internal-shell [class*="bg-slate-200/"],
+.internal-shell [class*="bg-gray-50/"],
+.internal-shell [class*="bg-gray-100/"],
+.internal-shell [class*="bg-gray-200/"] {
+  backdrop-filter: blur(18px);
+}
+
+.internal-shell .bg-white {
+  background-color: rgba(8, 16, 32, 0.88) !important;
+}
+
+.internal-shell [class*="bg-white/90"] {
+  background-color: rgba(8, 16, 32, 0.9) !important;
+}
+
+.internal-shell [class*="bg-white/80"] {
+  background-color: rgba(8, 16, 32, 0.82) !important;
+}
+
+.internal-shell [class*="bg-white/70"] {
+  background-color: rgba(8, 16, 32, 0.74) !important;
+}
+
+.internal-shell [class*="bg-white/60"] {
+  background-color: rgba(8, 16, 32, 0.66) !important;
+}
+
+.internal-shell [class*="bg-white/50"] {
+  background-color: rgba(8, 16, 32, 0.58) !important;
+}
+
+.internal-shell [class*="bg-white/40"],
+.internal-shell [class*="bg-white/30"],
+.internal-shell [class*="bg-white/20"],
+.internal-shell [class*="bg-white/10"],
+.internal-shell [class*="bg-white/5"] {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.internal-shell .bg-slate-50,
+.internal-shell .bg-gray-50 {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+.internal-shell .bg-slate-50 {
+  background-color: rgba(255, 255, 255, 0.04) !important;
+}
+
+.internal-shell .bg-slate-100,
+.internal-shell .bg-gray-100,
+.internal-shell .bg-zinc-100,
+.internal-shell .bg-neutral-100 {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.internal-shell .bg-slate-200,
+.internal-shell .bg-gray-200 {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.internal-shell [class*="from-white"],
+.internal-shell [class*="via-white"],
+.internal-shell [class*="to-white"],
+.internal-shell [class*="from-slate-50"],
+.internal-shell [class*="via-slate-50"],
+.internal-shell [class*="to-slate-50"],
+.internal-shell [class*="from-slate-100"],
+.internal-shell [class*="via-slate-100"],
+.internal-shell [class*="to-slate-100"],
+.internal-shell [class*="from-gray-50"],
+.internal-shell [class*="via-gray-50"],
+.internal-shell [class*="to-gray-50"] {
+  --tw-gradient-from: rgba(8, 16, 32, 0.92) var(--tw-gradient-from-position) !important;
+  --tw-gradient-via: rgba(11, 23, 44, 0.84) var(--tw-gradient-via-position) !important;
+  --tw-gradient-to: rgba(19, 91, 236, 0.08) var(--tw-gradient-to-position) !important;
+}
+
+.internal-shell .bg-blue-50,
+.internal-shell .bg-blue-100,
+.internal-shell .bg-red-50,
+.internal-shell .bg-red-100,
+.internal-shell .bg-emerald-50 {
+  backdrop-filter: blur(18px);
+}
+
+.internal-shell [class*="hover:bg-white"]:hover,
+.internal-shell [class*="hover:bg-slate-50"]:hover,
+.internal-shell [class*="hover:bg-slate-100"]:hover,
+.internal-shell [class*="hover:bg-gray-50"]:hover,
+.internal-shell [class*="hover:bg-gray-100"]:hover {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+.internal-shell [class*="hover:bg-blue-50"]:hover,
+.internal-shell [class*="hover:bg-blue-100"]:hover {
+  background-color: rgba(19, 91, 236, 0.16) !important;
+}
+
+.internal-shell [class*="hover:bg-emerald-50"]:hover,
+.internal-shell [class*="hover:bg-emerald-100"]:hover {
+  background-color: rgba(16, 185, 129, 0.16) !important;
+}
+
+.internal-shell [class*="hover:bg-amber-50"]:hover,
+.internal-shell [class*="hover:bg-amber-100"]:hover {
+  background-color: rgba(245, 158, 11, 0.16) !important;
+}
+
+.internal-shell [class*="hover:bg-red-50"]:hover,
+.internal-shell [class*="hover:bg-red-100"]:hover,
+.internal-shell [class*="hover:bg-rose-50"]:hover,
+.internal-shell [class*="hover:bg-rose-100"]:hover {
+  background-color: rgba(248, 113, 113, 0.16) !important;
+}
+
+.internal-shell .bg-blue-50 {
+  background-color: rgba(19, 91, 236, 0.14) !important;
+}
+
+.internal-shell .bg-blue-100 {
+  background-color: rgba(19, 91, 236, 0.2) !important;
+}
+
+.internal-shell .bg-red-50 {
+  background-color: rgba(248, 113, 113, 0.14) !important;
+}
+
+.internal-shell .bg-red-100,
+.internal-shell .bg-rose-100 {
+  background-color: rgba(248, 113, 113, 0.18) !important;
+}
+
+.internal-shell .bg-emerald-50 {
+  background-color: rgba(16, 185, 129, 0.14) !important;
+}
+
+.internal-shell .bg-emerald-100 {
+  background-color: rgba(16, 185, 129, 0.18) !important;
+}
+
+.internal-shell .bg-amber-50 {
+  background-color: rgba(245, 158, 11, 0.14) !important;
+}
+
+.internal-shell .bg-amber-100 {
+  background-color: rgba(245, 158, 11, 0.18) !important;
+}
+
+.internal-shell .border,
+.internal-shell .border-slate-200,
+.internal-shell .border-slate-300,
+.internal-shell .border-gray-200,
+.internal-shell .border-blue-100,
+.internal-shell .border-blue-200,
+.internal-shell .border-red-200,
+.internal-shell .border-emerald-100,
+.internal-shell .border-emerald-200,
+.internal-shell .border-amber-100,
+.internal-shell .border-amber-200,
+.internal-shell .border-red-100,
+.internal-shell .border-white\/10 {
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.internal-shell [class*="ring-slate-200"],
+.internal-shell [class*="ring-slate-100"],
+.internal-shell [class*="ring-white"] {
+  --tw-ring-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+.internal-shell .text-slate-900,
+.internal-shell .text-slate-800,
+.internal-shell .text-slate-700,
+.internal-shell .text-gray-700 {
+  color: #f8fafc !important;
+}
+
+.internal-shell .text-slate-600,
+.internal-shell .text-slate-500,
+.internal-shell .text-slate-400,
+.internal-shell .text-gray-600,
+.internal-shell .text-gray-500,
+.internal-shell .text-gray-400 {
+  color: rgba(226, 232, 240, 0.76) !important;
+}
+
+.internal-shell .text-blue-800,
+.internal-shell .text-blue-700,
+.internal-shell .text-blue-600 {
+  color: #bfdbfe !important;
+}
+
+.internal-shell .text-emerald-800,
+.internal-shell .text-emerald-700,
+.internal-shell .text-emerald-600 {
+  color: #a7f3d0 !important;
+}
+
+.internal-shell .text-amber-900,
+.internal-shell .text-amber-800,
+.internal-shell .text-amber-700,
+.internal-shell .text-amber-600 {
+  color: #fde68a !important;
+}
+
+.internal-shell .text-red-800,
+.internal-shell .text-red-700,
+.internal-shell .text-red-600,
+.internal-shell .text-rose-800,
+.internal-shell .text-rose-700,
+.internal-shell .text-rose-600 {
+  color: #fecaca !important;
+}
+
+.internal-shell .shadow-sm,
+.internal-shell .shadow-lg,
+.internal-shell .shadow-xl,
+.internal-shell .shadow-2xl {
+  box-shadow: 0 24px 60px rgba(2, 6, 23, 0.42) !important;
+}
+
+.internal-shell input,
+.internal-shell textarea,
+.internal-shell select {
+  color: #f8fafc;
+}
+
+.internal-shell input::placeholder,
+.internal-shell textarea::placeholder {
+  color: rgba(148, 163, 184, 0.78);
+}
+
+.internal-shell select option {
+  color: #f8fafc;
+  background: #091226;
+}
+
+.eligibility-form-theme input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.eligibility-form-theme select,
+.eligibility-form-theme textarea {
+  background-color: #0c1529 !important;
+  color: #f8fafc !important;
+  border-color: rgba(71, 85, 105, 0.72) !important;
+}
+
+.eligibility-form-theme input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):hover,
+.eligibility-form-theme input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):focus,
+.eligibility-form-theme input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):active,
+.eligibility-form-theme select:hover,
+.eligibility-form-theme select:focus,
+.eligibility-form-theme select:active,
+.eligibility-form-theme textarea:hover,
+.eligibility-form-theme textarea:focus,
+.eligibility-form-theme textarea:active {
+  background-color: #0c1529 !important;
+  color: #f8fafc !important;
+}
+
+.eligibility-form-theme input:not([type="checkbox"]):not([type="radio"]):not([type="file"])::placeholder,
+.eligibility-form-theme textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+.eligibility-form-theme select option {
+  background: #0c1529;
+  color: #f8fafc;
+}
+
+.eligibility-form-theme input:-webkit-autofill,
+.eligibility-form-theme input:-webkit-autofill:hover,
+.eligibility-form-theme input:-webkit-autofill:focus,
+.eligibility-form-theme textarea:-webkit-autofill,
+.eligibility-form-theme textarea:-webkit-autofill:hover,
+.eligibility-form-theme textarea:-webkit-autofill:focus,
+.eligibility-form-theme select:-webkit-autofill,
+.eligibility-form-theme select:-webkit-autofill:hover,
+.eligibility-form-theme select:-webkit-autofill:focus {
+  -webkit-text-fill-color: #f8fafc;
+  -webkit-box-shadow: 0 0 0 1000px #0c1529 inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
+ 
 .btn-1 {
   background: #50a2ff;
   color: white;
@@ -345,6 +670,36 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.eligibility-agent-button {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.eligibility-agent-scroll {
+  scrollbar-width: auto;
+  scrollbar-color: rgba(125, 211, 252, 0.7) rgba(15, 23, 42, 0.65);
+}
+
+.eligibility-agent-scroll::-webkit-scrollbar {
+  width: 12px;
+}
+
+.eligibility-agent-scroll::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.7);
+  border-radius: 9999px;
+}
+
+.eligibility-agent-scroll::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(56, 189, 248, 0.95), rgba(37, 99, 235, 0.95));
+  border-radius: 9999px;
+  border: 2px solid rgba(15, 23, 42, 0.7);
+}
+
+.eligibility-agent-scroll::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(103, 232, 249, 0.98), rgba(59, 130, 246, 0.98));
 }
  
 .animate-scaleIn {

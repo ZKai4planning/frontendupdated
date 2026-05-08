@@ -19,7 +19,7 @@ export function VerifyEmailForm() {
             viewBox="0 0 100 100"
           >
             <rect height="40" strokeWidth="1" width="50" x="25" y="40"></rect>
-            <path d="M25 40L50 15L75 40" strokeWidth="1"></path>
+            <path d="m²5 40L50 15L75 40" strokeWidth="1"></path>
             <path d="M10 90H90" strokeDasharray="2 2" strokeWidth="0.5"></path>
           </svg>
           <div className="relative z-10 bg-primary/5 rounded-full p-6 border border-primary/20">

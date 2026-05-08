@@ -1,6 +1,213 @@
-import React, { useEffect } from "react"
+import React, { useCallback, useEffect, useState } from "react"
 import { useProject } from "@/app/context/ProjectContext"
 import { EligibilityStepContentProps } from "./types"
+
+const POSTCODE_AUTOCOMPLETE_ENDPOINT =
+  process.env.NEXT_PUBLIC_POSTCODE_AUTOCOMPLETE_ENDPOINT ??
+  "http://localhost:8000/api/v1/ds02/address/autocomplete"
+const POSTCODE_AUTOCOMPLETE_QUERY_PARAM =
+  process.env.NEXT_PUBLIC_POSTCODE_AUTOCOMPLETE_QUERY_PARAM ?? "q"
+const POSTCODE_LOOKUP_ENDPOINT =
+  process.env.NEXT_PUBLIC_POSTCODE_LOOKUP_ENDPOINT ??
+  "http://localhost:8000/api/v1/ds02/address"
+const POSTCODE_LOOKUP_QUERY_PARAM =
+  process.env.NEXT_PUBLIC_POSTCODE_LOOKUP_QUERY_PARAM ?? "q"
+
+type PostcodeLookupResponse = {
+  postcode?: string
+  lat?: number
+  lng?: number
+  lpa_code?: string
+  lpa_name?: string
+  region?: string
+  country?: string
+  ward?: string
+  constituency?: string
+  source?: string
+  ds?: string
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null
+
+const toText = (value: unknown) =>
+  typeof value === "string" ? value.replace(/\s+/g, " ").trim() : ""
+
+const isNonEmptyString = (value: string): value is string => value.length > 0
+
+const normalizePostcode = (value: string) =>
+  value.replace(/\s+/g, " ").trim().toUpperCase()
+
+const normalizeAddressForMatch = (value: string) =>
+  value.toLowerCase().replace(/[^a-z0-9]/g, "")
+
+const collectAddressCollection = (payload: unknown): unknown[] => {
+  if (Array.isArray(payload)) {
+    return payload
+  }
+
+  if (!isRecord(payload)) {
+    return []
+  }
+
+  const candidates = [
+    payload.suggestions,
+    payload.results,
+    payload.data,
+    payload.items,
+    payload.postcodes,
+    payload.addresses,
+  ]
+
+  const firstCollection = candidates.find(Array.isArray)
+  return Array.isArray(firstCollection) ? firstCollection : []
+}
+
+const buildAddressLine2FromParts = (
+  parts: string[],
+  siteAddressLine1: string,
+  postcode: string
+) => {
+  const normalizedLine1 = normalizeAddressForMatch(siteAddressLine1)
+  const normalizedPostcode = normalizePostcode(postcode)
+
+  const filteredParts = parts.filter((part) => {
+    if (!part) return false
+    if (normalizedLine1 && normalizeAddressForMatch(part) === normalizedLine1) {
+      return false
+    }
+    if (normalizedPostcode && normalizePostcode(part) === normalizedPostcode) {
+      return false
+    }
+    return true
+  })
+
+  return filteredParts.join(", ").trim()
+}
+
+const extractAddressLine2FromCandidate = (
+  candidate: unknown,
+  siteAddressLine1: string,
+  postcode: string
+) => {
+  if (typeof candidate === "string") {
+    return buildAddressLine2FromParts(
+      candidate.split(",").map((part) => toText(part)),
+      siteAddressLine1,
+      postcode
+    )
+  }
+
+  if (!isRecord(candidate)) {
+    return ""
+  }
+
+  const directLine2 = buildAddressLine2FromParts(
+    [
+      toText(candidate.address_line_2),
+      toText(candidate.addressLine2),
+      toText(candidate.line_2),
+      toText(candidate.line2),
+      toText(candidate.address2),
+      toText(candidate.dependent_locality),
+      toText(candidate.dependentLocality),
+      toText(candidate.locality),
+      toText(candidate.town),
+      toText(candidate.city),
+    ].filter(isNonEmptyString),
+    siteAddressLine1,
+    postcode
+  )
+
+  if (directLine2) {
+    return directLine2
+  }
+
+  const fullAddress = [
+    toText(candidate.address),
+    toText(candidate.full_address),
+    toText(candidate.formatted_address),
+    toText(candidate.display),
+    toText(candidate.description),
+    toText(candidate.label),
+    toText(candidate.text),
+  ].find(Boolean)
+
+  if (!fullAddress) {
+    return ""
+  }
+
+  return buildAddressLine2FromParts(
+    fullAddress.split(",").map((part) => toText(part)),
+    siteAddressLine1,
+    postcode
+  )
+}
+
+const getCandidateMatchScore = (
+  candidate: unknown,
+  siteAddressLine1: string,
+  postcode: string
+) => {
+  const normalizedLine1 = normalizeAddressForMatch(siteAddressLine1)
+  const normalizedPostcode = normalizePostcode(postcode)
+
+  if (typeof candidate === "string") {
+    const normalizedCandidate = normalizeAddressForMatch(candidate)
+    return Number(normalizedCandidate.includes(normalizedLine1)) * 3 +
+      Number(normalizePostcode(candidate).includes(normalizedPostcode)) * 2
+  }
+
+  if (!isRecord(candidate)) {
+    return 0
+  }
+
+  const candidateLine1 = [
+    toText(candidate.address_line_1),
+    toText(candidate.addressLine1),
+    toText(candidate.line_1),
+    toText(candidate.line1),
+    toText(candidate.address1),
+    toText(candidate.sTreet_address),
+    toText(candidate.sTreetAddress),
+  ].find(Boolean)
+
+  const fullAddress = [
+    toText(candidate.address),
+    toText(candidate.full_address),
+    toText(candidate.formatted_address),
+    toText(candidate.display),
+    toText(candidate.description),
+    toText(candidate.label),
+    toText(candidate.text),
+  ].find(Boolean)
+
+  return (
+    Number(normalizeAddressForMatch(candidateLine1 || "").includes(normalizedLine1)) * 4 +
+    Number(normalizeAddressForMatch(fullAddress || "").includes(normalizedLine1)) * 3 +
+    Number(normalizePostcode(fullAddress || "").includes(normalizedPostcode)) * 2
+  )
+}
+
+const resolveAddressLine2FromAutocomplete = (
+  payload: unknown,
+  siteAddressLine1: string,
+  postcode: string
+) => {
+  const bestMatch = collectAddressCollection(payload)
+    .map((candidate, index) => ({
+      index,
+      score: getCandidateMatchScore(candidate, siteAddressLine1, postcode),
+      line2: extractAddressLine2FromCandidate(candidate, siteAddressLine1, postcode),
+    }))
+    .filter((candidate) => candidate.line2)
+    .sort((left, right) => right.score - left.score || left.index - right.index)[0]
+
+  return bestMatch?.line2 ?? ""
+}
+
+const isValidCoordinate = (value: unknown): value is number =>
+  typeof value === "number" && Number.isFinite(value)
 
 export function ApplicantPropertyStepContent({
   savedFormData,
@@ -8,14 +215,25 @@ export function ApplicantPropertyStepContent({
   asStringValue,
   components,
 }: EligibilityStepContentProps) {
+  const otherOwnersDetailsLabel =
+    "Names & Addresses of Other Owners (if Certificate B, C or D)"
   const { data } = useProject()
-  const { SectionHeading, Input, PhoneNumberField, RadioGroupField, SelectField, FieldLabel } = components
+  const {
+    SectionHeading,
+    Input,
+    PhoneNumberField,
+    RadioGroupField,
+    SelectField,
+    FieldLabel,
+    CheckboxGroup,
+  } = components
+  const [isGettingAddress, setIsGettingAddress] = useState(false)
 
-  if (!SectionHeading || !Input || !PhoneNumberField || !RadioGroupField || !SelectField || !FieldLabel) {
-    return null
-  }
-
-  const previousCouncilApplication = savedFormData["Have you previously applied to the council?"]
+  const previousCouncilApplication = savedFormData["have you previously applied to any council?"]
+  const useAlternateCorrespondenceAddress =
+    asStringValue(savedFormData["Is this address same as site address?"]).trim() === "No"
+  const usesPlanningAgent =
+    asStringValue(savedFormData["Are you using a planning agent?"]).trim() === "Yes"
   const siteAddressLine1 = asStringValue(savedFormData["Site Address Line 1"]).trim()
   const postcode = asStringValue(savedFormData["Postcode"]).trim()
   const planningReferenceNumber = asStringValue(savedFormData["Planning Reference Number *"]).trim()
@@ -29,11 +247,11 @@ export function ApplicantPropertyStepContent({
     })
   }
 
-  const buildCouncilFromPostcode = (value: string) => {
+  const buildCouncilFromPostcode = useCallback((value: string) => {
     const normalized = value.trim().toUpperCase()
     const outwardCode = normalized.split(/\s+/)[0]?.replace(/\d.*$/, "") || "LOCAL"
     const councilByArea: Record<string, string> = {
-      E: "Tower Hamlets Council",
+      E: "Newham Council",
       EC: "City of London Corporation",
       N: "Islington Council",
       NW: "Camden Council",
@@ -52,7 +270,7 @@ export function ApplicantPropertyStepContent({
     }
 
     return councilByArea[outwardCode] ?? `${outwardCode} Area Council`
-  }
+  }, [])
 
   const buildAddressLine2 = (addressLine: string, value: string) => {
     const normalizedAddress = addressLine.replace(/\s+/g, " ").trim()
@@ -67,7 +285,7 @@ export function ApplicantPropertyStepContent({
     return `Auto-filled locality for ${outwardCode}`
   }
 
-  const resolveCouncilFromPostcode = (value: string) => {
+  const resolveCouncilFromPostcode = useCallback((value: string) => {
     const normalizedPostcode = value.replace(/\s+/g, " ").trim().toUpperCase()
     const lookupPostcode = data.eligibility?.location?.postcode?.replace(/\s+/g, " ").trim().toUpperCase()
     const lookupCouncil = data.eligibility?.location?.lpaName?.trim()
@@ -77,7 +295,7 @@ export function ApplicantPropertyStepContent({
     }
 
     return buildCouncilFromPostcode(value)
-  }
+  }, [buildCouncilFromPostcode, data.eligibility?.location?.lpaName, data.eligibility?.location?.postcode])
 
   useEffect(() => {
     if (!postcode) return
@@ -94,19 +312,110 @@ export function ApplicantPropertyStepContent({
         Council: resolvedCouncil,
       },
     })
-  }, [asStringValue, data.eligibility?.location?.lpaName, data.eligibility?.location?.postcode, postcode, savedFormData, updateSection])
+  }, [asStringValue, postcode, resolveCouncilFromPostcode, savedFormData, updateSection])
 
   const handleGetAddress = () => {
-    if (!siteAddressLine1 || !postcode) return
+    if (!siteAddressLine1 || !postcode || isGettingAddress) return
 
-    updateFormData({
-      "Site Address Line 2":
-        asStringValue(savedFormData["Site Address Line 2"]).trim() ||
-        buildAddressLine2(siteAddressLine1, postcode),
-      Council:
-        asStringValue(savedFormData["Council"]).trim() ||
-        resolveCouncilFromPostcode(postcode),
-    })
+    void (async () => {
+      setIsGettingAddress(true)
+
+      const normalizedPostcode = normalizePostcode(postcode)
+      const currentAddressLine2 = asStringValue(savedFormData["Site Address Line 2"]).trim()
+      const currentCouncil = asStringValue(savedFormData["Council"]).trim()
+      const fallbackAddressLine2 = currentAddressLine2 || buildAddressLine2(siteAddressLine1, postcode)
+      const fallbackCouncil = currentCouncil || resolveCouncilFromPostcode(postcode)
+
+      try {
+        const autocompleteParams = new URLSearchParams({
+          [POSTCODE_AUTOCOMPLETE_QUERY_PARAM]: normalizedPostcode,
+        })
+        const lookupParams = new URLSearchParams({
+          [POSTCODE_LOOKUP_QUERY_PARAM]: normalizedPostcode,
+        })
+
+        const [autocompleteResponse, lookupResponse] = await Promise.all([
+          fetch(`${POSTCODE_AUTOCOMPLETE_ENDPOINT}?${autocompleteParams.toString()}`, {
+            method: "GET",
+          }),
+          fetch(`${POSTCODE_LOOKUP_ENDPOINT}?${lookupParams.toString()}`, {
+            method: "GET",
+          }),
+        ])
+
+        const autocompletePayload = autocompleteResponse.ok
+          ? await autocompleteResponse.json()
+          : null
+        const lookupPayload = lookupResponse.ok
+          ? ((await lookupResponse.json()) as PostcodeLookupResponse)
+          : null
+
+        const resolvedAddressLine2 =
+          currentAddressLine2 ||
+          resolveAddressLine2FromAutocomplete(
+            autocompletePayload,
+            siteAddressLine1,
+            normalizedPostcode
+          ) ||
+          fallbackAddressLine2
+
+        const resolvedCouncil =
+          currentCouncil ||
+          toText(lookupPayload?.lpa_name) ||
+          fallbackCouncil
+
+        updateSection("eligibility", {
+          formData: {
+            ...savedFormData,
+            "Site Address Line 2": resolvedAddressLine2,
+            Council: resolvedCouncil,
+          },
+          ...(lookupPayload
+            ? {
+              location: {
+                postcode: normalizePostcode(lookupPayload.postcode || normalizedPostcode),
+                lat: isValidCoordinate(lookupPayload.lat) ? lookupPayload.lat : undefined,
+                lng: isValidCoordinate(lookupPayload.lng) ? lookupPayload.lng : undefined,
+                lpaCode:
+                  typeof lookupPayload.lpa_code === "string"
+                    ? lookupPayload.lpa_code
+                    : undefined,
+                lpaName:
+                  typeof lookupPayload.lpa_name === "string"
+                    ? lookupPayload.lpa_name
+                    : undefined,
+                region:
+                  typeof lookupPayload.region === "string"
+                    ? lookupPayload.region
+                    : undefined,
+                country:
+                  typeof lookupPayload.country === "string"
+                    ? lookupPayload.country
+                    : undefined,
+                ward:
+                  typeof lookupPayload.ward === "string" ? lookupPayload.ward : undefined,
+                constituency:
+                  typeof lookupPayload.constituency === "string"
+                    ? lookupPayload.constituency
+                    : undefined,
+                source:
+                  typeof lookupPayload.source === "string"
+                    ? lookupPayload.source
+                    : undefined,
+                ds: typeof lookupPayload.ds === "string" ? lookupPayload.ds : undefined,
+              },
+            }
+            : {}),
+        })
+      } catch {
+        updateFormData({
+          "Site Address Line 2": fallbackAddressLine2,
+          Council: fallbackCouncil,
+        })
+      } finally {
+        setIsGettingAddress(false)
+      }
+    })()
   }
 
   const handleGetPreApplicationDetails = () => {
@@ -129,11 +438,23 @@ export function ApplicantPropertyStepContent({
       "What was previously proposed, and was it approved, refused, or withdrawn?":
         asStringValue(
           savedFormData[
-            "What was previously proposed, and was it approved, refused, or withdrawn?"
+          "What was previously proposed, and was it approved, refused, or withdrawn?"
           ]
         ).trim() ||
         `Reference ${planningReferenceNumber} reviewed by the council. Previous scheme details have been brought in for review.`,
     })
+  }
+
+  if (
+    !SectionHeading ||
+    !Input ||
+    !PhoneNumberField ||
+    !RadioGroupField ||
+    !SelectField ||
+    !FieldLabel ||
+    !CheckboxGroup
+  ) {
+    return null
   }
 
   return (
@@ -149,30 +470,75 @@ export function ApplicantPropertyStepContent({
           <Input label="Email Address" />
           <PhoneNumberField />
         </div>
-        <div className="grid gap-6 md:grid-cols-3">
-          <div className="md:col-span-2">
-            <Input label="Site Address Line 1" />
-          </div>
-          <Input
-            label="Postcode"
-            autocompleteKind="postcode"
-            actionLabel="Get address"
-            onAction={handleGetAddress}
-            actionDisabled={!siteAddressLine1 || !postcode}
-            actionMessage="Agent Z is using Site Address Line 1 and Postcode to fill the council and the second address line."
-          />
-        </div>
         <div className="grid gap-6 md:grid-cols-2">
-          <Input label="Site Address Line 2" />
-          <Input label="Council" />
+          <div className="md:col-span-2 grid gap-6">
+            <div className="grid gap-6 md:grid-cols-2">
+              <Input label="Correspondence Address Line 1" />
+              <Input label="Correspondence Address Line 2" />
+            </div>
+            <div className="grid gap-6 md:grid-cols-2">
+              <Input label="Correspondence Council" />
+              <Input
+                label="Correspondence Postcode"
+                autocompleteKind="postcode"
+              />
+            </div>
+          </div>
+          <div className="md:col-span-2">
+            <RadioGroupField
+              label="Is this address same as site address?"
+              options={["Yes", "No"]}
+              tooltip="Choose Yes if the site address is the same as the correspondence address."
+            />
+          </div>
+
+          {useAlternateCorrespondenceAddress && (
+            <div className="md:col-span-2 grid gap-6 animate-in fade-in duration-300">
+              <div className="grid gap-6 md:grid-cols-3">
+                <div className="md:col-span-2">
+                  <Input label="Site Address Line 1" />
+                </div>
+                <Input label="Site Address Line 2" />
+              </div>
+              <div className="grid gap-6 md:grid-cols-2">
+                <Input label="Council" />
+                <Input
+                  label="Postcode"
+                  autocompleteKind="postcode"
+                  // actionLabel={isGettingAddress ? "Getting..." : "Get address"}
+                  onAction={handleGetAddress}
+                  actionDisabled={!siteAddressLine1 || !postcode || isGettingAddress}
+                  actionOpensAgentSidebar={false}
+                />
+              </div>
+            </div>
+          )}
         </div>
+        {/* <div className="grid gap-6 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <RadioGroupField
+              label="Are you using a planning agent?"
+              options={["Yes", "No"]}
+            />
+          </div>
+
+          {usesPlanningAgent && (
+            <div className="md:col-span-2 grid gap-6 animate-in fade-in duration-300">
+              <div className="grid gap-6 md:grid-cols-2">
+                <Input label="Agent Name" />
+                <Input label="Agent Address" />
+              </div>
+              <Input label="Agent Contact" />
+            </div>
+          )}
+        </div> */}
       </div>
 
       <SectionHeading>Pre-Application Check</SectionHeading>
       <div className="grid grid-cols-2 gap-6 mb-6">
         <div className="col-span-2">
           <RadioGroupField
-            label="Have you previously applied to the council?"
+            label="have you previously applied to any council?"
             options={["Yes", "No"]}
             tooltip="If yes, we will collect details about the earlier council application before proceeding."
           />
@@ -191,7 +557,7 @@ export function ApplicantPropertyStepContent({
                 className="w-full rounded-xl border px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
                 value={asStringValue(
                   savedFormData[
-                    "What was previously proposed, and was it approved, refused, or withdrawn?"
+                  "What was previously proposed, and was it approved, refused, or withdrawn?"
                   ]
                 )}
                 onChange={e =>
@@ -241,6 +607,8 @@ export function ApplicantPropertyStepContent({
             "Detached house",
             "Semi-detached house",
             "Terraced house",
+            "End Terrace",
+            "Converted Flat",
             "Flat / Maisonette",
             "Bungalow",
             "Other / Ask Agent Z",
@@ -258,22 +626,100 @@ export function ApplicantPropertyStepContent({
           ]}
           consultTrigger="We can assist with land registry checks."
         />
-        <RadioGroupField
-          label="Conservation Area or Near Listed Building?"
-          options={["Yes", "No", "Ask Agent Z"]}
-          consultTrigger="We can provide a heritage impact assessment or pre-application advice."
-        />
-        <SelectField
-          label="Purpose of Development"
+        <div className="col-span-2">
+          <FieldLabel
+            label={otherOwnersDetailsLabel}
+            wrapperClassName="mb-1"
+          />
+          <textarea
+            rows={2}
+            placeholder="List any other known owners or agricultural tenants..."
+            className="w-full rounded-xl border px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
+            value={asStringValue(savedFormData[otherOwnersDetailsLabel])}
+            onChange={e =>
+              updateSection("eligibility", {
+                formData: {
+                  ...savedFormData,
+                  [otherOwnersDetailsLabel]: e.target.value,
+                },
+              })
+            }
+          />
+        </div>
+        <CheckboxGroup
+          label="Are you planning any building works?"
           options={[
             "Rear extension",
             "Side extension",
             "Loft conversion",
+            "Internal wall changes",
+            "Additional bathroom",
             "New build",
-            "Change of use",
-            "Other / Ask Agent Z",
+            "Unsure / Ask Agent Z",
           ]}
+          optionStyleOverrides={{
+            "Unsure / Ask Agent Z": {
+              hideIndicator: true,
+              centerLabel: true,
+            },
+          }}
           consultTrigger="Our consultant can help clarify the development type."
+        />
+        <div className="col-span-2">
+          <RadioGroupField
+            label="Has the property already been extended before?"
+            options={["Yes", "No", "Unsure / Ask Agent Z"]}
+          />
+        </div>
+      </div>
+
+      <SectionHeading>Current Use Status</SectionHeading>
+      <div className="grid grid-cols-2 gap-6 mb-2">
+        <SelectField
+          label="How is the property currently used?"
+          options={[
+            "Single family home",
+            "Vacant",
+            "Already shared by tenants",
+            "Let room-by-room",
+            "Other",
+          ]}
+        />
+        <Input
+          label="How many people currently live there?"
+          placeholder="Enter number of occupants"
+        />
+        <div className="col-span-2">
+          <RadioGroupField
+            label="Are they one family or separate households?"
+            options={["One household", "2 households", "3+ households"]}
+          />
+        </div>
+      </div>
+
+      <SectionHeading>Proposed HMO Use</SectionHeading>
+      <div className="grid grid-cols-2 gap-6 mb-2">
+        <div className="col-span-2">
+          <RadioGroupField
+            label="How many occupants do you plan to accommodate?"
+            options={["3", "4", "5", "6", "More than 6"]}
+          />
+        </div>
+        <RadioGroupField
+          label="Will occupants share kitchen/bathroom?"
+          options={["Yes", "No", "Don't know / Ask Agent Z"]}
+        />
+        <RadioGroupField
+          label="Will rooms be rented individually?"
+          options={["Yes", "No", "Don't know / Ask Agent Z"]}
+        />
+        <RadioGroupField
+          label="Is there a communal kitchen?"
+          options={["Yes", "No", "Planning to create one / Ask Agent Z Can help you"]}
+        />
+        <RadioGroupField
+          label="Is any lounge/dining room proposed as a bedroom?"
+          options={["Yes", "No"]}
         />
       </div>
     </>

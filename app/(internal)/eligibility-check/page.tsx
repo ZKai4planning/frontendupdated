@@ -246,7 +246,7 @@ export default function EligibilityCheckPage() {
                   <Input label="Contact Email / Phone" defaultValue={formData.propertyDetails.contactEmailOrPhone} />
                   <Input label="Site Address" defaultValue={formData.propertyDetails.siteAddress} />
                   <Input label="Postcode" defaultValue={formData.propertyDetails.postcode} />
-                  <Select label="Property Type" defaultValue={formData.propertyDetails.propertyType} options={["Detached house","Semi-detached house","Terraced house","Flat / Maisonette","Other / Don’t know"]} />
+                  <Select label="Property Type" defaultValue={formData.propertyDetails.propertyType} options={["Detached house","Semi-detached house","Terraced house","Flat / Maisonette","Converted Flat", "End Terrace", "Other / Don’t know"]} />
                   <Select label="Ownership Status" defaultValue={formData.propertyDetails.ownershipStatus} options={["Freehold","Leasehold","Shared ownership","Don’t know"]} />
                   <RadioGroup label="Conservation Area or Listed Building?" defaultValue={formData.propertyDetails.conservationOrListed} options={["Yes","No","Don’t know"]} />
                   <Select label="Purpose of Development" defaultValue={formData.propertyDetails.purposeOfDevelopment} options={["Rear extension","Side extension","Loft conversion","New build","Change of use","Other / Don’t know"]} />
@@ -278,7 +278,7 @@ export default function EligibilityCheckPage() {
                   <RadioGroup label="TPO?" defaultValue={formData.constraints.tpo} options={["Yes","No","Don’t know"]} />
                   <RadioGroup label="Flood Zone?" defaultValue={formData.constraints.floodZone} options={["Yes","No","Don’t know"]} />
                   <RadioGroup label="Vehicle access?" defaultValue={formData.constraints.vehicleAccess} options={["Yes","No","Don’t know"]} />
-                  <RadioGroup label="Pre-application advice?" defaultValue={formData.constraints.preApplicationAdvice} options={["Yes","No","Don’t know"]} />
+                  {/* <RadioGroup label="Pre-application advice?" defaultValue={formData.constraints.preApplicationAdvice} options={["Yes","No","Don’t know"]} /> */}
                   <Select label="Additional Consents Required" defaultValue={formData.constraints.additionalConsentsRequired} options={["None","Listed Building Consent","Tree works","Advertisement consent","Unsure"]} />
                 </div>
                 <InfoBox>Constraints may override permitted development rights.</InfoBox>

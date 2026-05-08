@@ -2,7 +2,7 @@
 "use client"
 import { useProject } from "@/app/context/ProjectContext"
 
-import React, { Suspense, useEffect, useState, useRef } from "react"
+import React, { Suspense, useEffect, useMemo, useState, useRef } from "react"
 import { useRouter, usePathname, useSearchParams, useParams } from "next/navigation"
 import {
   Info,
@@ -10,12 +10,16 @@ import {
   Ruler,
   ShieldCheck,
   Landmark,
+  Bot,
   CheckCircle2,
   CheckCircle,
   Upload,
   X,
   PenLine,
   AlertCircle,
+  ExternalLink,
+  FileImage,
+  FileText,
 } from "lucide-react"
 import {
   PROJECT_FLOW,
@@ -26,7 +30,11 @@ import {
   resolveProjectProgressIndex,
 } from "@/lib/project-flow"
 import { useUserIdentity } from "@/lib/use-user-identity"
+import { useUserProfile } from "@/lib/use-user-profile"
+import { useResolvedServiceSelection } from "@/lib/use-service-selection"
+import { buildServiceCartPayload, postServiceCart } from "@/lib/service-cart"
 import axiosInstance from "@/lib/axiosinstance"
+import { BorderBeam } from "@/components/ui/border-beam"
 import { ApplicantPropertyStepContent } from "@/components/dashboard-steps/eligibility/ApplicantPropertyStepContent"
 import { WorksMaterialsStepContent } from "@/components/dashboard-steps/eligibility/WorksMaterialsStepContent"
 import { SiteConstraintsStepContent } from "@/components/dashboard-steps/eligibility/SiteConstraintsStepContent"
@@ -52,14 +60,17 @@ type EligibilityAssetsContextValue = {
   setUploadedFiles: React.Dispatch<React.SetStateAction<EligibilityFileMap>>
   signatureFile: File | null
   setSignatureFile: React.Dispatch<React.SetStateAction<File | null>>
+  signaturePreviewUrl: string | null
+  setSignaturePreviewUrl: React.Dispatch<React.SetStateAction<string | null>>
 }
 
 type EligibilityAgentSidebarState = {
   id: string
   fieldLabel: string
   message?: string
-  requestType: "ask-agent" | "action"
+  requestType: "ask-agent" | "action" | "completion-review"
   responseMode: "info" | "yes-no"
+  missingFields?: string[]
 } | null
 
 type EligibilityAgentContextValue = {
@@ -70,10 +81,21 @@ type EligibilityAgentContextValue = {
 
 const DEFAULT_ELIGIBILITY_TOOLTIP = ""
 const ELIGIBILITY_SERVICE_ID = "grexnb"
+const SAFETY_COMPLIANCE_UPLOAD_LABEL = "Upload safety & compliance documents"
+const ENERGY_PERFORMANCE_CERTIFICATE_LABEL = "Energy Performance Certificate (EPC) available?"
+const LEGACY_ENERGY_PERFORMANCE_CERTIFICATE_LABEL = "EPC available?"
+const SAFETY_COMPLIANCE_SLOT_LABELS = [
+  "Gas Safety Certificate",
+  "Electrical Report (EICR)",
+  "Energy Performance Certificate (EPC)",
+] as const
+const SAFETY_COMPLIANCE_FILES_FIELD = "safetyComplianceDocuments"
+const SAFETY_COMPLIANCE_FILE_NAMES_FIELD = "safetyComplianceDocumentsFileNames"
 const ELIGIBILITY_CREATE_ENDPOINT =
   process.env.NEXT_PUBLIC_ELIGIBILITY_CREATE_ENDPOINT ?? "/eligibility"
 const SELECTED_PROJECT_STORAGE_KEY = "selectedProjectId"
 const SELECTED_PROJECT_STAGE_STORAGE_KEY = "selectedProjectStageId"
+const DASHBOARD_ELIGIBILITY_SUMMARY_STORAGE_PREFIX = "dashboardEligibilitySummary:"
 const MAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024
 const MAX_UPLOAD_FILE_SIZE_LABEL = "10 MB"
 const POSTCODE_AUTOCOMPLETE_ENDPOINT =
@@ -119,6 +141,11 @@ const isAgentOptionLabel = (value: string) => {
   return normalized.includes("ask agent z") || normalized === "unsure"
 }
 
+const getNativeSelectOptionStyle = (value: string) =>
+  isAgentOptionLabel(value)
+    ? { color: "#ffffff", backgroundColor: "#1f3d9a" }
+    : { color: "#0f172a", backgroundColor: "#ffffff" }
+
 const renderAgentOptionLabel = (value: string) => {
   const marker = "Agent Z"
   const index = value.indexOf(marker)
@@ -151,6 +178,36 @@ const isAgentSidebarTriggerValue = (value: string) => {
 const shouldAutoApplyYesNoResponse = (options: string[]) => {
   const normalizedOptions = options.map((option) => option.trim().toLowerCase())
   return normalizedOptions.includes("yes") && normalizedOptions.includes("no")
+}
+
+const scrollDashboardFormToTop = (target?: HTMLElement | null) => {
+  if (typeof window === "undefined") return
+
+  const scrollRoot = document.getElementById("dashboard-scroll-root")
+
+  if (scrollRoot && target) {
+    const rootRect = scrollRoot.getBoundingClientRect()
+    const targetRect = target.getBoundingClientRect()
+    const nextTop = scrollRoot.scrollTop + (targetRect.top - rootRect.top) - 16
+
+    scrollRoot.scrollTo({
+      top: Math.max(0, nextTop),
+      behavior: "smooth",
+    })
+    return
+  }
+
+  if (target) {
+    target.scrollIntoView({ behavior: "smooth", block: "start" })
+    return
+  }
+
+  if (scrollRoot) {
+    scrollRoot.scrollTo({ top: 0, left: 0, behavior: "smooth" })
+    return
+  }
+
+  window.scrollTo({ top: 0, left: 0, behavior: "smooth" })
 }
 
 const createAgentSidebarPayload = (
@@ -250,6 +307,20 @@ type PostcodeLookupResponse = {
   ds?: string
 }
 
+type EligibilityLocation = {
+  postcode?: string
+  lat?: number
+  lng?: number
+  lpaCode?: string
+  lpaName?: string
+  region?: string
+  country?: string
+  ward?: string
+  constituency?: string
+  source?: string
+  ds?: string
+}
+
 const toSuggestionText = (value: unknown): string => {
   if (typeof value !== "string") return ""
   return value.replace(/\s+/g, " ").trim()
@@ -257,6 +328,17 @@ const toSuggestionText = (value: unknown): string => {
 
 const normalizePostcode = (value: string) =>
   value.replace(/\s+/g, " ").trim().toUpperCase()
+
+const buildTypedPostcodeSuggestion = (value: string): AutocompleteSuggestion | null => {
+  const normalized = normalizePostcode(value)
+  if (normalized.length < 1) return null
+
+  return {
+    id: `${normalized}-manual`,
+    label: normalized,
+    value: normalized,
+  }
+}
 
 const buildAutocompleteSuggestion = (value: unknown, index: number): AutocompleteSuggestion | null => {
   if (typeof value === "string") {
@@ -332,6 +414,24 @@ const extractAutocompleteSuggestions = (payload: unknown): AutocompleteSuggestio
   }, [])
 }
 
+const withTypedPostcodeFallback = (
+  suggestions: AutocompleteSuggestion[],
+  value: string
+): AutocompleteSuggestion[] => {
+  const typedSuggestion = buildTypedPostcodeSuggestion(value)
+  if (!typedSuggestion) return suggestions
+
+  const alreadyIncluded = suggestions.some(
+    suggestion => suggestion.value.toUpperCase() === typedSuggestion.value.toUpperCase()
+  )
+
+  if (alreadyIncluded) {
+    return suggestions
+  }
+
+  return [typedSuggestion, ...suggestions]
+}
+
 const isValidCoordinate = (value: unknown): value is number =>
   typeof value === "number" && Number.isFinite(value)
 
@@ -340,10 +440,47 @@ const hasUploadedAsset = (entry: UploadedFileEntry) => Boolean(entry.file || ent
 const getUploadedAssetName = (entry: UploadedFileEntry) =>
   entry.file?.name || entry.remoteFileName || entry.description || "Uploaded file"
 
+const getUploadedAssetMimeType = (entry: UploadedFileEntry) => entry.file?.type?.toLowerCase() ?? ""
+
+const getUploadedAssetExtension = (entry: UploadedFileEntry) => {
+  const candidate = getUploadedAssetName(entry).split("?")[0].trim()
+  const extension = candidate.includes(".") ? candidate.split(".").pop() ?? "" : ""
+  return extension.toLowerCase()
+}
+
+const isImageUploadEntry = (entry: UploadedFileEntry) => {
+  const mimeType = getUploadedAssetMimeType(entry)
+  if (mimeType.startsWith("image/")) return true
+
+  return ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"].includes(getUploadedAssetExtension(entry))
+}
+
+const isPdfUploadEntry = (entry: UploadedFileEntry) => {
+  const mimeType = getUploadedAssetMimeType(entry)
+  if (mimeType === "application/pdf") return true
+
+  return getUploadedAssetExtension(entry) === "pdf"
+}
+
 const getFileNameFromUrl = (url: string) => {
   const cleanUrl = url.split("?")[0]
   const lastSegment = cleanUrl.split("/").pop() ?? ""
   return decodeURIComponent(lastSegment) || "Uploaded file"
+}
+
+const formatSignedDateForDisplay = (value: string) => {
+  if (!value.trim()) return ""
+
+  const trimmed = value.trim()
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) return trimmed
+
+  const parsed = new Date(trimmed)
+  if (Number.isNaN(parsed.getTime())) return trimmed
+
+  const day = String(parsed.getUTCDate()).padStart(2, "0")
+  const month = String(parsed.getUTCMonth() + 1).padStart(2, "0")
+  const year = parsed.getUTCFullYear()
+  return `${day}/${month}/${year}`
 }
 
 const extractProjectId = (payload: unknown): string | null => {
@@ -491,6 +628,46 @@ const splitLegacySiteAddress = (value: unknown) => {
   return { line1, line2 }
 }
 
+const splitAutofillSiteAddress = (value: unknown) => {
+  if (typeof value !== "string") {
+    return { line1: "", line2: "" }
+  }
+
+  const segments = value
+    .split(/[\r\n,]+/)
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+
+  if (segments.length === 0) {
+    return { line1: "", line2: "" }
+  }
+
+  if (segments.length === 1) {
+    return { line1: segments[0], line2: "" }
+  }
+
+  return {
+    line1: segments.slice(0, 2).join(", "),
+    line2: segments.slice(2).join(", "),
+  }
+}
+
+const buildProfileAddressLine1 = (address: {
+  doorNo?: string
+  sTreet?: string
+}) => [address.doorNo, address.sTreet].map((value) => value?.trim()).filter(Boolean).join(", ")
+
+const buildProfileAddressLine2 = (address: {
+  locality?: string
+  city?: string
+  state?: string
+  country?: string
+}) =>
+  [address.locality, address.city, address.state, address.country]
+    .map((value) => value?.trim())
+    .filter(Boolean)
+    .join(", ")
+
 const normalizeBooleanLike = (value: unknown): boolean | null => {
   if (typeof value === "boolean") return value
   if (typeof value === "number") return value !== 0
@@ -590,6 +767,16 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
 
   mergeFlatEligibilityFormData(formData, record.formData)
 
+  if (
+    typeof formData[LEGACY_ENERGY_PERFORMANCE_CERTIFICATE_LABEL] === "string" &&
+    formData[ENERGY_PERFORMANCE_CERTIFICATE_LABEL] === undefined
+  ) {
+    formData[ENERGY_PERFORMANCE_CERTIFICATE_LABEL] =
+      formData[LEGACY_ENERGY_PERFORMANCE_CERTIFICATE_LABEL]
+  }
+
+  delete formData[LEGACY_ENERGY_PERFORMANCE_CERTIFICATE_LABEL]
+
   const fieldMappings: Array<{
     label: string
     paths: string[][]
@@ -628,30 +815,70 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
       paths: [["applicantAndProperty", "applicantDetails", "siteAddress", "line2"]],
     },
     {
+      label: "Council",
+      paths: [
+        ["applicantAndProperty", "councilApplicationHistory", "councilName"],
+        ["location", "lpaName"],
+        ["location", "lpa_name"],
+      ],
+    },
+    {
       label: "Postcode",
       paths: [
         ["applicantAndProperty", "applicantDetails", "siteAddress", "postcode"],
         ["applicantAndProperty", "applicantDetails", "postcode"],
+        ["location", "postcode"],
       ],
     },
     {
-      label: "Are you using a planning agent?",
-      paths: [["applicantAndProperty", "agentDetails", "usesPlanningAgent"]],
+      label: "Is this address same as site address?",
+      paths: [
+        ["applicantAndProperty", "applicantDetails", "useAlternateCorrespondenceAddress"],
+        ["applicantAndProperty", "applicantDetails", "correspondenceAddress", "enabled"],
+      ],
     },
     {
-      label: "Agent Name",
-      paths: [["applicantAndProperty", "agentDetails", "agentName"]],
+      label: "Correspondence Address Line 1",
+      paths: [
+        ["applicantAndProperty", "applicantDetails", "correspondenceAddress", "line1"],
+      ],
     },
     {
-      label: "Agent Address",
-      paths: [["applicantAndProperty", "agentDetails", "agentAddress"]],
+      label: "Correspondence Address Line 2",
+      paths: [
+        ["applicantAndProperty", "applicantDetails", "correspondenceAddress", "line2"],
+      ],
     },
     {
-      label: "Agent Contact",
-      paths: [["applicantAndProperty", "agentDetails", "agentContactEmailPhone"]],
+      label: "Correspondence Council",
+      paths: [
+        ["applicantAndProperty", "applicantDetails", "correspondenceAddress", "council"],
+      ],
     },
     {
-      label: "Have you previously applied to the council?",
+      label: "Correspondence Postcode",
+      paths: [
+        ["applicantAndProperty", "applicantDetails", "correspondenceAddress", "postcode"],
+      ],
+    },
+    // {
+    //   label: "Are you using a planning agent?",
+    //   paths: [["applicantAndProperty", "agentDetails", "usesPlanningAgent"]],
+    // },
+    // {
+    //   label: "Agent Name",
+    //   paths: [["applicantAndProperty", "agentDetails", "agentName"]],
+    // },
+    // {
+    //   label: "Agent Address",
+    //   paths: [["applicantAndProperty", "agentDetails", "agentAddress"]],
+    // },
+    // {
+    //   label: "Agent Contact",
+    //   paths: [["applicantAndProperty", "agentDetails", "agentContactEmailPhone"]],
+    // },
+    {
+      label: "Have you previously applied to any council?",
       paths: [["applicantAndProperty", "councilApplicationHistory", "hasPreviousCouncilApplication"]],
     },
     {
@@ -662,10 +889,6 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
       label: "Planning Reference Number *",
       paths: [["applicantAndProperty", "councilApplicationHistory", "planningReferenceNumber"]],
     },
-      {
-        label: "Council",
-        paths: [["applicantAndProperty", "councilApplicationHistory", "councilName"]],
-      },
     {
       label: "Type of Application *",
       paths: [["applicantAndProperty", "councilApplicationHistory", "previousApplicationType"]],
@@ -687,12 +910,57 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
       paths: [["applicantAndProperty", "propertyAndOwnership", "ownershipStatus"]],
     },
     {
-      label: "Conservation Area or Near Listed Building?",
-      paths: [["applicantAndProperty", "propertyAndOwnership", "nearConservationAreaOrListedBuilding"]],
+      label: "Are you planning any building works?",
+      paths: [["applicantAndProperty", "propertyAndOwnership", "purposeOfDevelopment"]],
+      mode: "array",
     },
     {
-      label: "Purpose of Development",
-      paths: [["applicantAndProperty", "propertyAndOwnership", "purposeOfDevelopment"]],
+      label: "Has the property already been extended before?",
+      paths: [["applicantAndProperty", "propertyAndOwnership", "previouslyExtended"]],
+    },
+    {
+      label: "How is the property currently used?",
+      paths: [["applicantAndProperty", "propertyAndOwnership", "currentUseStatus"]],
+    },
+    {
+      label: "How many people currently live there?",
+      paths: [["applicantAndProperty", "propertyAndOwnership", "currentOccupantsCount"]],
+    },
+    {
+      label: "Are they one family or separate households?",
+      paths: [["applicantAndProperty", "propertyAndOwnership", "currentHouseholdArrangement"]],
+    },
+    {
+      label: "How many occupants do you plan to accommodate?",
+      paths: [["applicantAndProperty", "propertyAndOwnership", "plannedOccupantsCount"]],
+    },
+    {
+      label: "Will occupants share kitchen/bathroom?",
+      paths: [["applicantAndProperty", "propertyAndOwnership", "sharedKitchenBathroom"]],
+    },
+    {
+      label: "Will rooms be rented individually?",
+      paths: [["applicantAndProperty", "propertyAndOwnership", "roomsRentedIndividually"]],
+    },
+    {
+      label: "Number of bedrooms available?",
+      paths: [["worksAndMaterials", "roomLayoutCheck", "availableBedroomsCount"]],
+    },
+    {
+      label: "Number of bathrooms / shower rooms?",
+      paths: [["worksAndMaterials", "roomLayoutCheck", "bathroomsOrShowerRoomsCount"]],
+    },
+    {
+      label: "Is there a communal kitchen?",
+      paths: [["worksAndMaterials", "roomLayoutCheck", "hasCommunalKitchen"]],
+    },
+    {
+      label: "Is any lounge/dining room proposed as a bedroom?",
+      paths: [["worksAndMaterials", "roomLayoutCheck", "loungeDiningRoomAsBedroom"]],
+    },
+    {
+      label: "Approx smallest bedroom size?",
+      paths: [["worksAndMaterials", "roomLayoutCheck", "smallestBedroomSize"]],
     },
     {
       label: "Description of Proposed Works",
@@ -713,15 +981,17 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
       ],
     },
     {
-      label: "Proposed Extension Depth (m)",
+      label: "Proposed Extension Width (m)",
       paths: [
         ["worksAndMaterials", "descriptionOfWorks", "proposedExtensionWidthM"],
-        ["worksAndMaterials", "descriptionOfWorks", "proposedExtensionDepthM"],
       ],
     },
     {
-      label: "Proposed Extension Height (m)",
-      paths: [["worksAndMaterials", "descriptionOfWorks", "proposedExtensionHeightM"]],
+      label: "Proposed Extension Depth (m)",
+      paths: [
+        ["worksAndMaterials", "descriptionOfWorks", "proposedExtensionDepthM"],
+        ["worksAndMaterials", "descriptionOfWorks", "proposedExtensionHeightM"],
+      ],
     },
     {
       label: "Ridge / Eaves Height (m)",
@@ -730,6 +1000,51 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
     {
       label: "Distance from Boundary (m)",
       paths: [["worksAndMaterials", "descriptionOfWorks", "distanceFromBoundaryM"]],
+    },
+    {
+      label: "Total internal floor area",
+      paths: [
+        ["worksAndMaterials", "propertyOverview", "totalInternalFloorAreaM2"],
+        ["worksAndMaterials", "propertyOverview", "totalInternalFloorArea"],
+      ],
+    },
+    {
+      label: "Number of floors",
+      paths: [["worksAndMaterials", "propertyOverview", "numberOfFloors"]],
+    },
+    {
+      label: "Property footprint (approx length x width in metres)",
+      paths: [["worksAndMaterials", "propertyOverview", "propertyFootprint"]],
+    },
+    {
+      label: "Garden depth (metres)",
+      paths: [
+        ["worksAndMaterials", "propertyOverview", "gardenDepthM"],
+        ["worksAndMaterials", "propertyOverview", "gardenDepth"],
+      ],
+    },
+    {
+      label: "Plot width (metres)",
+      paths: [
+        ["worksAndMaterials", "propertyOverview", "plotWidthM"],
+        ["worksAndMaterials", "propertyOverview", "plotWidth"],
+      ],
+    },
+    {
+      label: "Kitchen Room Length (metres)",
+      paths: [["worksAndMaterials", "roomDimensions", "kitchenRoomLengthM"]],
+    },
+    {
+      label: "Kitchen Room Width (metres)",
+      paths: [["worksAndMaterials", "roomDimensions", "kitchenRoomWidthM"]],
+    },
+    {
+      label: "Bathroom Room Length (metres)",
+      paths: [["worksAndMaterials", "roomDimensions", "bathroomRoomLengthM"]],
+    },
+    {
+      label: "Bathroom Room Width (metres)",
+      paths: [["worksAndMaterials", "roomDimensions", "bathroomRoomWidthM"]],
     },
     {
       label: "Wall Materials",
@@ -748,19 +1063,26 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
       paths: [["worksAndMaterials", "materials", "materialsMatchExisting"]],
     },
     {
-      label: "Is the property a Listed Building?",
+      label: "Conservation Area or Near Listed Building?",
       paths: [
-        ["siteConstratints", "heritageAndListing", "isListedBuilding"],
-        ["siteConstraints", "heritageAndListing", "isListedBuilding"],
+        ["applicantAndProperty", "propertyAndOwnership", "nearConservationAreaOrListedBuilding"],
+        ["siteConstraints", "heritageAndListing", "conservationAreaOrNearListedBuilding"],
       ],
     },
-    {
-      label: "Conservation Area?",
-      paths: [
-        ["siteConstratints", "heritageAndListing", "isInConservationArea"],
-        ["siteConstraints", "heritageAndListing", "isInConservationArea"],
-      ],
-    },
+    // {
+    //   label: "Is the property a Listed Building?",
+    //   paths: [
+    //     ["siteConstratints", "heritageAndListing", "isListedBuilding"],
+    //     ["siteConstraints", "heritageAndListing", "isListedBuilding"],
+    //   ],
+    // },
+    // {
+    //   label: "Conservation Area?",
+    //   paths: [
+    //     ["siteConstratints", "heritageAndListing", "isInConservationArea"],
+    //     ["siteConstraints", "heritageAndListing", "isInConservationArea"],
+    //   ],
+    // },
     {
       label: "New or altered vehicle access?",
       paths: [
@@ -792,29 +1114,29 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
     {
       label: "Trees with TPO on or near site?",
       paths: [
-        ["siteConstratints", "treesHedgesLandscaping", "treesWithTPO"],
-        ["siteConstraints", "treesHedgesLandscaping", "treesWithTPO"],
+        ["siteConstratints", "TreesHedgesLandscaping", "TreesWithTPO"],
+        ["siteConstraints", "TreesHedgesLandscaping", "TreesWithTPO"],
       ],
     },
     {
       label: "Trees within falling distance of works?",
       paths: [
-        ["siteConstratints", "treesHedgesLandscaping", "treesWithinFallingDistance"],
-        ["siteConstraints", "treesHedgesLandscaping", "treesWithinFallingDistance"],
+        ["siteConstratints", "TreesHedgesLandscaping", "TreesWithinFallingDistance"],
+        ["siteConstraints", "TreesHedgesLandscaping", "TreesWithinFallingDistance"],
       ],
     },
     {
       label: "Tree Species (if known)",
       paths: [
-        ["siteConstratints", "treesHedgesLandscaping", "treeSpecies"],
-        ["siteConstraints", "treesHedgesLandscaping", "treeSpecies"],
+        ["siteConstratints", "TreesHedgesLandscaping", "TreeSpecies"],
+        ["siteConstraints", "TreesHedgesLandscaping", "TreeSpecies"],
       ],
     },
     {
       label: "Approximate Tree Height (m)",
       paths: [
-        ["siteConstratints", "treesHedgesLandscaping", "approximateTreeSizeM"],
-        ["siteConstraints", "treesHedgesLandscaping", "approximateTreeSizeM"],
+        ["siteConstratints", "TreesHedgesLandscaping", "approximateTreeSizeM"],
+        ["siteConstraints", "TreesHedgesLandscaping", "approximateTreeSizeM"],
       ],
     },
     {
@@ -831,13 +1153,13 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
         ["siteConstraints", "floodAndEnvironmentalRisk", "isSiteContaminatedLand"],
       ],
     },
-    {
-      label: "Has pre-application advice been sought?",
-      paths: [
-        ["siteConstratints", "preApplicationAdvice", "soughtPreAppAdvice"],
-        ["siteConstraints", "preApplicationAdvice", "soughtPreAppAdvice"],
-      ],
-    },
+    // {
+    //   label: "Has pre-application advice been sought?",
+    //   paths: [
+    //     ["siteConstratints", "preApplicationAdvice", "soughtPreAppAdvice"],
+    //     ["siteConstraints", "preApplicationAdvice", "soughtPreAppAdvice"],
+    //   ],
+    // },
     {
       label: "Pre-Application Reference Number",
       paths: [
@@ -864,6 +1186,35 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
       paths: [
         ["siteConstratints", "preApplicationAdvice", "preApplicationAdviceSummary"],
         ["siteConstraints", "preApplicationAdvice", "preApplicationAdviceSummary"],
+      ],
+    },
+    {
+      label: "Do you currently have smoke alarms installed?",
+      paths: [
+        ["utilitesAndConsents", "safetyAndCompliance", "smokeAlarmsInstalled"],
+        ["utilitiesAndConsents", "safetyAndCompliance", "smokeAlarmsInstalled"],
+      ],
+    },
+    {
+      label: "Do you have a valid Gas Safety Certificate?",
+      paths: [
+        ["utilitesAndConsents", "safetyAndCompliance", "gasSafetyCertificate"],
+        ["utilitiesAndConsents", "safetyAndCompliance", "gasSafetyCertificate"],
+      ],
+    },
+    {
+      label: "Do you have a valid Electrical Report (EICR)?",
+      paths: [
+        ["utilitesAndConsents", "safetyAndCompliance", "electricalReportEicr"],
+        ["utilitiesAndConsents", "safetyAndCompliance", "electricalReportEicr"],
+      ],
+    },
+    {
+      label: ENERGY_PERFORMANCE_CERTIFICATE_LABEL,
+      paths: [
+        ["utilitesAndConsents", "safetyAndCompliance", "epcAvailable"],
+        ["utilitiesAndConsents", "safetyAndCompliance", "epcAvailable"],
+        ["formData", LEGACY_ENERGY_PERFORMANCE_CERTIFICATE_LABEL],
       ],
     },
     {
@@ -908,15 +1259,9 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
         ["utilitiesAndConsents", "utilitiesAndWaste", "renewableEnergyDetails"],
       ],
     },
+   
     {
-      label: "Which Ownership Certificate applies?",
-      paths: [
-        ["utilitesAndConsents", "ownershipCertificate", "certificateOfOwnership"],
-        ["utilitiesAndConsents", "ownershipCertificate", "certificateOfOwnership"],
-      ],
-    },
-    {
-      label: "Other Owners Details",
+      label: "Names & Addresses of Other Owners (if Certificate B, C or D)",
       paths: [
         ["utilitesAndConsents", "ownershipCertificate", "ownershipDetails"],
         ["utilitiesAndConsents", "ownershipCertificate", "ownershipDetails"],
@@ -1010,6 +1355,15 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
     setEligibilityFormValue(formData, label, getFirstPathValue(record, paths), mode)
   })
 
+  if (typeof formData["Is this address same as site address?"] === "string") {
+    formData["Is this address same as site address?"] =
+      isYesLikeValue(formData["Is this address same as site address?"]) ? "No" : "Yes"
+  }
+
+  if (typeof formData["Date (dd/mm/yyyy)"] === "string") {
+    formData["Date (dd/mm/yyyy)"] = formatSignedDateForDisplay(formData["Date (dd/mm/yyyy)"])
+  }
+
   const setMissingValue = (label: string, value: unknown) => {
     if (asStringValue(formData[label]).trim()) return
     setEligibilityFormValue(formData, label, value)
@@ -1040,11 +1394,20 @@ const normalizeEligibilityFormDataFromApi = (payload: unknown): EligibilityFormV
   setMissingValue("Phone Number", legacyContactDetails.phoneNumber)
 
   const legacyAddressLines = splitLegacySiteAddress(legacySiteAddress)
+  setMissingValue("Correspondence Address Line 1", legacyAddressLines.line1)
+  setMissingValue("Correspondence Address Line 2", legacyAddressLines.line2)
+  setMissingValue("Correspondence Postcode", legacyPostcode)
+  setMissingValue("Correspondence Council", legacyCouncil)
+  setMissingValue("Correspondence Council", formData["Which council have you applied for?"])
   setMissingValue("Site Address Line 1", legacyAddressLines.line1)
   setMissingValue("Site Address Line 2", legacyAddressLines.line2)
   setMissingValue("Postcode", legacyPostcode)
   setMissingValue("Council", legacyCouncil)
   setMissingValue("Council", formData["Which council have you applied for?"])
+  setMissingValue(
+    "Names & Addresses of Other Owners (if Certificate B, C or D)",
+    formData["Other Owners Details"]
+  )
 
   return formData
 }
@@ -1061,6 +1424,31 @@ const extractStringFromPaths = (
   return undefined
 }
 
+const extractStringArrayFromPaths = (
+  record: Record<string, unknown> | null,
+  paths: string[][]
+) => {
+  if (!record) return []
+
+  const value = getFirstPathValue(record, paths)
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (typeof item === "string" ? item.trim() : typeof item === "number" ? String(item) : ""))
+      .filter(Boolean)
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    return [value.trim()]
+  }
+
+  if (typeof value === "number") {
+    return [String(value)]
+  }
+
+  return []
+}
+
 const extractBooleanFromPaths = (
   record: Record<string, unknown> | null,
   paths: string[][]
@@ -1069,6 +1457,39 @@ const extractBooleanFromPaths = (
   const value = getFirstPathValue(record, paths)
   const normalized = normalizeBooleanLike(value)
   return normalized ?? undefined
+}
+
+const normalizeEligibilityLocationFromApi = (
+  record: Record<string, unknown> | null
+): EligibilityLocation | undefined => {
+  if (!record) return undefined
+
+  const rawLocation = getFirstPathValue(record, [["location"]])
+  if (!isRecord(rawLocation)) return undefined
+
+  const location: EligibilityLocation = {
+    postcode: extractStringFromPaths(rawLocation, [["postcode"]]),
+    lat:
+      typeof rawLocation.lat === "number" && Number.isFinite(rawLocation.lat)
+        ? rawLocation.lat
+        : undefined,
+    lng:
+      typeof rawLocation.lng === "number" && Number.isFinite(rawLocation.lng)
+        ? rawLocation.lng
+        : undefined,
+    lpaCode: extractStringFromPaths(rawLocation, [["lpaCode"], ["lpa_code"]]),
+    lpaName: extractStringFromPaths(rawLocation, [["lpaName"], ["lpa_name"]]),
+    region: extractStringFromPaths(rawLocation, [["region"]]),
+    country: extractStringFromPaths(rawLocation, [["country"]]),
+    ward: extractStringFromPaths(rawLocation, [["ward"]]),
+    constituency: extractStringFromPaths(rawLocation, [["constituency"]]),
+    source: extractStringFromPaths(rawLocation, [["source"]]),
+    ds: extractStringFromPaths(rawLocation, [["ds"]]),
+  }
+
+  return Object.values(location).some((value) => value !== undefined && value !== "")
+    ? location
+    : undefined
 }
 
 const normalizeEligibilityResponseFromApi = (payload: unknown, fallbackProjectId: string) => {
@@ -1120,12 +1541,28 @@ const normalizeEligibilityResponseFromApi = (payload: unknown, fallbackProjectId
   return {
     projectId: extractProjectId(payload) ?? fallbackProjectId,
     formData: normalizeEligibilityFormDataFromApi(payload),
+    location: normalizeEligibilityLocationFromApi(record),
     isDraft,
     draftSavedAt: extractStringFromPaths(record, [["draftSavedAt"]]),
     completedAt,
     isEligible,
     step: normalizedStep,
   }
+}
+
+const extractDigitalSignaturePreviewUrlFromApi = (payload: unknown) => {
+  const record = unwrapEligibilityRecord(payload)
+  if (!record) return null
+
+  return (
+    extractStringFromPaths(record, [
+      ["Declarations", "DigitalSignature", "digitalSignatureUrl"],
+      ["Declarations", "digitalSignature", "digitalSignatureUrl"],
+      ["declarations", "DigitalSignature", "digitalSignatureUrl"],
+      ["declarations", "digitalSignature", "digitalSignatureUrl"],
+      ["digitalSignature", "digitalSignatureUrl"],
+    ]) ?? null
+  )
 }
 
 const normalizeRemoteUploadEntry = (
@@ -1156,15 +1593,16 @@ const normalizeEligibilityUploadsFromApi = (payload: unknown): EligibilityFileMa
   const record = unwrapEligibilityRecord(payload)
   if (!record) return {}
 
-  const plans = getPathValue(record, ["worksAndMaterials", "plansDrawingsPhotographs"])
-  if (!isRecord(plans)) return {}
-
   const uploaded: EligibilityFileMap = {}
 
   const setUploads = (label: string, rawValue: unknown, fallbackDescriptions: string[] = []) => {
-    if (!Array.isArray(rawValue)) return
+    const values = Array.isArray(rawValue)
+      ? rawValue
+      : rawValue === undefined || rawValue === null
+        ? []
+        : [rawValue]
 
-    const entries = rawValue
+    const entries = values
       .map((item, index) =>
         normalizeRemoteUploadEntry(item, fallbackDescriptions[index] ?? "", fallbackDescriptions[index])
       )
@@ -1175,13 +1613,123 @@ const normalizeEligibilityUploadsFromApi = (payload: unknown): EligibilityFileMa
     }
   }
 
-  setUploads(
-    "Existing & Proposed Elevations",
-    plans.existingAndProposedElevations,
+  const setUploadsFromPaths = (
+    label: string,
+    paths: string[][],
+    fallbackDescriptions: string[] = []
+  ) => {
+    const rawValue = getFirstPathValue(record, paths)
+    setUploads(label, rawValue, fallbackDescriptions)
+  }
+
+  setUploadsFromPaths("Location Plan (1:1250 or 1:2500)", [
+    ["worksAndMaterials", "plansDrawingsPhotographs", "locationPlan"],
+    ["locationPlan"],
+  ])
+  setUploadsFromPaths("Site Plan (1:200 or 1:500)", [
+    ["worksAndMaterials", "plansDrawingsPhotographs", "sitePlan"],
+    ["sitePlan"],
+  ])
+  setUploadsFromPaths(
+    "Existing & Proposed Plans",
+    [
+      ["worksAndMaterials", "plansDrawingsPhotographs", "existingAndProposedElevations"],
+      ["existingAndProposedElevations"],
+    ],
     ["Existing elevation", "Proposed elevation"]
   )
-  setUploads("Photographs of Site", plans.photographsOfSite)
-  setUploads("Additional Drawings (floor plans, sections etc.)", plans.additionalDrawings)
+  setUploadsFromPaths("Photographs of Site", [
+    ["worksAndMaterials", "plansDrawingsPhotographs", "photographsOfSite"],
+    ["photographsOfSite"],
+  ])
+  setUploadsFromPaths("Additional Drawings (floor plans, sections etc.)", [
+    ["worksAndMaterials", "plansDrawingsPhotographs", "additionalDrawings"],
+    ["additionalDrawings"],
+  ])
+  setUploadsFromPaths("Tree Report / BS5837 Report (if available)", [
+    ["siteConstratints", "TreesHedgesAndLandscaping", "TreeReportBs5837"],
+    ["siteConstraints", "TreesHedgesAndLandscaping", "TreeReportBs5837"],
+    ["siteConstraints", "TreesHedgesLandscaping", "TreeReportBs5837"],
+    ["TreeSurveyReport"],
+  ])
+  setUploadsFromPaths("Flood Risk Assessment (if available)", [
+    ["siteConstratints", "floodAndEnvironmentalRisk", "floodRiskAssessment"],
+    ["siteConstraints", "floodAndEnvironmentalRisk", "floodRiskAssessment"],
+    ["floodRiskAssesmentReport"],
+    ["floodRiskAssessmentReport"],
+  ])
+  const safetyComplianceDocuments = getFirstPathValue(record, [
+    ["utilitesAndConsents", "safetyAndCompliance", SAFETY_COMPLIANCE_FILES_FIELD],
+    ["utilitiesAndConsents", "safetyAndCompliance", SAFETY_COMPLIANCE_FILES_FIELD],
+    [SAFETY_COMPLIANCE_FILES_FIELD],
+  ])
+  const safetyComplianceFileNames = extractStringArrayFromPaths(record, [
+    ["utilitesAndConsents", "safetyAndCompliance", SAFETY_COMPLIANCE_FILE_NAMES_FIELD],
+    ["utilitiesAndConsents", "safetyAndCompliance", SAFETY_COMPLIANCE_FILE_NAMES_FIELD],
+    [SAFETY_COMPLIANCE_FILE_NAMES_FIELD],
+  ])
+
+  if (safetyComplianceDocuments !== undefined && safetyComplianceDocuments !== null) {
+    setUploads(
+      SAFETY_COMPLIANCE_UPLOAD_LABEL,
+      safetyComplianceDocuments,
+      safetyComplianceFileNames.length > 0
+        ? safetyComplianceFileNames
+        : [...SAFETY_COMPLIANCE_SLOT_LABELS]
+    )
+  } else {
+    const safetyComplianceEntries = [
+      normalizeRemoteUploadEntry(
+        getFirstPathValue(record, [
+          ["utilitesAndConsents", "safetyAndCompliance", "gasSafetyCertificateFile"],
+          ["utilitiesAndConsents", "safetyAndCompliance", "gasSafetyCertificateFile"],
+          ["utilitesAndConsents", "safetyAndCompliance", "gasSafetyCertificateUpload"],
+          ["utilitiesAndConsents", "safetyAndCompliance", "gasSafetyCertificateUpload"],
+          ["utilitesAndConsents", "safetyAndCompliance", "gasSafetyCertificateDocument"],
+          ["utilitiesAndConsents", "safetyAndCompliance", "gasSafetyCertificateDocument"],
+          ["gasSafetyCertificateUpload"],
+          ["gasSafetyCertificateDocument"],
+          ["gasSafetyCertificateFile"],
+        ]),
+        SAFETY_COMPLIANCE_SLOT_LABELS[0],
+        SAFETY_COMPLIANCE_SLOT_LABELS[0]
+      ) ?? createUploadEntry(SAFETY_COMPLIANCE_SLOT_LABELS[0]),
+      normalizeRemoteUploadEntry(
+        getFirstPathValue(record, [
+          ["utilitesAndConsents", "safetyAndCompliance", "electricalReportEicrFile"],
+          ["utilitiesAndConsents", "safetyAndCompliance", "electricalReportEicrFile"],
+          ["utilitesAndConsents", "safetyAndCompliance", "electricalReportEicrUpload"],
+          ["utilitiesAndConsents", "safetyAndCompliance", "electricalReportEicrUpload"],
+          ["utilitesAndConsents", "safetyAndCompliance", "electricalReportEicrDocument"],
+          ["utilitiesAndConsents", "safetyAndCompliance", "electricalReportEicrDocument"],
+          ["electricalReportEicrUpload"],
+          ["electricalReportEicrDocument"],
+          ["electricalReportEicrFile"],
+        ]),
+        SAFETY_COMPLIANCE_SLOT_LABELS[1],
+        SAFETY_COMPLIANCE_SLOT_LABELS[1]
+      ) ?? createUploadEntry(SAFETY_COMPLIANCE_SLOT_LABELS[1]),
+      normalizeRemoteUploadEntry(
+        getFirstPathValue(record, [
+          ["utilitesAndConsents", "safetyAndCompliance", "epcCertificateFile"],
+          ["utilitiesAndConsents", "safetyAndCompliance", "epcCertificateFile"],
+          ["utilitesAndConsents", "safetyAndCompliance", "epcCertificateUpload"],
+          ["utilitiesAndConsents", "safetyAndCompliance", "epcCertificateUpload"],
+          ["utilitesAndConsents", "safetyAndCompliance", "epcCertificateDocument"],
+          ["utilitiesAndConsents", "safetyAndCompliance", "epcCertificateDocument"],
+          ["epcCertificateUpload"],
+          ["epcCertificateDocument"],
+          ["epcCertificate"],
+        ]),
+        SAFETY_COMPLIANCE_SLOT_LABELS[2],
+        SAFETY_COMPLIANCE_SLOT_LABELS[2]
+      ) ?? createUploadEntry(SAFETY_COMPLIANCE_SLOT_LABELS[2]),
+    ]
+
+    if (safetyComplianceEntries.some((entry) => entry.remoteFileUrl)) {
+      uploaded[SAFETY_COMPLIANCE_UPLOAD_LABEL] = safetyComplianceEntries
+    }
+  }
 
   return uploaded
 }
@@ -1197,10 +1745,44 @@ const getBooleanFieldValue = (
 
 const buildEligibilityStepPayload = (
   step: Step,
-  formValues: EligibilityFormValues
+  formValues: EligibilityFormValues,
+  uploadedFiles?: EligibilityFileMap
 ) => {
   const getValue = (label: string) => asStringValue(formValues[label])
+  const conservationAreaOrNearListedBuilding = getValue(
+    "Conservation Area or Near Listed Building?"
+  )
+  const hasSafetyComplianceUpload = (index: number) =>
+    Boolean(
+      uploadedFiles?.[SAFETY_COMPLIANCE_UPLOAD_LABEL]?.[index] &&
+        hasUploadedAsset(uploadedFiles[SAFETY_COMPLIANCE_UPLOAD_LABEL][index])
+    )
+  const buildCorrespondenceAddress = () => {
+    const line1 = getValue("Correspondence Address Line 1")
+    const line2 = getValue("Correspondence Address Line 2")
+    const council = getValue("Correspondence Council")
+    const postcode = getValue("Correspondence Postcode")
+
+    if (![line1, line2, council, postcode].some(Boolean)) {
+      return undefined
+    }
+
+    return { line1, line2, council, postcode }
+  }
   const buildApplicantSiteAddress = () => {
+    if (getBooleanFieldValue(formValues, "Is this address same as site address?")) {
+      const correspondenceAddress = buildCorrespondenceAddress()
+      if (!correspondenceAddress) {
+        return undefined
+      }
+
+      return {
+        line1: correspondenceAddress.line1,
+        line2: correspondenceAddress.line2,
+        postcode: correspondenceAddress.postcode,
+      }
+    }
+
     const line1 = getValue("Site Address Line 1")
     const line2 = getValue("Site Address Line 2")
     const postcode = getValue("Postcode")
@@ -1224,17 +1806,20 @@ const buildEligibilityStepPayload = (
             countryCode: getValue("Country Code"),
             phoneNumber: getValue("Phone Number"),
             siteAddress: buildApplicantSiteAddress(),
+            useAlternateCorrespondenceAddress:
+              !getBooleanFieldValue(formValues, "Is this address same as site address?"),
+            correspondenceAddress: buildCorrespondenceAddress(),
           },
-          agentDetails: {
-            usesPlanningAgent: getBooleanFieldValue(formValues, "Are you using a planning agent?"),
-            agentName: getValue("Agent Name"),
-            agentAddress: getValue("Agent Address"),
-            agentContactEmailPhone: getValue("Agent Contact"),
-          },
+          // agentDetails: {
+          //   usesPlanningAgent: getBooleanFieldValue(formValues, "Are you using a planning agent?"),
+          //   agentName: getValue("Agent Name"),
+          //   agentAddress: getValue("Agent Address"),
+          //   agentContactEmailPhone: getValue("Agent Contact"),
+          // },
           councilApplicationHistory: {
             hasPreviousCouncilApplication: getBooleanFieldValue(
               formValues,
-              "Have you previously applied to the council?"
+              "have you previously applied to any council?"
             ),
             previousProposalDetails: getValue(
               "What was previously proposed, and was it approved, refused, or withdrawn?"
@@ -1251,21 +1836,60 @@ const buildEligibilityStepPayload = (
             propertyType: getValue("Property Type"),
             ownershipStatus: getValue("Ownership Status"),
             nearConservationAreaOrListedBuilding: getValue("Conservation Area or Near Listed Building?"),
-            purposeOfDevelopment: getValue("Purpose of Development"),
+            purposeOfDevelopment: asArrayValue(
+              formValues["Are you planning any building works?"]
+            ).join(", "),
+            previouslyExtended: getValue("Has the property already been extended before?"),
+            currentUseStatus: getValue("How is the property currently used?"),
+            currentOccupantsCount: getValue("How many people currently live there?"),
+            currentHouseholdArrangement: getValue(
+              "Are they one family or separate households?"
+            ),
+            plannedOccupantsCount: getValue(
+              "How many occupants do you plan to accommodate?"
+            ),
+            sharedKitchenBathroom: getValue("Will occupants share kitchen/bathroom?"),
+            roomsRentedIndividually: getValue("Will rooms be rented individually?"),
           },
         },
       }
     case 2:
       return {
         worksAndMaterials: {
+          roomLayoutCheck: {
+            availableBedroomsCount: getValue("Number of bedrooms available?"),
+            bathroomsOrShowerRoomsCount: getValue("Number of bathrooms / shower rooms?"),
+            hasCommunalKitchen: getValue("Is there a communal kitchen?"),
+            loungeDiningRoomAsBedroom: getValue(
+              "Is any lounge/dining room proposed as a bedroom?"
+            ),
+            smallestBedroomSize: getValue("Approx smallest bedroom size?"),
+          },
           descriptionOfWorks: {
             propsedWorksDescription: getValue("Description of Proposed Works"),
             existingPropertyWidthM: getValue("Existing Property Width (m)"),
             existingPropertyHeightM: getValue("Existing Property Depth (m)"),
-            proposedExtensionWidthM: getValue("Proposed Extension Depth (m)"),
-            proposedExtensionHeightM: getValue("Proposed Extension Height (m)"),
+            existingPropertyDepthM: getValue("Existing Property Depth (m)"),
+            proposedExtensionWidthM: getValue("Proposed Extension Width (m)"),
+            proposedExtensionDepthM: getValue("Proposed Extension Depth (m)"),
+            proposedExtensionHeightM: getValue("Proposed Extension Depth (m)"),
             ridgeOrEavesHeightM: getValue("Ridge / Eaves Height (m)"),
             distanceFromBoundaryM: getValue("Distance from Boundary (m)"),
+          },
+          propertyOverview: {
+            totalInternalFloorAreaM2: getValue("Total internal floor area"),
+            numberOfFloors: getValue("Number of floors"),
+            propertyFootprint: getValue(
+              "Property footprint (approx length x width in metres)"
+            ),
+            gardenDepthM: getValue("Garden depth (metres)"),
+            plotWidthM: getValue("Plot width (metres)"),
+          },
+          roomDimensions: {
+            kitchenRoomLengthM: getValue("Kitchen Room Length (metres)"),
+            kitchenRoomWidthM: getValue("Kitchen Room Width (metres)"),
+            bathroomRoomLengthM: getValue("Bathroom Room Length (metres)"),
+            bathroomRoomWidthM: getValue("Bathroom Room Width (metres)"),
           },
           materials: {
             wallMaterials: getValue("Wall Materials"),
@@ -1279,8 +1903,13 @@ const buildEligibilityStepPayload = (
       return {
         siteConstraints: {
           heritageAndListing: {
-            isListedBuilding: getValue("Is the property a Listed Building?"),
-            isInConservationArea: getValue("Conservation Area?"),
+            isListedBuilding:
+              getValue("Is the property a Listed Building?") ||
+              conservationAreaOrNearListedBuilding,
+            isInConservationArea:
+              getValue("Conservation Area?") ||
+              conservationAreaOrNearListedBuilding,
+            conservationAreaOrNearListedBuilding,
           },
           accessAndParking: {
             newOrAlteredAccess: getValue("New or altered vehicle access?"),
@@ -1288,28 +1917,41 @@ const buildEligibilityStepPayload = (
             proposedParkingSpaces: getValue("Number of Proposed Parking Spaces"),
             cycleStorageProvisions: getValue("Cycle storage provided?"),
           },
-          treesHedgesLandscaping: {
-            treesWithTPO: getValue("Trees with TPO on or near site?"),
-            treesWithinFallingDistance: getValue("Trees within falling distance of works?"),
-            treeSpecies: getValue("Tree Species (if known)"),
+          TreesHedgesLandscaping: {
+            TreesWithTPO: getValue("Trees with TPO on or near site?"),
+            TreesWithinFallingDistance: getValue("Trees within falling distance of works?"),
+            TreeSpecies: getValue("Tree Species (if known)"),
             approximateTreeSizeM: getValue("Approximate Tree Height (m)"),
           },
           floodAndEnvironmentalRisk: {
             isSiteInFloodRiskArea: getValue("Is the site in Flood Zone 2 or 3?"),
             isSiteContaminatedLand: getValue("Any known contamination on site?"),
           },
-          preApplicationAdvice: {
-            soughtPreAppAdvice: getValue("Has pre-application advice been sought?"),
-            preApplicationReferenceNumber: getValue("Pre-Application Reference Number"),
-            dateOfPreAppAdvice: getValue("Date of Pre-App Advice"),
-            officerName: getValue("Officer Name"),
-            preApplicationAdviceSummary: getValue("Summary of Pre-App Advice Received"),
-          },
+          // preApplicationAdvice: {
+          //   soughtPreAppAdvice: getValue("Has pre-application advice been sought?"),
+          //   preApplicationReferenceNumber: getValue("Pre-Application Reference Number"),
+          //   dateOfPreAppAdvice: getValue("Date of Pre-App Advice"),
+          //   officerName: getValue("Officer Name"),
+          //   preApplicationAdviceSummary: getValue("Summary of Pre-App Advice Received"),
+          // },
         },
       }
     case 4:
       return {
         utilitiesAndConsents: {
+          safetyAndCompliance: {
+            smokeAlarmsInstalled: getValue("Do you currently have smoke alarms installed?"),
+            gasSafetyCertificate:
+              getValue("Do you have a valid Gas Safety Certificate?") ||
+              (hasSafetyComplianceUpload(0) ? "Yes" : ""),
+            electricalReportEicr:
+              getValue("Do you have a valid Electrical Report (EICR)?") ||
+              (hasSafetyComplianceUpload(1) ? "Yes" : ""),
+            epcAvailable:
+              getValue(ENERGY_PERFORMANCE_CERTIFICATE_LABEL) ||
+              getValue(LEGACY_ENERGY_PERFORMANCE_CERTIFICATE_LABEL) ||
+              (hasSafetyComplianceUpload(2) ? "Yes" : ""),
+          },
           utilitiesAndWaste: {
             waterSupply: getValue("Water Supply"),
             sewageOrDrainage: getValue("Sewage / Drainage"),
@@ -1320,7 +1962,9 @@ const buildEligibilityStepPayload = (
           },
           ownershipCertificate: {
             certificateOfOwnership: getValue("Which Ownership Certificate applies?"),
-            ownershipDetails: getValue("Other Owners Details"),
+            ownershipDetails:
+              getValue("Names & Addresses of Other Owners (if Certificate B, C or D)") ||
+              getValue("Other Owners Details"),
           },
           additionalConsents: asArrayValue(formValues["Additional Consents"]).join(", "),
           communityConsultation: getValue("Community consultation undertaken?"),
@@ -1358,12 +2002,68 @@ const buildSerializableEligibilityFormData = (formValues: EligibilityFormValues)
     return accumulator
   }, {})
 
-const buildEligibilityPayload = (formValues: EligibilityFormValues) => ({
-  ...buildEligibilityStepPayload(1, formValues),
-  ...buildEligibilityStepPayload(2, formValues),
-  ...buildEligibilityStepPayload(3, formValues),
-  ...buildEligibilityStepPayload(4, formValues),
-  ...buildEligibilityStepPayload(5, formValues),
+const persistSelectedEligibilityProject = (projectId?: string | null, projectStageId?: string | null) => {
+  if (typeof window === "undefined" || !projectId?.trim()) return
+
+  window.localStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, projectId)
+  window.sessionStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, projectId)
+
+  if (projectStageId?.trim()) {
+    window.localStorage.setItem(SELECTED_PROJECT_STAGE_STORAGE_KEY, projectStageId)
+    window.sessionStorage.setItem(SELECTED_PROJECT_STAGE_STORAGE_KEY, projectStageId)
+  }
+}
+
+const persistDashboardEligibilitySummary = (
+  projectId: string,
+  formValues: EligibilityFormValues,
+  options?: {
+    completedAt?: string
+    isEligible?: boolean
+  }
+) => {
+  if (typeof window === "undefined" || !projectId.trim()) return
+
+  const summaryKey = `${DASHBOARD_ELIGIBILITY_SUMMARY_STORAGE_PREFIX}${projectId}`
+  const summaryPayload = {
+    projectId,
+    formData: buildSerializableEligibilityFormData(formValues),
+    completedAt: options?.completedAt,
+    isEligible: options?.isEligible,
+  }
+
+  const serialized = JSON.stringify(summaryPayload)
+  window.localStorage.setItem(summaryKey, serialized)
+  window.sessionStorage.setItem(summaryKey, serialized)
+}
+
+const buildSerializableEligibilityLocation = (location?: EligibilityLocation) => {
+  if (!location) return undefined
+
+  const entries = Object.entries(location).filter(([, value]) => {
+    if (value === undefined || value === null) return false
+    if (typeof value === "string") return value.trim().length > 0
+    return true
+  })
+
+  if (entries.length === 0) return undefined
+
+  return Object.fromEntries(entries) as EligibilityLocation
+}
+
+const buildEligibilityPayload = (
+  formValues: EligibilityFormValues,
+  uploadedFiles?: EligibilityFileMap,
+  location?: EligibilityLocation
+) => ({
+  ...buildEligibilityStepPayload(1, formValues, uploadedFiles),
+  ...buildEligibilityStepPayload(2, formValues, uploadedFiles),
+  ...buildEligibilityStepPayload(3, formValues, uploadedFiles),
+  ...buildEligibilityStepPayload(4, formValues, uploadedFiles),
+  ...buildEligibilityStepPayload(5, formValues, uploadedFiles),
+  ...(buildSerializableEligibilityLocation(location)
+    ? { location: buildSerializableEligibilityLocation(location) }
+    : {}),
   formData: buildSerializableEligibilityFormData(formValues),
 })
 
@@ -1372,6 +2072,7 @@ const buildEligibilityMultipartFormData = ({
   status,
   formValues,
   uploadedFiles,
+  location,
   signatureFile,
   subServices,
   userId,
@@ -1381,6 +2082,7 @@ const buildEligibilityMultipartFormData = ({
   status: EligibilitySaveStatus
   formValues: EligibilityFormValues
   uploadedFiles: EligibilityFileMap
+  location?: EligibilityLocation
   signatureFile: File | null
   subServices?: string | null
   userId?: string | null
@@ -1393,7 +2095,7 @@ const buildEligibilityMultipartFormData = ({
       .map((entry) => entry.file)
       .filter((file): file is File => Boolean(file))
       .slice(0, limit)
-  const payload = buildEligibilityPayload(formValues)
+  const payload = buildEligibilityPayload(formValues, uploadedFiles, location)
   const appendUploadFileNames = (key: string, label: string) => {
     const labels = getEntries(label)
       .filter((entry) => entry.file)
@@ -1431,7 +2133,7 @@ const buildEligibilityMultipartFormData = ({
   appendRepeatedFiles(
     formData,
     "existingAndProposedElevations",
-    getFiles("Existing & Proposed Elevations", 2)
+    getFiles("Existing & Proposed Plans", 2)
   )
   appendRepeatedFiles(
     formData,
@@ -1445,16 +2147,22 @@ const buildEligibilityMultipartFormData = ({
   )
   appendSingleFile(
     formData,
-    "treeSurveyReport",
-    getFiles("Arboriculture Report / BS5837 Report (if available)")
+    "TreeSurveyReport",
+    getFiles("Tree Report / BS5837 Report (if available)")
   )
   appendSingleFile(
     formData,
     "floodRiskAssesmentReport",
     getFiles("Flood Risk Assessment (if available)")
   )
+  appendRepeatedFiles(
+    formData,
+    SAFETY_COMPLIANCE_FILES_FIELD,
+    getFiles(SAFETY_COMPLIANCE_UPLOAD_LABEL)
+  )
   appendUploadFileNames("photographsOfSiteFileNames", "Photographs of Site")
   appendUploadFileNames("additionalDrawingsFileNames", "Additional Drawings (floor plans, sections etc.)")
+  appendUploadFileNames(SAFETY_COMPLIANCE_FILE_NAMES_FIELD, SAFETY_COMPLIANCE_UPLOAD_LABEL)
   if (signatureFile) {
     formData.append("digitalSignatureUrl", signatureFile)
   }
@@ -1472,13 +2180,19 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
   "Site Address Line 1": "Primary address line for the property where the works are proposed.",
   "Site Address Line 2": "Optional second address line for the property.",
   "Postcode": "Postcode helps us identify planning constraints in your area.",
+  "Is this address same as site address?":
+    "Choose Yes if the site address is the same as the correspondence address.",
+  "Correspondence Address Line 1": "Primary address line for correspondence.",
+  "Correspondence Address Line 2": "Optional second address line for correspondence.",
+  "Correspondence Council": "Council for the correspondence address.",
+  "Correspondence Postcode": "Postcode for the correspondence address.",
   Council:
-    "Name of the council that handled the earlier application.",
-  "Are you using a planning agent?": "Tell us if a professional is acting on your behalf for the application.",
-  "Agent Name": "Name of the planning agent or firm.",
-  "Agent Address": "Address of the planning agent or firm.",
-  "Agent Contact": "Best email or phone for the agent.",
-  "Have you previously applied to the council?":
+    "Local planning authority or council for this property and any related previous application.",
+  // "Are you using a planning agent?": "Tell us if a professional is acting on your behalf for the application.",
+  // "Agent Name": "Name of the planning agent or firm.",
+  // "Agent Address": "Address of the planning agent or firm.",
+  // "Agent Contact": "Best email or phone for the agent.",
+  "have you previously applied to any council?":
     "Tell us whether there has already been a council application connected to this site or proposal.",
   "What was previously proposed, and was it approved, refused, or withdrawn?":
     "Summarise the earlier scheme and confirm whether it was approved, refused, or withdrawn.",
@@ -1494,15 +2208,53 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
   "Ownership Status": "Choose the ownership situation for the site.",
   "Conservation Area or Near Listed Building?":
     "Indicate if the property is in or near heritage designations.",
-  "Purpose of Development": "Select the main type of works being proposed.",
+  "Are you planning any building works?": "Select the main type of works being proposed.",
+  "Has the property already been extended before?":
+    "Tell us whether the property has already had an extension built previously.",
+  "How is the property currently used?": "Describe the current use or occupancy status of the property.",
+  "How many people currently live there?": "Enter the number of current occupants living at the property.",
+  "Are they one family or separate households?":
+    "Tell us whether the current occupants form one household or multiple households.",
+  "How many occupants do you plan to accommodate?":
+    "Select the planned number of occupants for the proposed HMO use.",
+  "Will occupants share kitchen/bathroom?":
+    "Confirm whether the proposed occupants will share kitchen or bathroom facilities.",
+  "Will rooms be rented individually?":
+    "Tell us whether rooms will be let separately rather than as a single household.",
+  "Number of bedrooms available?": "Enter how many bedrooms are currently or will be available.",
+  "Number of bathrooms / shower rooms?":
+    "Enter the number of bathrooms or shower rooms available in the layout.",
+  "Is there a communal kitchen?":
+    "Confirm whether a shared kitchen exists already or is proposed.",
+  "Is any lounge/dining room proposed as a bedroom?":
+    "Tell us if a lounge or dining room is being used or converted into a bedroom.",
   "Description of Proposed Works": "Brief summary of the project scope, size, and location on site.",
   "Existing Property Width (m)": "External width of the existing property in meters.",
   "Existing Property Depth (m)": "External depth of the existing property in meters.",
+  "Proposed Extension Width (m)":
+    "External width of the proposed extension measured in meters.",
   "Proposed Extension Depth (m)":
     "How far the extension projects from the existing rear wall, in meters.",
-  "Proposed Extension Height (m)": "Overall height of the proposed extension in meters.",
   "Ridge / Eaves Height (m)": "Provide ridge and eaves height in meters where relevant.",
   "Distance from Boundary (m)": "Minimum distance from the works to the nearest boundary.",
+  "Total internal floor area":
+    "Total internal floor space of the property measured in square meters.",
+  "Number of floors":
+    "List the storeys included in the property, such as ground, first, loft, or basement.",
+  "Property footprint (approx length x width in metres)":
+    "Approximate overall building footprint using length by width in meters.",
+  "Garden depth (metres)": "Depth of the rear garden or external amenity space in meters.",
+  "Plot width (metres)": "Approximate width of the overall plot in meters.",
+  "Kitchen Room Dimensions (metres)":
+    "Enter the kitchen room length and width measured in meters.",
+  "Kitchen Room Length (metres)": "Length of the kitchen room measured in meters.",
+  "Kitchen Room Width (metres)": "Width of the kitchen room measured in meters.",
+  "Bathroom Room Dimensions (metres)":
+    "Enter the bathroom room length and width measured in meters.",
+  "Bathroom Room Length (metres)": "Length of the bathroom room measured in meters.",
+  "Bathroom Room Width (metres)": "Width of the bathroom room measured in meters.",
+  "Approx smallest bedroom size?":
+    "Choose the approximate size band for the smallest bedroom in the proposal.",
   "Wall Materials": "Primary material or finish for new external walls.",
   "Roof Materials": "Primary material or finish for the proposed roof.",
   "Colour / Finish Notes (optional)":
@@ -1510,7 +2262,7 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
   "Materials match existing?": "Tell us if new materials match the existing property.",
   "Location Plan (1:1250 or 1:2500)": "Scaled plan showing the site in its wider context.",
   "Site Plan (1:200 or 1:500)": "Scaled block plan showing the site and proposed works.",
-  "Existing & Proposed Elevations": "Drawings showing current and proposed elevations.",
+  "Existing & Proposed Plans": "Drawings showing current and Proposed Plans.",
   "Photographs of Site": "Current photos of the site and surrounding context.",
   "Additional Drawings (floor plans, sections etc.)":
     "Any extra plans, sections, or supporting drawings.",
@@ -1522,21 +2274,31 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
   "Cycle storage provided?": "Indicate if cycle storage will be included.",
   "Trees with TPO on or near site?": "Tree Preservation Orders can require separate consent.",
   "Trees within falling distance of works?":
-    "Helps assess potential tree protection constraints.",
-  "Tree Species (if known)": "If known, specify tree species near the works.",
-  "Approximate Tree Height (m)": "Estimated height of nearby trees in meters.",
-  "Arboriculture Report / BS5837 Report (if available)":
+    "Helps assess potential Tree protection constraints.",
+  "Tree Species (if known)": "If known, specify Tree species near the works.",
+  "Approximate Tree Height (m)": "Estimated height of nearby Trees in meters.",
+  "Tree Report / BS5837 Report (if available)":
     "Upload an arboricultural survey if available.",
   "Is the site in Flood Zone 2 or 3?": "Flood zones may require additional assessments.",
   "Any known contamination on site?": "Known contamination can trigger further reports.",
   "Flood Risk Assessment (if available)": "Upload an FRA if already commissioned.",
-  "Has pre-application advice been sought?":
-    "Let us know if the LPA has already advised on this scheme.",
-  "Pre-Application Reference Number": "Reference from the local planning authority.",
-  "Date of Pre-App Advice": "Date the pre-application advice was issued.",
-  "Officer Name": "Name of the planning officer who provided advice.",
-  "Summary of Pre-App Advice Received":
-    "Brief summary of the advice or guidance received.",
+  // "Has pre-application advice been sought?":
+  //   "Let us know if the LPA has already advised on this scheme.",
+  // "Pre-Application Reference Number": "Reference from the local planning authority.",
+  // "Date of Pre-App Advice": "Date the pre-application advice was issued.",
+  // "Officer Name": "Name of the planning officer who provided advice.",
+  // "Summary of Pre-App Advice Received":
+  //   "Brief summary of the advice or guidance received.",
+  "Do you currently have smoke alarms installed?":
+    "Confirm whether smoke alarms are already installed at the property.",
+  "Do you have a valid Gas Safety Certificate?":
+    "Tell us whether a current gas safety certificate is available.",
+  "Do you have a valid Electrical Report (EICR)?":
+    "Tell us whether a valid electrical installation condition report is available.",
+  [ENERGY_PERFORMANCE_CERTIFICATE_LABEL]:
+    "Confirm whether an Energy Performance Certificate (EPC) is available.",
+  "Upload safety & compliance documents":
+    "Upload the Gas Safety Certificate, Electrical Report (EICR), and Energy Performance Certificate (EPC) documents if they are available.",
   "Water Supply": "Type of water supply serving the property.",
   "Sewage / Drainage": "Type of foul drainage arrangement.",
   "Surface Water Drainage": "How surface water will be drained from the site.",
@@ -1545,8 +2307,8 @@ const ELIGIBILITY_TOOLTIP_BY_LABEL: Record<string, string> = {
     "Include solar panels, heat pumps, or other renewable measures.",
   "Details of Renewable / Energy Measures (if applicable)":
     "Describe any energy measures proposed.",
-  "Which Ownership Certificate applies?":
-    "Planning applications require the correct ownership certificate.",
+  // "Which Ownership Certificate applies?":
+  //   "Planning applications require the correct ownership certificate.",
   "Names & Addresses of Other Owners (if Certificate B, C or D)":
     "List other owners or agricultural tenants when required.",
   "Additional Consents": "Select any other consents that may be needed.",
@@ -1574,15 +2336,20 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Applicant Last Name",
   "Email Address",
   "Phone Number",
+  "Correspondence Address Line 1",
+  "Correspondence Address Line 2",
+  "Correspondence Council",
+  "Correspondence Postcode",
+  "Is this address same as site address?",
   "Site Address Line 1",
   "Site Address Line 2",
   "Council",
   "Postcode",
-  "Are you using a planning agent?",
-  "Agent Name",
-  "Agent Address",
-  "Agent Contact",
-  "Have you previously applied to the council?",
+  // "Are you using a planning agent?",
+  // "Agent Name",
+  // "Agent Address",
+  // "Agent Contact",
+  "have you previously applied to any council?",
   "What was previously proposed, and was it approved, refused, or withdrawn?",
   "Planning Reference Number *",
   "Type of Application *",
@@ -1590,26 +2357,44 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Is this project similar to the previous application or different this time?",
   "Property Type",
   "Ownership Status",
-  "Conservation Area or Near Listed Building?",
-  "Purpose of Development",
+  "Names & Addresses of Other Owners (if Certificate B, C or D)",
+  "Are you planning any building works?",
+  "Has the property already been extended before?",
+  "How is the property currently used?",
+  "How many people currently live there?",
+  "Are they one family or separate households?",
+  "How many occupants do you plan to accommodate?",
+  "Will occupants share kitchen/bathroom?",
+  "Will rooms be rented individually?",
+  "Number of bedrooms available?",
+  "Number of bathrooms / shower rooms?",
+  "Is there a communal kitchen?",
+  "Is any lounge/dining room proposed as a bedroom?",
   "Description of Proposed Works",
+  "Total internal floor area",
+  "Number of floors",
   "Existing Property Width (m)",
   "Existing Property Depth (m)",
+  "Proposed Extension Width (m)",
   "Proposed Extension Depth (m)",
-  "Proposed Extension Height (m)",
+  "Garden depth (metres)",
   "Ridge / Eaves Height (m)",
   "Distance from Boundary (m)",
+  "Kitchen Room Dimensions (metres)",
+  "Bathroom Room Dimensions (metres)",
+  "Approx smallest bedroom size?",
   "Wall Materials",
   "Roof Materials",
   "Colour / Finish Notes (optional)",
   "Materials match existing?",
   "Location Plan (1:1250 or 1:2500)",
   "Site Plan (1:200 or 1:500)",
-  "Existing & Proposed Elevations",
+  "Existing & Proposed Plans",
   "Photographs of Site",
   "Additional Drawings (floor plans, sections etc.)",
-  "Is the property a Listed Building?",
-  "Conservation Area?",
+  // "Is the property a Listed Building?",
+  // "Conservation Area?",
+  "Conservation Area or Near Listed Building?",
   "New or altered vehicle access?",
   "Details of Access / Parking Changes",
   "Number of Proposed Parking Spaces",
@@ -1618,23 +2403,27 @@ const ELIGIBILITY_QUESTION_ORDER = [
   "Trees within falling distance of works?",
   "Tree Species (if known)",
   "Approximate Tree Height (m)",
-  "Arboriculture Report / BS5837 Report (if available)",
+  "Tree Report / BS5837 Report (if available)",
   "Is the site in Flood Zone 2 or 3?",
   "Any known contamination on site?",
   "Flood Risk Assessment (if available)",
-  "Has pre-application advice been sought?",
-  "Pre-Application Reference Number",
-  "Date of Pre-App Advice",
-  "Officer Name",
-  "Summary of Pre-App Advice Received",
+  // "Has pre-application advice been sought?",
+  // "Pre-Application Reference Number",
+  // "Date of Pre-App Advice",
+  // "Officer Name",
+  // "Summary of Pre-App Advice Received",
+  "Do you currently have smoke alarms installed?",
+  "Do you have a valid Gas Safety Certificate?",
+  "Do you have a valid Electrical Report (EICR)?",
+  ENERGY_PERFORMANCE_CERTIFICATE_LABEL,
+  "Upload safety & compliance documents",
   "Water Supply",
   "Sewage / Drainage",
   "Surface Water Drainage",
   "Existing Waste Arrangements",
   "Renewable energy installations proposed?",
   "Details of Renewable / Energy Measures (if applicable)",
-  "Which Ownership Certificate applies?",
-  "Names & Addresses of Other Owners (if Certificate B, C or D)",
+  // "Which Ownership Certificate applies?",
   "Additional Consents",
   "Community consultation undertaken?",
   "The information given in this application is correct and accurate to the best of my knowledge.",
@@ -1652,10 +2441,207 @@ const ELIGIBILITY_QUESTION_NUMBER = Object.fromEntries(
   ELIGIBILITY_QUESTION_ORDER.map((label, index) => [label, index + 1])
 ) as Record<string, number>
 
+const ELIGIBILITY_DECLARATION_FIELDS = [
+  {
+    label: "The information given in this application is correct and accurate to the best of my knowledge.",
+    fieldKey: "declaration_0",
+  },
+  {
+    label: "I am the owner/occupier of the application site, or I have the authority of the owner/occupier to make this application.",
+    fieldKey: "declaration_1",
+  },
+  {
+    label: "I understand that planning permission, if granted, does not authorise any infringement of private rights.",
+    fieldKey: "declaration_2",
+  },
+  {
+    label: "I consent to the information in this application being used for planning purposes and being made publicly available.",
+    fieldKey: "declaration_3",
+  },
+  {
+    label: "I understand that a fee may be payable and I agree to pay any fees required.",
+    fieldKey: "declaration_4",
+  },
+] as const
+
+const ELIGIBILITY_DECLARATION_FIELD_KEY_BY_LABEL = Object.fromEntries(
+  ELIGIBILITY_DECLARATION_FIELDS.map(({ label, fieldKey }) => [label, fieldKey])
+) as Record<string, string>
+
+const ELIGIBILITY_OPTIONAL_COMPLETION_LABELS = new Set<string>([
+  "Applicant Middle Name",
+  "Site Address Line 2",
+  "Correspondence Address Line 2",
+  "Colour / Finish Notes (optional)",
+  "Tree Species (if known)",
+  "Approximate Tree Height (m)",
+  "Tree Report / BS5837 Report (if available)",
+  "Flood Risk Assessment (if available)",
+  "Upload safety & compliance documents",
+  "Additional Drawings (floor plans, sections etc.)",
+])
+
+const ELIGIBILITY_REQUIRED_UPLOAD_MIN_COUNTS: Record<string, number> = {
+  "Location Plan (1:1250 or 1:2500)": 1,
+  "Site Plan (1:200 or 1:500)": 1,
+  "Existing & Proposed Plans": 2,
+  "Photographs of Site": 1,
+}
+
+const STATIC_AGENT_Z_COMPLETION_REVIEW_FIELDS = [
+  "Location Plan (1:1250 or 1:2500)",
+  "Site Plan (1:200 or 1:500)",
+  "Existing & Proposed Plans - Existing elevation",
+  "Existing & Proposed Plans - Proposed elevation",
+  "Photographs of Site",
+  "Additional Drawings (floor plans, sections etc.)",
+  "Tree Report / BS5837 Report (if available)",
+  "Flood Risk Assessment (if available)",
+]
+
+const hasCompletedEligibilityValue = (value: EligibilityFormValue) => {
+  if (Array.isArray(value)) {
+    return value.some((item) => item.trim().length > 0)
+  }
+
+  return typeof value === "string" && value.trim().length > 0
+}
+
+const isYesLikeValue = (value: EligibilityFormValue) =>
+  typeof value === "string" && value.trim().toLowerCase() === "yes"
+
+const isCompletionCheckRelevant = (
+  label: string,
+  formData: EligibilityFormValues
+) => {
+  if (ELIGIBILITY_OPTIONAL_COMPLETION_LABELS.has(label)) {
+    return false
+  }
+
+  if (
+    [
+      "Site Address Line 1",
+      "Site Address Line 2",
+      "Council",
+      "Postcode",
+    ].includes(label)
+  ) {
+    return !isYesLikeValue(formData["Is this address same as site address?"])
+  }
+
+  if (
+    [
+      "What was previously proposed, and was it approved, refused, or withdrawn?",
+      "Planning Reference Number *",
+      "Type of Application *",
+      "Type of Development Previously Proposed",
+      "Is this project similar to the previous application or different this time?",
+    ].includes(label)
+  ) {
+    return isYesLikeValue(formData["have you previously applied to any council?"])
+  }
+
+  if (label === "Details of Renewable / Energy Measures (if applicable)") {
+    return isYesLikeValue(formData["Renewable energy installations proposed?"])
+  }
+
+  if (label === "Names & Addresses of Other Owners (if Certificate B, C or D)") {
+    const certificateValue = typeof formData["Which Ownership Certificate applies?"] === "string"
+      ? formData["Which Ownership Certificate applies?"].toLowerCase()
+      : ""
+
+    return ["certificate b", "certificate c", "certificate d"].some((token) =>
+      certificateValue.includes(token)
+    )
+  }
+
+  if (label === "Details of Access / Parking Changes") {
+    return isYesLikeValue(formData["New or altered vehicle access?"])
+  }
+
+  return true
+}
+
+const isCompletionCheckSatisfied = ({
+  label,
+  formData,
+  uploadedFiles,
+  signatureFile,
+}: {
+  label: string
+  formData: EligibilityFormValues
+  uploadedFiles: EligibilityFileMap
+  signatureFile: File | null
+}) => {
+  if (label === "Phone Number") {
+    return (
+      hasCompletedEligibilityValue(formData["Country Code"]) &&
+      hasCompletedEligibilityValue(formData["Phone Number"])
+    )
+  }
+
+  if (label === "Kitchen Room Dimensions (metres)") {
+    return (
+      hasCompletedEligibilityValue(formData["Kitchen Room Length (metres)"]) &&
+      hasCompletedEligibilityValue(formData["Kitchen Room Width (metres)"])
+    )
+  }
+
+  if (label === "Bathroom Room Dimensions (metres)") {
+    return (
+      hasCompletedEligibilityValue(formData["Bathroom Room Length (metres)"]) &&
+      hasCompletedEligibilityValue(formData["Bathroom Room Width (metres)"])
+    )
+  }
+
+  if (label === "Digital Signature") {
+    return Boolean(signatureFile)
+  }
+
+  if (label in ELIGIBILITY_DECLARATION_FIELD_KEY_BY_LABEL) {
+    return formData[ELIGIBILITY_DECLARATION_FIELD_KEY_BY_LABEL[label]] === "true"
+  }
+
+  if (label in ELIGIBILITY_REQUIRED_UPLOAD_MIN_COUNTS) {
+    const requiredUploadCount = ELIGIBILITY_REQUIRED_UPLOAD_MIN_COUNTS[label]
+    const uploadedCount = (uploadedFiles[label] ?? []).filter((entry) => hasUploadedAsset(entry)).length
+
+    return uploadedCount >= requiredUploadCount
+  }
+
+  return hasCompletedEligibilityValue(formData[label])
+}
+
+const getMissingEligibilityFields = ({
+  formData,
+  uploadedFiles,
+  signatureFile,
+}: {
+  formData: EligibilityFormValues
+  uploadedFiles: EligibilityFileMap
+  signatureFile: File | null
+}) =>
+  ELIGIBILITY_QUESTION_ORDER.filter((label) => {
+    if (!isCompletionCheckRelevant(label, formData)) {
+      return false
+    }
+
+    return !isCompletionCheckSatisfied({
+      label,
+      formData,
+      uploadedFiles,
+      signatureFile,
+    })
+  })
+
 /* ─────────────────────────────────────────────
    CONSULTATION TRIGGER BANNER
 ───────────────────────────────────────────── */
-function ConsultationTrigger({ message }: { message: string }) {
+function ConsultationTrigger({
+  message,
+}: {
+  message: string
+}) {
   return (
     <div className="flex items-start gap-3 mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
       <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
@@ -1667,26 +2653,351 @@ function ConsultationTrigger({ message }: { message: string }) {
   )
 }
 
+function MissingUploadDecision({
+  fieldLabel,
+  prompt,
+  yesMessage,
+  noMessage,
+  triggerAgent = true,
+  embedded = false,
+}: {
+  fieldLabel: string
+  prompt: string
+  yesMessage?: string
+  noMessage?: string
+  triggerAgent?: boolean
+  embedded?: boolean
+}) {
+  const { data, updateSection } = useProject()
+  const { showAgentSidebar } = useEligibilityAgent()
+  const selectedValue = asStringValue(data.eligibility?.formData?.[fieldLabel])
+
+  const handleSelect = (value: "Yes" | "No") => {
+    updateSection("eligibility", {
+      formData: {
+        ...(data.eligibility?.formData || {}),
+        [fieldLabel]: value,
+      },
+    })
+
+    if (triggerAgent) {
+      const message =
+        value === "Yes"
+          ? yesMessage ?? `Agent Z is helping with ${fieldLabel}.`
+          : noMessage ?? `Agent Z has noted that you do not need help with ${fieldLabel} right now.`
+
+      showAgentSidebar(
+        createAgentSidebarPayload(fieldLabel, message, {
+          requestType: "ask-agent",
+          responseMode: "info",
+        })
+      )
+    }
+  }
+
+  return (
+    <div
+      className={
+        embedded
+          ? ""
+          : "mt-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3"
+      }
+    >
+      <p className={`text-xs font-medium ${embedded ? "text-amber-900" : "text-blue-900"}`}>
+        {prompt}
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {(["Yes", "No"] as const).map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => handleSelect(option)}
+            className={`rounded-xl border px-4 py-2 text-sm font-medium transition-all ${
+              selectedValue === option
+                ? embedded
+                  ? "border-amber-700 bg-amber-600 text-white"
+                  : "border-blue-700 bg-blue-600 text-white"
+                : embedded
+                  ? "border-amber-300 bg-white text-amber-900 hover:border-amber-400 hover:bg-amber-100"
+                  : "border-blue-200 bg-white text-blue-800 hover:border-blue-400 hover:bg-blue-100"
+            }`}
+          >
+            {option}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function MissingUploadTriggerCard({
+  message,
+  decision,
+}: {
+  message: string
+  decision?: {
+    fieldLabel: string
+    prompt: string
+    yesMessage?: string
+    noMessage?: string
+    triggerAgent?: boolean
+  }
+}) {
+  return (
+    <div className="mt-3 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+      <div className="min-w-0 flex-1">
+        <p className="text-xs text-amber-800">
+          <span className="font-semibold">Agent can help · </span>
+          {message}
+        </p>
+        {decision ? (
+          <div className="mt-3">
+            <MissingUploadDecision
+              fieldLabel={decision.fieldLabel}
+              prompt={decision.prompt}
+              yesMessage={decision.yesMessage}
+              noMessage={decision.noMessage}
+              triggerAgent={decision.triggerAgent}
+              embedded
+            />
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+function getMissingUploadTriggerConfig(
+  onMissingTrigger:
+    | string
+    | {
+        message: string
+        decision?: {
+          fieldLabel: string
+          prompt: string
+          yesMessage?: string
+          noMessage?: string
+          triggerAgent?: boolean
+        }
+      }
+    | undefined
+) {
+  if (!onMissingTrigger) {
+    return {
+      message: undefined,
+      decision: undefined,
+    }
+  }
+
+  if (typeof onMissingTrigger === "string") {
+    return {
+      message: onMissingTrigger,
+      decision: undefined,
+    }
+  }
+
+  return {
+    message: onMissingTrigger.message,
+    decision: onMissingTrigger.decision,
+  }
+}
+
 function AgentActionButton({
   label,
   onClick,
   disabled = false,
   className = "mt-3",
+  agentFieldLabel,
+  agentMessage,
+  agentRequestType = "action",
+  agentResponseMode = "info",
 }: {
   label: string
   onClick: () => void
   disabled?: boolean
   className?: string
+  agentFieldLabel?: string
+  agentMessage?: string
+  agentRequestType?: "ask-agent" | "action"
+  agentResponseMode?: "info" | "yes-no"
 }) {
+  const { showAgentSidebar } = useEligibilityAgent()
+
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() => {
+        onClick()
+
+        if (agentFieldLabel) {
+          showAgentSidebar(
+            createAgentSidebarPayload(agentFieldLabel, agentMessage, {
+              requestType: agentRequestType,
+              responseMode: agentResponseMode,
+            })
+          )
+        }
+      }}
       disabled={disabled}
-      className={`inline-flex items-center justify-center rounded-xl border border-blue-700 bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 ${className}`}
+      className={`eligibility-agent-button inline-flex items-center justify-center rounded-xl border border-blue-900/60 bg-gradient-to-r from-slate-800/92 via-[#1f3d9a]/86 to-blue-800/84 px-3 py-2 text-xs font-semibold text-white transition-all hover:from-slate-800 hover:via-[#1d388f]/92 hover:to-blue-800/90 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-none disabled:bg-slate-100 disabled:text-slate-400 ${className}`}
     >
-      {label}
+      <span className="relative z-10">{label}</span>
+      {!disabled && <EligibilityAgentMovingBorder size={54} />}
     </button>
+  )
+}
+
+function EligibilityAgentMovingBorder({
+  size = 58,
+}: {
+  size?: number
+}) {
+  return (
+    <>
+      <BorderBeam
+        size={size}
+        duration={2.8}
+        initialOffset={18}
+        borderWidth={3}
+        className="from-transparent via-sky-300 to-transparent"
+        colorFrom="#f59e0b"
+        colorTo="#60a5fa"
+      />
+      <BorderBeam
+        size={Math.max(size - 6, 36)}
+        duration={3.25}
+        initialOffset={44}
+        borderWidth={2.5}
+        reverse
+        className="from-transparent via-fuchsia-300 to-transparent"
+        colorFrom="#ec4899"
+        colorTo="#a78bfa"
+      />
+      <BorderBeam
+        size={Math.max(size - 10, 32)}
+        duration={3.7}
+        initialOffset={72}
+        borderWidth={2}
+        className="from-transparent via-emerald-300 to-transparent"
+        colorFrom="#22c55e"
+        colorTo="#06b6d4"
+      />
+    </>
+  )
+}
+
+function UploadedAssetPreview({
+  entry,
+  className = "",
+}: {
+  entry: UploadedFileEntry
+  className?: string
+}) {
+  const [loadedImagePreview, setLoadedImagePreview] = useState<{ key: string; url: string } | null>(null)
+  const [failedImagePreviewKey, setFailedImagePreviewKey] = useState<string | null>(null)
+  const isImageEntry = isImageUploadEntry(entry)
+  const localImagePreviewKey =
+    entry.file && isImageEntry
+      ? `${entry.file.name}-${entry.file.size}-${entry.file.lastModified}`
+      : null
+  const localDocumentPreviewUrl = useMemo(() => {
+    if (!entry.file || isImageEntry) return null
+    return URL.createObjectURL(entry.file)
+  }, [entry.file, isImageEntry])
+
+  useEffect(() => {
+    if (!localImagePreviewKey || !entry.file) return
+
+    let isCancelled = false
+    const reader = new FileReader()
+
+    reader.onload = () => {
+      if (isCancelled || typeof reader.result !== "string") return
+      setLoadedImagePreview({ key: localImagePreviewKey, url: reader.result })
+    }
+
+    reader.readAsDataURL(entry.file)
+
+    return () => {
+      isCancelled = true
+    }
+  }, [entry.file, localImagePreviewKey])
+
+  useEffect(() => {
+    return () => {
+      if (localDocumentPreviewUrl) {
+        URL.revokeObjectURL(localDocumentPreviewUrl)
+      }
+    }
+  }, [localDocumentPreviewUrl])
+
+  const localImagePreviewUrl =
+    localImagePreviewKey && loadedImagePreview?.key === localImagePreviewKey
+      ? loadedImagePreview.url
+      : null
+  const assetUrl = entry.remoteFileUrl ?? localImagePreviewUrl ?? localDocumentPreviewUrl
+  const assetName = getUploadedAssetName(entry)
+  const isImage = Boolean(assetUrl) && isImageEntry
+  const isPdf = isPdfUploadEntry(entry)
+  const extension = getUploadedAssetExtension(entry)
+  const fileTypeLabel = isImage ? "Image" : isPdf ? "PDF" : extension ? extension.toUpperCase() : "File"
+  const pdfPreviewUrl = isPdf && assetUrl ? `${assetUrl}#toolbar=0&navpanes=0&scrollbar=0&view=FitH` : null
+  const imagePreviewKey = localImagePreviewKey ?? entry.remoteFileUrl ?? null
+  const shouldRenderImagePreview = Boolean(isImage && assetUrl && imagePreviewKey !== failedImagePreviewKey)
+  const imageAssetUrl = shouldRenderImagePreview ? assetUrl ?? undefined : undefined
+
+  return (
+    <div className={`flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 ${className}`.trim()}>
+      <div
+        className={`flex shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white ${
+          isPdf ? "h-28 w-24" : "h-24 w-24"
+        }`}
+      >
+        {shouldRenderImagePreview && imageAssetUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={imageAssetUrl}
+            alt={assetName}
+            className="h-full w-full object-cover"
+            onError={() => {
+              if (imagePreviewKey) {
+                setFailedImagePreviewKey(imagePreviewKey)
+              }
+            }}
+          />
+        ) : isPdf && pdfPreviewUrl ? (
+          <iframe
+            src={pdfPreviewUrl}
+            title={`${assetName} preview`}
+            className="h-full w-full border-0 bg-white"
+            loading="lazy"
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-1 text-slate-400">
+            {isPdf ? <FileText className="h-8 w-8" /> : <FileImage className="h-8 w-8" />}
+            <span className="text-[10px] font-semibold uppercase tracking-[0.2em]">{fileTypeLabel}</span>
+          </div>
+        )}
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-slate-700">{assetName}</p>
+        <p className="mt-1 text-xs text-slate-500">
+          {entry.description?.trim() || "Uploaded file ready for review."}
+        </p>
+        {assetUrl && (
+          <a
+            href={assetUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-700"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            View full file
+          </a>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -1703,7 +3014,18 @@ function FileUploadArea({
   accept?: string
   multiple?: boolean
   hint?: string
-  onMissingTrigger?: string
+  onMissingTrigger?:
+    | string
+    | {
+        message: string
+        decision?: {
+          fieldLabel: string
+          prompt: string
+          yesMessage?: string
+          noMessage?: string
+          triggerAgent?: boolean
+        }
+      }
   tooltip?: string
   questionNumber?: number
 }) {
@@ -1752,6 +3074,7 @@ function FileUploadArea({
   }
 
   const fieldId = getFieldId(label)
+  const missingTriggerConfig = getMissingUploadTriggerConfig(onMissingTrigger)
 
   return (
     <div className="col-span-2" id={fieldId}>
@@ -1789,40 +3112,33 @@ function FileUploadArea({
       {files.length > 0 && (
         <ul className="mt-3 space-y-2">
           {files.map((f, i) => (
-            <li
-              key={i}
-              className="flex items-center justify-between rounded-lg border bg-white px-3 py-2 text-xs text-slate-700 shadow-sm"
-            >
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="truncate max-w-[200px]">{getUploadedAssetName(f)}</span>
-                {f.remoteFileUrl && (
-                  <a
-                    href={f.remoteFileUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="shrink-0 text-[11px] font-medium text-blue-600 hover:text-blue-700"
-                    onClick={(e) => e.stopPropagation()}
+            <li key={i} className="rounded-xl border bg-white p-3 shadow-sm">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <UploadedAssetPreview entry={f} className="flex-1 border-0 bg-transparent p-0" />
+                {f.file && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      removeFile(i)
+                    }}
+                    className="inline-flex items-center gap-1 self-start rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-500 transition-colors hover:border-red-200 hover:text-red-500"
                   >
-                    View
-                  </a>
+                    <X className="h-4 w-4" />
+                    Remove
+                  </button>
                 )}
               </div>
-              {f.file && (
-                <button
-                  type="button"
-                  onClick={e => { e.stopPropagation(); removeFile(i) }}
-                  className="text-slate-400 hover:text-red-500 transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              )}
             </li>
           ))}
         </ul>
       )}
 
-      {files.length === 0 && onMissingTrigger && (
-        <ConsultationTrigger message={onMissingTrigger} />
+      {files.length === 0 && missingTriggerConfig.message && (
+        <MissingUploadTriggerCard
+          message={missingTriggerConfig.message}
+          decision={missingTriggerConfig.decision}
+        />
       )}
     </div>
   )
@@ -1845,7 +3161,18 @@ function StructuredFileUploadArea({
   label: string
   accept?: string
   hint?: string
-  onMissingTrigger?: string
+  onMissingTrigger?:
+    | string
+    | {
+        message: string
+        decision?: {
+          fieldLabel: string
+          prompt: string
+          yesMessage?: string
+          noMessage?: string
+          triggerAgent?: boolean
+        }
+      }
   tooltip?: string
   questionNumber?: number
   minSlots?: number
@@ -1980,6 +3307,7 @@ function StructuredFileUploadArea({
   })
 
   const uploadedCount = entries.filter((entry) => hasUploadedAsset(entry)).length
+  const missingTriggerConfig = getMissingUploadTriggerConfig(onMissingTrigger)
 
   return (
     <div className="col-span-2" id={fieldId}>
@@ -2061,6 +3389,10 @@ function StructuredFileUploadArea({
                   )}
                 </div>
               </div>
+
+              {hasUploadedAsset(entry) && (
+                <UploadedAssetPreview entry={entry} className="mt-3" />
+              )}
             </div>
           )
         })}
@@ -2076,12 +3408,15 @@ function StructuredFileUploadArea({
         </button>
       )}
 
-      <p className="mt-2 text-xs text-slate-400">
+      {/* <p className="mt-2 text-xs text-slate-400">
         Uploaded files: {uploadedCount}
-      </p>
+      </p> */}
 
-      {uploadedCount === 0 && onMissingTrigger && (
-        <ConsultationTrigger message={onMissingTrigger} />
+      {uploadedCount === 0 && missingTriggerConfig.message && (
+        <MissingUploadTriggerCard
+          message={missingTriggerConfig.message}
+          decision={missingTriggerConfig.decision}
+        />
       )}
     </div>
   )
@@ -2106,15 +3441,11 @@ function SignaturePad({
   strokeWidth = 1.5, // Default set to 1.5 (Fine point) instead of 2.5
 }: SignaturePadProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const { signatureFile, setSignatureFile } = useEligibilityAssets()
-  const [isSigned, setIsSigned] = useState(Boolean(signatureFile))
+  const { signatureFile, setSignatureFile, signaturePreviewUrl, setSignaturePreviewUrl } = useEligibilityAssets()
   const [isDrawing, setIsDrawing] = useState(false)
+  const [hasInkStroke, setHasInkStroke] = useState(false)
   const fieldId = getFieldId(label)
-
-  // Update state when external signature file changes
-  useEffect(() => {
-    setIsSigned(Boolean(signatureFile))
-  }, [signatureFile])
+  const isSigned = hasInkStroke || Boolean(signatureFile || signaturePreviewUrl)
 
   // Helper: Configure the 2D context for smooth drawing
   const configureContext = (ctx: CanvasRenderingContext2D) => {
@@ -2127,6 +3458,7 @@ function SignaturePad({
   const persistSignature = () => {
     const canvas = canvasRef.current
     if (!canvas) return
+    setSignaturePreviewUrl(canvas.toDataURL("image/png"))
     canvas.toBlob((blob) => {
       if (!blob) return
       setSignatureFile(
@@ -2177,8 +3509,14 @@ function SignaturePad({
        // but this ensures safety for older browsers if needed.
     }
 
+    if (signaturePreviewUrl || signatureFile) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      setSignaturePreviewUrl(null)
+      setSignatureFile(null)
+    }
+
     setIsDrawing(true)
-    setIsSigned(true)
+    setHasInkStroke(true)
     
     const pos = getPos(e, canvas)
     
@@ -2218,8 +3556,9 @@ function SignaturePad({
     if (!ctx) return
     
     ctx.clearRect(0, 0, canvas.width, canvas.height)
-    setIsSigned(false)
+    setHasInkStroke(false)
     setSignatureFile(null)
+    setSignaturePreviewUrl(null)
   }
 
   return (
@@ -2240,6 +3579,16 @@ function SignaturePad({
           // "touch-none" is critical: it tells the browser "don't scroll when I touch this"
           className="w-full touch-none cursor-crosshair block"
         />
+        {signaturePreviewUrl && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/80 p-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={signaturePreviewUrl}
+              alt="Digital signature preview"
+              className="max-h-full max-w-full rounded-md object-contain"
+            />
+          </div>
+        )}
         {!isSigned && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
             <div className="flex items-center gap-2 text-slate-300">
@@ -2262,6 +3611,19 @@ function SignaturePad({
           Clear
         </button>
       </div>
+      {signaturePreviewUrl && (
+        <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+          <p className="mb-2 text-xs font-medium text-emerald-700">Saved signature preview</p>
+          <div className="flex h-28 w-full items-center justify-center overflow-hidden rounded-md bg-white">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={signaturePreviewUrl}
+              alt="Digital signature preview"
+              className="max-h-full max-w-full object-contain"
+            />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -2275,12 +3637,20 @@ function CheckboxGroup({
   consultTrigger,
   tooltip,
   questionNumber,
+  optionStyleOverrides,
 }: {
   label: string
   options: string[]
   consultTrigger?: string
   tooltip?: string
   questionNumber?: number
+  optionStyleOverrides?: Record<
+    string,
+    {
+      hideIndicator?: boolean
+      centerLabel?: boolean
+    }
+  >
 }) {
   const { data, updateSection } = useProject()
   const { showAgentSidebar } = useEligibilityAgent()
@@ -2329,44 +3699,60 @@ function CheckboxGroup({
         {options.map(o => {
           const isAgentOption = isAgentOptionLabel(o)
           const isSelected = selected.includes(o)
+          const optionStyleOverride = optionStyleOverrides?.[o]
+          const hideIndicator = Boolean(optionStyleOverride?.hideIndicator)
+          const centerLabel = Boolean(optionStyleOverride?.centerLabel)
 
           return (
             <button
               key={o}
               type="button"
               onClick={() => toggle(o)}
-              className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm text-left transition-all ${
+              className={`${
+                isAgentOption ? "eligibility-agent-button" : ""
+              } flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm transition-all ${
+                centerLabel ? "justify-center text-center" : "text-left"
+              } ${
                 isSelected
                   ? isAgentOption
-                    ? "border-blue-700 bg-blue-600 text-white"
+                    ? "border-blue-900/60 bg-gradient-to-r from-slate-800/92 via-[#1f3d9a]/86 to-blue-800/84 text-white"
                     : "bg-blue-600 text-white border-blue-600"
                   : isAgentOption
-                    ? "border-blue-500 bg-blue-100 text-blue-900 hover:bg-blue-200"
+                    ? "border-blue-900/60 bg-gradient-to-r from-slate-800/84 via-[#1f3d9a]/78 to-blue-800/76 text-white hover:from-slate-800/92 hover:via-[#1d388f]/86 hover:to-blue-800/84"
                     : "hover:bg-blue-50 border-slate-200 text-slate-700"
               }`}
             >
               <span
-                className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                  isSelected
-                    ? isAgentOption
-                      ? "bg-white border-white"
-                      : "bg-white border-white"
-                    : isAgentOption
-                      ? "border-blue-500"
-                      : "border-slate-300"
+                className={`relative z-10 flex items-center ${
+                  centerLabel ? "justify-center text-center" : "gap-2"
                 }`}
               >
-                {isSelected && (
-                  <svg
-                    className="w-3 h-3 text-blue-600"
-                    viewBox="0 0 12 12"
-                    fill="none"
+                {!hideIndicator && (
+                  <span
+                    className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                      isSelected
+                        ? isAgentOption
+                          ? "bg-white border-white"
+                          : "bg-white border-white"
+                        : isAgentOption
+                          ? "border-blue-500"
+                          : "border-slate-300"
+                    }`}
                   >
-                    <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
+                    {isSelected && (
+                      <svg
+                        className="w-3 h-3 text-blue-600"
+                        viewBox="0 0 12 12"
+                        fill="none"
+                      >
+                        <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </span>
                 )}
+                {renderAgentOptionLabel(o)}
               </span>
-              {renderAgentOptionLabel(o)}
+              {isAgentOption && <EligibilityAgentMovingBorder size={58} />}
             </button>
           )
         })}
@@ -2388,15 +3774,28 @@ function EligibilityCheckPage() {
   const params = useParams()
   const { data, updateSection } = useProject()
   const { fullName, userId } = useUserIdentity()
+  const { profile: userProfile } = useUserProfile()
+  const serviceSelection = useResolvedServiceSelection(data.service)
   const displayName = fullName || "User"
-  const savedFormData = data.eligibility?.formData || {}
+  const savedFormData = useMemo(
+    () => data.eligibility?.formData || {},
+    [data.eligibility?.formData]
+  )
+  const selectedServiceAppliedName = "Mandatory HMO License"
+    // serviceSelection?.plan?.trim() ||
+    // serviceSelection?.serviceTitle?.trim() ||
+    // serviceSelection?.category?.trim() ||
+    // "No service selected"
   const [storedProjectId, setStoredProjectId] = useState<string | null>(null)
   const [storedProjectStageId, setStoredProjectStageId] = useState<string | null>(null)
   const projectIdFromQuery =
     searchParams.get("projectId") ?? searchParams.get("eligibilityProjectId")
   const existingProjectId =
     data.eligibility?.projectId ?? projectIdFromQuery ?? storedProjectId ?? null
-  const subServices = data.service?.serviceId?.trim() || ELIGIBILITY_SERVICE_ID
+  const subServices =
+    serviceSelection?.subServiceId?.trim() ||
+    serviceSelection?.serviceId?.trim() ||
+    ELIGIBILITY_SERVICE_ID
 
   const stageParam =
     typeof params?.stage === "string"
@@ -2434,6 +3833,14 @@ function EligibilityCheckPage() {
   const [step, setStep] = useState<Step>(1)
   const hasSubmittedEligibility = Boolean(data.eligibility?.completedAt)
   const isReviewOnly = isReadOnly || hasSubmittedEligibility
+  const hasPersistedEligibilityProgress =
+    Boolean(existingProjectId) ||
+    Boolean(data.eligibility?.isDraft) ||
+    Boolean(data.eligibility?.draftSavedAt) ||
+    Boolean(data.eligibility?.isEligible)
+  const [isEligibilityFormVisible, setIsEligibilityFormVisible] = useState(
+    hasSubmittedEligibility || isReadOnly || hasPersistedEligibilityProgress
+  )
   const [showVerification, setShowVerification] = useState(hasSubmittedEligibility)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [isSavingDraft, setIsSavingDraft] = useState(false)
@@ -2445,14 +3852,39 @@ function EligibilityCheckPage() {
   const [agentSidebar, setAgentSidebar] = useState<EligibilityAgentSidebarState>(null)
   const [uploadedFiles, setUploadedFiles] = useState<EligibilityFileMap>({})
   const [signatureFile, setSignatureFile] = useState<File | null>(null)
+  const [signaturePreviewUrl, setSignaturePreviewUrl] = useState<string | null>(null)
   const fetchedEligibilityProjectRef = useRef<string | null>(null)
+  const profileAutofillKeyRef = useRef<string | null>(null)
+  const latestEligibilityFormDataRef = useRef(savedFormData)
+  const formCardRef = useRef<HTMLDivElement | null>(null)
 
   const TOTAL_STEPS = 5
   const showAgentSidebar = Boolean(agentSidebar)
-  const hasRightPanel = showVerification || showAgentSidebar
+  const shouldShowEligibilitySidePanel =
+    !isEligibilityFormVisible || showAgentSidebar || showVerification
 
   const nextStep = () => setStep(prev => (prev < TOTAL_STEPS ? ((prev + 1) as Step) : prev))
   const prevStep = () => setStep(prev => (prev > 1 ? ((prev - 1) as Step) : prev))
+
+  useEffect(() => {
+    const animationFrame = window.requestAnimationFrame(() => {
+      scrollDashboardFormToTop(formCardRef.current)
+    })
+
+    return () => {
+      window.cancelAnimationFrame(animationFrame)
+    }
+  }, [step])
+
+  useEffect(() => {
+    latestEligibilityFormDataRef.current = savedFormData
+  }, [savedFormData])
+
+  useEffect(() => {
+    if (hasSubmittedEligibility || isReadOnly || hasPersistedEligibilityProgress) {
+      setIsEligibilityFormVisible(true)
+    }
+  }, [hasPersistedEligibilityProgress, hasSubmittedEligibility, isReadOnly])
 
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -2483,7 +3915,6 @@ function EligibilityCheckPage() {
     if (fetchedEligibilityProjectRef.current === existingProjectId) return
 
     let isCancelled = false
-    fetchedEligibilityProjectRef.current = existingProjectId
 
     const loadSavedEligibility = async () => {
       setIsLoadingEligibility(true)
@@ -2504,15 +3935,34 @@ function EligibilityCheckPage() {
         updateSection("eligibility", {
           projectId: normalized.projectId,
           formData: {
-            ...savedFormData,
+            ...latestEligibilityFormDataRef.current,
             ...normalized.formData,
           },
+          location: normalized.location,
           isDraft: normalized.isDraft,
           draftSavedAt: normalized.draftSavedAt,
           completedAt: normalized.completedAt,
           isEligible: normalized.isEligible,
         })
+        persistSelectedEligibilityProject(
+          normalized.projectId || existingProjectId,
+          existingProjectStageId
+        )
+        persistDashboardEligibilitySummary(
+          normalized.projectId || existingProjectId,
+          {
+            ...latestEligibilityFormDataRef.current,
+            ...normalized.formData,
+          },
+          {
+            completedAt: normalized.completedAt,
+            isEligible: normalized.isEligible,
+          }
+        )
+        fetchedEligibilityProjectRef.current = normalized.projectId || existingProjectId
         setUploadedFiles(normalizedUploads)
+        setSignaturePreviewUrl(extractDigitalSignaturePreviewUrlFromApi(response.data))
+        setSignatureFile(null)
 
         if (normalized.step && normalized.step >= 1 && normalized.step <= TOTAL_STEPS) {
           setStep(normalized.step as Step)
@@ -2520,6 +3970,7 @@ function EligibilityCheckPage() {
 
         if (normalized.completedAt || normalized.isEligible) {
           setShowVerification(true)
+          setIsEligibilityFormVisible(true)
         }
       } catch {
         if (!isCancelled) {
@@ -2538,7 +3989,96 @@ function EligibilityCheckPage() {
     return () => {
       isCancelled = true
     }
-  }, [existingProjectId])
+  }, [existingProjectId, existingProjectStageId, updateSection])
+
+  useEffect(() => {
+    if (isLoadingEligibility) return
+    const paymentCustomerDetails = data.payment?.customerDetails
+    const paymentPostcode =
+      paymentCustomerDetails?.serviceLocationType === "different" &&
+      paymentCustomerDetails.servicePostalCode?.trim()
+        ? paymentCustomerDetails.servicePostalCode
+        : paymentCustomerDetails?.postalCode ?? ""
+    const paymentAddress = splitAutofillSiteAddress(paymentCustomerDetails?.fullAddress)
+    const applicantFullName =
+      userProfile?.fullName ||
+      paymentCustomerDetails?.fullName ||
+      fullName ||
+      ""
+    const siteAddressLine1 =
+      buildProfileAddressLine1(userProfile?.address ?? {}) || paymentAddress.line1
+    const siteAddressLine2 =
+      buildProfileAddressLine2(userProfile?.address ?? {}) || paymentAddress.line2
+    const autofillKeyParts = [
+      userProfile?.userId ?? userId ?? "",
+      applicantFullName,
+      userProfile?.email || paymentCustomerDetails?.email || "",
+      userProfile?.phone.countryCode || paymentCustomerDetails?.phoneCountryCode || "",
+      userProfile?.phone.number || paymentCustomerDetails?.phoneNumber || "",
+      siteAddressLine1,
+      siteAddressLine2,
+      userProfile?.address.postalCode || paymentPostcode,
+      userProfile?.council || "",
+    ]
+
+    if (!autofillKeyParts.some((value) => value.trim())) return
+
+    const autofillKey = `${existingProjectId ?? "new"}:${autofillKeyParts.join("|")}`
+    if (profileAutofillKeyRef.current === autofillKey) return
+
+    const nextFormData = { ...savedFormData }
+    let hasAutofilledValues = false
+
+    const setMissingValue = (label: string, value: string) => {
+      if (!value.trim()) return
+      if (asStringValue(nextFormData[label]).trim()) return
+
+      nextFormData[label] = value
+      hasAutofilledValues = true
+    }
+
+    const applicantName = splitApplicantFullName(applicantFullName)
+
+    setMissingValue("Applicant First Name", applicantName.firstName)
+    setMissingValue("Applicant Middle Name", applicantName.middleName)
+    setMissingValue("Applicant Last Name", applicantName.lastName)
+    setMissingValue("Email Address", userProfile?.email || paymentCustomerDetails?.email || "")
+    setMissingValue(
+      "Country Code",
+      userProfile?.phone.countryCode || paymentCustomerDetails?.phoneCountryCode || ""
+    )
+    setMissingValue(
+      "Phone Number",
+      userProfile?.phone.number || paymentCustomerDetails?.phoneNumber || ""
+    )
+    setMissingValue("Correspondence Address Line 1", siteAddressLine1)
+    setMissingValue("Correspondence Address Line 2", siteAddressLine2)
+    setMissingValue("Correspondence Postcode", userProfile?.address.postalCode || paymentPostcode)
+    setMissingValue("Correspondence Council", userProfile?.council || "")
+    setMissingValue("Site Address Line 1", siteAddressLine1)
+    setMissingValue("Site Address Line 2", siteAddressLine2)
+    setMissingValue("Postcode", userProfile?.address.postalCode || paymentPostcode)
+    setMissingValue("Council", userProfile?.council || "")
+
+    profileAutofillKeyRef.current = autofillKey
+
+    if (!hasAutofilledValues) return
+
+    updateSection("eligibility", {
+      ...(data.eligibility || {}),
+      formData: nextFormData,
+    })
+  }, [
+    data.eligibility,
+    data.payment?.customerDetails,
+    existingProjectId,
+    fullName,
+    isLoadingEligibility,
+    savedFormData,
+    updateSection,
+    userId,
+    userProfile,
+  ])
 
   const upsertEligibilityProject = async (status: EligibilitySaveStatus = "in_progress") => {
     if (step === 1 && !existingProjectId) {
@@ -2554,6 +4094,7 @@ function EligibilityCheckPage() {
         status,
         formValues: savedFormData,
         uploadedFiles,
+        location: data.eligibility?.location,
         signatureFile,
         subServices,
         userId,
@@ -2573,6 +4114,7 @@ function EligibilityCheckPage() {
         ...(data.eligibility || {}),
         projectId,
       })
+      persistSelectedEligibilityProject(projectId, existingProjectStageId)
 
       return projectId
     }
@@ -2586,6 +4128,7 @@ function EligibilityCheckPage() {
       status,
       formValues: savedFormData,
       uploadedFiles,
+      location: data.eligibility?.location,
       signatureFile,
       subServices,
       userId,
@@ -2641,21 +4184,39 @@ function EligibilityCheckPage() {
     }
   }
 
-  const handleEligibilitySubmit = async () => {
-    if (hasSubmittedEligibility || isAnalyzing || isSavingDraft || isSavingStep || isLoadingEligibility) return
+    const handleEligibilitySubmit = async () => {
+      if (hasSubmittedEligibility || isAnalyzing || isSavingDraft || isSavingStep || isLoadingEligibility) return
 
     setSubmitError(null)
     setIsAnalyzing(true)
 
-    try {
-      await upsertEligibilityProject("submitted")
+      try {
+        const submittedProjectId = await upsertEligibilityProject("submitted")
+        if (!userId) {
+          throw new Error("User ID is missing. Unable to sync the selected cart services.")
+        }
+
+        const serviceCartPayload = buildServiceCartPayload({
+          projectId: submittedProjectId,
+          userId,
+          formData: savedFormData,
+        })
+
+        await postServiceCart(serviceCartPayload)
+        const completedAt = new Date().toISOString()
+
+        persistSelectedEligibilityProject(submittedProjectId, existingProjectStageId)
+      persistDashboardEligibilitySummary(submittedProjectId, savedFormData, {
+        completedAt,
+        isEligible: true,
+      })
 
       setAgentSidebar(null)
       setShowVerification(true)
       updateSection("eligibility", {
         ...(data.eligibility || {}),
         isEligible: true,
-        completedAt: new Date().toISOString(),
+        completedAt,
       })
       window.scrollTo({ top: 0, behavior: "smooth" })
     } catch (error) {
@@ -2664,6 +4225,12 @@ function EligibilityCheckPage() {
       setIsAnalyzing(false)
     }
   }
+
+  useEffect(() => {
+    if (showVerification || hasSubmittedEligibility) {
+      setAgentSidebar(null)
+    }
+  }, [hasSubmittedEligibility, showVerification])
 
   const STEP_LABELS = [
     "1. Applicant & Property",
@@ -2714,10 +4281,16 @@ function EligibilityCheckPage() {
           <p className="text-xl text-slate-600 mt-2">
             Customer ID: <span className="font-medium"> {userId} </span>
           </p>
-          <p className="text-sm text-slate-500 mt-1">
+          {/* <p className="text-sm text-slate-500 mt-1">
             Current Stage:{" "}
             <span className="font-medium text-slate-700">
               {PROJECT_FLOW[currentStageIndex]?.label}
+            </span>
+          </p> */}
+          <p className="text-md text-slate-700 mt-1">
+            Service Selected:{" "}
+            <span className="font-medium text-slate-700">
+              <strong>{selectedServiceAppliedName}</strong>
             </span>
           </p>
         </div>
@@ -2740,7 +4313,7 @@ function EligibilityCheckPage() {
 
       {/* ROADMAP */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
-        <div className="lg:col-span-8 space-y-6">
+        <div className={`${isEligibilityFormVisible ? "lg:col-span-8" : "lg:col-span-12"} space-y-6`}>
           <div className="rounded-2xl border bg-white p-4 sm:p-6 shadow-sm">
             <div className="flex items-center justify-between mb-6">
               <h2 className="font-semibold text-slate-800">Project Stages</h2>
@@ -2776,34 +4349,36 @@ function EligibilityCheckPage() {
             </div>
           </div>
         </div>
-        <div className="lg:col-span-4">
-          <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-lg flex flex-col h-[220px]">
-            <h3 className="text-lg font-semibold mb-3">
-              {currentStepCard?.title ?? "Eligibility Check"}
-            </h3>
-            {currentStepCard?.description && (
-              <p className="text-sm opacity-90 mb-4">
-                {currentStepCard.description}
-              </p>
-            )}
-            {currentStepCard?.highlights?.map((highlight, index) => (
-              <p key={index} className="text-sm opacity-90">
-                {highlight}
-              </p>
-            ))}
-            {currentStepCard?.ctaLabel && currentStepCta && (
-              <div className="mt-auto">
-                <button
-                  onClick={() => router.push(currentStepCta)}
-                  className="w-full rounded-xl bg-white text-blue-600 font-semibold py-3
-                    hover:bg-blue-50 active:scale-[0.98] transition cursor-pointer"
-                >
-                  {currentStepCard.ctaLabel}
-                </button>
-              </div>
-            )}
+        {isEligibilityFormVisible && (
+          <div className="lg:col-span-4">
+            <div className="rounded-2xl bg-blue-600 p-5 text-white shadow-lg flex flex-col h-[220px]">
+              <h3 className="text-lg font-semibold mb-3">
+                {currentStepCard?.title ?? "Eligibility Check"}
+              </h3>
+              {currentStepCard?.description && (
+                <p className="text-sm opacity-90 mb-4">
+                  {currentStepCard.description}
+                </p>
+              )}
+              {currentStepCard?.highlights?.map((highlight, index) => (
+                <p key={index} className="text-sm opacity-90">
+                  {highlight}
+                </p>
+              ))}
+              {currentStepCard?.ctaLabel && currentStepCta && (
+                <div className="mt-auto">
+                  <button
+                    onClick={() => router.push(currentStepCta)}
+                    className="w-full rounded-xl bg-white text-blue-600 font-semibold py-3
+                      hover:bg-blue-50 active:scale-[0.98] transition cursor-pointer"
+                  >
+                    {currentStepCard.ctaLabel}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* FORM */}
@@ -2821,11 +4396,50 @@ function EligibilityCheckPage() {
             setUploadedFiles,
             signatureFile,
             setSignatureFile,
+            signaturePreviewUrl,
+            setSignaturePreviewUrl,
           }}
         >
-          <div className={`grid gap-6 transition-all duration-500 ${hasRightPanel ? "grid-cols-12" : "grid-cols-1"}`}>
-            <div className={hasRightPanel ? "col-span-8" : "col-span-12"}>
-              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+            <div className={shouldShowEligibilitySidePanel ? "lg:col-span-8" : "lg:col-span-12"}>
+              {isEligibilityFormVisible ? (
+                <div
+                  ref={formCardRef}
+                  className="rounded-2xl border bg-white p-6 shadow-sm"
+                >
+                  <div className="mb-6 flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-600">
+                        Eligibility Workspace
+                      </p>
+                      <h2 className="mt-2 text-xl font-semibold text-slate-900">
+                        Continue your eligibility assessment
+                      </h2>
+                      <p className="mt-1 text-sm text-slate-500">
+                        Complete the form step by step for{" "}
+                        <span className="font-medium text-slate-700">{selectedServiceAppliedName}</span>.
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={step === 1}
+                        onClick={prevStep}
+                        className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        ← Back
+                      </button>
+                      {!isReviewOnly && (
+                        <button
+                          type="button"
+                          onClick={() => setIsEligibilityFormVisible(false)}
+                          className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+                        >
+                          Hide form
+                        </button>
+                      )}
+                    </div>
+                  </div>
 
               {/* Step tabs */}
               <div className="flex gap-6 border-b pb-4 mb-6 text-sm overflow-x-auto">
@@ -2867,6 +4481,7 @@ function EligibilityCheckPage() {
                   RadioGroupField,
                   SelectField,
                   FieldLabel,
+                  CheckboxGroup,
                 }}
               />
             )}
@@ -2915,7 +4530,9 @@ function EligibilityCheckPage() {
                   RadioGroupField,
                   SelectField,
                   FieldLabel,
+                  StructuredFileUploadArea,
                   CheckboxGroup,
+                  AgentActionButton,
                 }}
               />
             )}
@@ -3000,12 +4617,24 @@ function EligibilityCheckPage() {
               {submitError && (
                 <p className="mt-3 text-sm text-red-600">{submitError}</p>
               )}
+                </div>
+              ) : (
+                <EligibilityEntryCard
+                  serviceName={selectedServiceAppliedName}
+                  onActivate={() => setIsEligibilityFormVisible(true)}
+                />
+              )}
             </div>
-          </div>
 
-          {/* RIGHT: VERIFICATION CALENDAR */}
-            {hasRightPanel && (
-              <div className="col-span-4 space-y-6">
+            {shouldShowEligibilitySidePanel && (
+              <div className="space-y-6 lg:col-span-4">
+                {!isEligibilityFormVisible && (
+                  <AgenticAssistantCard
+                    serviceName={selectedServiceAppliedName}
+                    councilName="Newham Council"
+                    hasAgentRequest={showAgentSidebar}
+                  />
+                )}
                 {showAgentSidebar && agentSidebar && (
                   <FloatingAgentWidget
                     requestId={agentSidebar.id}
@@ -3013,6 +4642,7 @@ function EligibilityCheckPage() {
                     message={agentSidebar.message}
                     requestType={agentSidebar.requestType}
                     responseMode={agentSidebar.responseMode}
+                    missingFields={agentSidebar.missingFields}
                     onClose={() => setAgentSidebar(null)}
                   />
                 )}
@@ -3029,6 +4659,279 @@ function EligibilityCheckPage() {
       {isAnalyzing && <AnalysisModal />}
     </main>
   )
+}
+
+function EligibilityEntryCard({
+  serviceName,
+  onActivate,
+}: {
+  serviceName: string
+  onActivate: () => void
+}) {
+  return (
+    <div className="rounded-3xl border border-blue-100 bg-white p-6 shadow-sm sm:p-8">
+      <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-700">
+        <CheckCircle className="h-3.5 w-3.5" />
+        Eligibility Access
+      </div>
+
+      <h2 className="mt-5 text-2xl font-semibold text-slate-900">
+        Start your eligibility review
+      </h2>
+      <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+        Thank you for choosing AI4Planning. Your selected <b>Bronze</b> plan includes
+        10 Agent Z buttons, and you can use them throughout the application.
+      </p>
+      <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+        Your selected service is <span className="font-bold text-slate-800 ">{serviceName}</span>.
+      </p>
+
+      <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+          What happens next
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <p className="text-sm font-semibold text-slate-900">Open the form</p>
+            <p className="mt-2 text-sm text-slate-500">
+              Unlock the full multi-step eligibility workflow.
+            </p>
+          </div>
+          <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <p className="text-sm font-semibold text-slate-900">Complete each step</p>
+            <p className="mt-2 text-sm text-slate-500">
+              Save draft progress and move through the assessment at your pace.
+            </p>
+          </div>
+          <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100">
+            <p className="text-sm font-semibold text-slate-900">Get guided support</p>
+            <p className="mt-2 text-sm text-slate-500">
+              Use the agentic workspace on the right as guidance is added.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={onActivate}
+        className="mt-6 rounded-2xl bg-blue-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-blue-700"
+      >
+        Open Eligibility Check
+      </button>
+    </div>
+  )
+}
+
+function AgenticAssistantCard({
+  serviceName,
+  councilName,
+  hasAgentRequest,
+}: {
+  serviceName: string
+  councilName: string
+  hasAgentRequest: boolean
+}) {
+  const typeSpeed = 14
+  const pauseBetweenLines = 280
+  const headingText = `Welcome to your ${serviceName} Dashboard`
+  const introText = `We're here to help you manage your ${serviceName} application smoothly and confidently.`
+  const councilText = `Your selected council authority is ${councilName}.`
+  const guidanceText =
+    "To guide you accurately through the council requirements, regulations, and next steps, please begin by completing your Eligibility Check Questionnaire."
+  const assessmentText =
+    "This will help us assess your property, identify any planning or licensing requirements, and create the best route for your application."
+  const quickPointOne = "Takes only a few minutes"
+  const quickPointTwo = "Tailored to your council area"
+  const quickPointThree = "Helps avoid delays or errors"
+  const aiSupportText =
+    "Your subscription includes 15 smart AI buttons designed to support you through every stage of your application journey."
+  const exploreText =
+    "Explore each feature and enjoy your personalised AI experience."
+  const beginText = "Click Eligibility Check  to begin."
+
+  const introDelay = headingText.length * typeSpeed + pauseBetweenLines
+  const councilDelay = introDelay + introText.length * typeSpeed + pauseBetweenLines
+  const guidanceDelay = councilDelay + councilText.length * typeSpeed + pauseBetweenLines
+  const assessmentDelay = guidanceDelay + guidanceText.length * typeSpeed + pauseBetweenLines
+  const pointOneDelay = assessmentDelay + assessmentText.length * typeSpeed + pauseBetweenLines
+  const pointTwoDelay = pointOneDelay + quickPointOne.length * typeSpeed + pauseBetweenLines
+  const pointThreeDelay = pointTwoDelay + quickPointTwo.length * typeSpeed + pauseBetweenLines
+  const aiSupportDelay = pointThreeDelay + quickPointThree.length * typeSpeed + pauseBetweenLines
+  const exploreDelay = aiSupportDelay + aiSupportText.length * typeSpeed + pauseBetweenLines
+  const beginDelay = exploreDelay + exploreText.length * typeSpeed + pauseBetweenLines
+
+  return (
+    <div className="overflow-hidden rounded-3xl bg-slate-900 text-white shadow-xl">
+      <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-blue-900 p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center gap-3">
+            {/* <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-white/10">
+              <Bot className="h-5 w-5 text-cyan-300" />
+            </div> */}
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-cyan-400/10 ring-1 ring-white/10 overflow-hidden">
+                    <video
+                      className="h-8 w-8 object-cover rounded-xl"
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                    >
+                      <source src="/video-logo-animation.mp4" type="video/mp4" />
+                      Your browser does not support the video tag.
+                    </video>
+                  </div>
+            <div>
+              <p className="text-sm font-semibold">Agent Z</p>
+              <p className="text-xs text-slate-300">AI4Planning Intelligence</p>
+            </div>
+          </div>
+          <span className="rounded-full bg-emerald-400/15 px-2.5 py-1 text-[11px] font-medium text-emerald-300">
+            {hasAgentRequest ? "Active" : "Standby"}
+          </span>
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4">
+          <TypewriterText
+            text={headingText}
+            className="text-lg font-semibold text-white"
+            speed={typeSpeed}
+          />
+          <TypewriterText
+            text={introText}
+            className="mt-3 text-sm leading-6 text-slate-200"
+            speed={typeSpeed}
+            startDelay={introDelay}
+          />
+          {/* <TypewriterText
+            text={councilText}
+            className="mt-3 text-sm leading-6 text-cyan-100"
+            speed={typeSpeed}
+            startDelay={councilDelay}
+          /> */}
+          <TypewriterText
+            text={guidanceText}
+            className="mt-3 text-sm leading-6 text-slate-300"
+            speed={typeSpeed}
+            startDelay={guidanceDelay}
+          />
+          <TypewriterText
+            text={assessmentText}
+            className="mt-3 text-sm leading-6 text-slate-300"
+            speed={typeSpeed}
+            startDelay={assessmentDelay}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-3 bg-slate-950/80 p-6">
+        <div className="rounded-2xl border border-white/8 bg-white/5 p-4">
+          <div className="space-y-2">
+            <div className="flex items-start gap-2">
+              <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+              <TypewriterText
+                text={quickPointOne}
+                className="text-sm text-slate-200"
+                speed={typeSpeed}
+                startDelay={pointOneDelay}
+              />
+            </div>
+            <div className="flex items-start gap-2">
+              <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+              <TypewriterText
+                text={quickPointTwo}
+                className="text-sm text-slate-200"
+                speed={typeSpeed}
+                startDelay={pointTwoDelay}
+              />
+            </div>
+            <div className="flex items-start gap-2">
+              <CheckCircle className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+              <TypewriterText
+                text={quickPointThree}
+                className="text-sm text-slate-200"
+                speed={typeSpeed}
+                startDelay={pointThreeDelay}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4 text-sm text-cyan-100">
+          <div className="flex items-start gap-2">
+            <Bot className="mt-0.5 h-4 w-4 shrink-0 text-cyan-200" />
+            <TypewriterText
+              text={aiSupportText}
+              className="text-sm text-cyan-100"
+              speed={typeSpeed}
+              startDelay={aiSupportDelay}
+            />
+          </div>
+          <TypewriterText
+            text={exploreText}
+            className="mt-3 text-cyan-50"
+            speed={typeSpeed}
+            startDelay={exploreDelay}
+          />
+          <TypewriterText
+            text={beginText}
+            className="mt-5 font-medium text-white"
+            speed={typeSpeed}
+            startDelay={beginDelay}
+          />
+          {/* <button
+            type="button"
+            onClick={onActivate}
+            className="mt-4 w-full rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-blue-700 transition hover:bg-blue-50"
+          >
+            Begin Eligibility Check
+          </button> */}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TypewriterText({
+  text,
+  className,
+  speed = 16,
+  startDelay = 0,
+}: {
+  text: string
+  className?: string
+  speed?: number
+  startDelay?: number
+}) {
+  const [visibleLength, setVisibleLength] = useState(0)
+
+  useEffect(() => {
+    let intervalTimer: number | null = null
+
+    const startTimer = window.setTimeout(() => {
+      setVisibleLength(0)
+      intervalTimer = window.setInterval(() => {
+        setVisibleLength((currentLength) => {
+          if (currentLength >= text.length) {
+            if (intervalTimer !== null) {
+              window.clearInterval(intervalTimer)
+            }
+            return currentLength
+          }
+
+          return currentLength + 1
+        })
+      }, speed)
+    }, startDelay)
+
+    return () => {
+      window.clearTimeout(startTimer)
+      if (intervalTimer !== null) {
+        window.clearInterval(intervalTimer)
+      }
+    }
+  }, [speed, startDelay, text])
+
+  return <p className={className}>{text.slice(0, visibleLength)}</p>
 }
 
 export default function Page() {
@@ -3185,6 +5088,7 @@ function Input({
   onAction,
   actionDisabled,
   actionMessage,
+  actionOpensAgentSidebar = true,
 }: {
   label: string
   placeholder?: string
@@ -3193,9 +5097,10 @@ function Input({
   autocompleteKind?: "postcode"
   fieldIdOverride?: string
   actionLabel?: string
-  onAction?: () => void
+  onAction?: () => void | Promise<void>
   actionDisabled?: boolean
   actionMessage?: string
+  actionOpensAgentSidebar?: boolean
 }) {
   const { data, updateSection } = useProject()
   const { showAgentSidebar } = useEligibilityAgent()
@@ -3225,7 +5130,7 @@ function Input({
       return
     }
 
-    if (trimmedValue.length < 2) {
+    if (trimmedValue.length < 1) {
       setSuggestions([])
       setIsAutocompleteOpen(false)
       setIsLoadingSuggestions(false)
@@ -3252,18 +5157,21 @@ function Input({
         }
 
         const payload = await response.json()
-        const nextSuggestions = extractAutocompleteSuggestions(payload)
+        const nextSuggestions = withTypedPostcodeFallback(
+          extractAutocompleteSuggestions(payload),
+          trimmedValue
+        )
 
         setSuggestions(nextSuggestions)
         setIsAutocompleteOpen(nextSuggestions.length > 0)
-      } catch (error) {
+      } catch {
         if (controller.signal.aborted) return
 
-        setSuggestions([])
-        setIsAutocompleteOpen(false)
-        setAutocompleteError(
-          error instanceof Error ? error.message : "Unable to load postcode suggestions."
-        )
+        const fallbackSuggestion = buildTypedPostcodeSuggestion(trimmedValue)
+
+        setSuggestions(fallbackSuggestion ? [fallbackSuggestion] : [])
+        setIsAutocompleteOpen(Boolean(fallbackSuggestion))
+        setAutocompleteError(null)
       } finally {
         if (!controller.signal.aborted) {
           setIsLoadingSuggestions(false)
@@ -3349,14 +5257,10 @@ function Input({
             ds: typeof payload.ds === "string" ? payload.ds : undefined,
           },
         })
-      } catch (error) {
+      } catch {
         if (controller.signal.aborted) return
 
-        setPostcodeLookupError(
-          error instanceof Error
-            ? error.message
-            : "Unable to resolve postcode coordinates."
-        )
+        setPostcodeLookupError(null)
       }
     }, 250)
 
@@ -3407,6 +5311,33 @@ function Input({
     })
   }
 
+  const handleActionClick = () => {
+    if (!onAction) return
+
+    void (async () => {
+      try {
+        await onAction()
+
+        if (!actionOpensAgentSidebar) {
+          return
+        }
+
+        showAgentSidebar(
+          createAgentSidebarPayload(
+            label,
+            actionMessage ?? `${actionLabel} requested for ${label}.`,
+            {
+              requestType: "action",
+              responseMode: "info",
+            }
+          )
+        )
+      } catch {
+        // Action handlers surface their own errors in the form when needed.
+      }
+    })()
+  }
+
   return (
     <div id={fieldId}>
       <FieldLabel
@@ -3432,56 +5363,57 @@ function Input({
                 setIsAutocompleteOpen(Boolean(e.target.value.trim()))
               }
             }}
-            className="w-full rounded-xl border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200 transition-shadow"
+            className={`w-full rounded-xl border px-4 py-2 text-sm transition-shadow focus:outline-none focus:ring-2 focus:ring-blue-200 ${
+              isPostcodeAutocomplete ? "pr-10" : ""
+            }`}
           />
           {isPostcodeAutocomplete && isLoadingSuggestions && (
-            <p className="mt-1 text-xs text-slate-400">Loading postcode suggestions...</p>
-          )}
-          {isPostcodeAutocomplete && autocompleteError && (
-            <p className="mt-1 text-xs text-red-600">{autocompleteError}</p>
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
+              <span className="block h-4 w-4 rounded-full border-2 border-slate-300 border-t-blue-600 animate-spin" />
+            </span>
           )}
           {isPostcodeAutocomplete && postcodeLookupError && (
             <p className="mt-1 text-xs text-red-600">{postcodeLookupError}</p>
           )}
-          {isPostcodeAutocomplete && isAutocompleteOpen && suggestions.length > 0 && (
+          {isPostcodeAutocomplete &&
+            isAutocompleteOpen &&
+            (isLoadingSuggestions || suggestions.length > 0 || autocompleteError) && (
             <div className="absolute z-30 mt-2 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
-              {suggestions.map((suggestion) => (
-                <button
-                  key={suggestion.id}
-                  type="button"
-                  onMouseDown={(event) => {
-                    event.preventDefault()
-                    updateInputValue(suggestion.value, {
-                      suppressAutocompleteLookup: true,
-                    })
-                    setIsAutocompleteOpen(false)
-                  }}
-                  className="block w-full px-4 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-blue-50"
-                >
-                  {suggestion.label}
-                </button>
-              ))}
+              {isLoadingSuggestions && (
+                <div className="flex items-center gap-2 px-4 py-3 text-sm text-slate-500">
+                  <span className="block h-4 w-4 rounded-full border-2 border-slate-300 border-t-blue-600 animate-spin" />
+                  <span>Loading postcode suggestions...</span>
+                </div>
+              )}
+              {!isLoadingSuggestions && autocompleteError && (
+                <p className="px-4 py-3 text-sm text-red-600">{autocompleteError}</p>
+              )}
+              {!isLoadingSuggestions &&
+                suggestions.map((suggestion) => (
+                  <button
+                    key={suggestion.id}
+                    type="button"
+                    onMouseDown={(event) => {
+                      event.preventDefault()
+                      updateInputValue(suggestion.value, {
+                        suppressAutocompleteLookup: true,
+                      })
+                      setIsAutocompleteOpen(false)
+                    }}
+                    className="block w-full px-4 py-2 text-left text-sm text-slate-700 transition-colors hover:bg-blue-50"
+                  >
+                    {suggestion.label}
+                  </button>
+                ))}
             </div>
-          )}
+            )}
         </div>
         {actionLabel && onAction && (
           <AgentActionButton
             label={actionLabel}
             disabled={actionDisabled}
             className="w-full xl:mt-0 xl:w-auto xl:min-w-[110px]"
-            onClick={() => {
-              onAction()
-              showAgentSidebar(
-                createAgentSidebarPayload(
-                  label,
-                  actionMessage ?? `${actionLabel} requested for ${label}.`,
-                  {
-                    requestType: "action",
-                    responseMode: "info",
-                  }
-                )
-              )
-            }}
+            onClick={handleActionClick}
           />
         )}
       </div>
@@ -3564,35 +5496,48 @@ function SelectField({
         questionNumber={questionNumber}
         wrapperClassName="mb-0"
       />
-      <select
-        value={value}
-        onChange={e => {
-          const nextValue = e.target.value
-          updateSection("eligibility", {
-            formData: { ...(data.eligibility?.formData || {}), [label]: nextValue },
-          })
-          if (isAgentSidebarTriggerValue(nextValue) && shouldShowAgentActionUi(label)) {
-            showAgentSidebar(
-              createAgentSidebarPayload(
-                label,
-                consultTrigger ?? `Agent Z is gathering more details for ${label}.`,
-                {
-                  requestType: "ask-agent",
-                  responseMode: shouldAutoApplyYesNoResponse(options) ? "yes-no" : "info",
-                }
+      <div className={`mt-1 ${isAgentValue ? "eligibility-agent-button relative rounded-xl" : ""}`}>
+        <select
+          value={value}
+          onChange={e => {
+            const nextValue = e.target.value
+            updateSection("eligibility", {
+              formData: { ...(data.eligibility?.formData || {}), [label]: nextValue },
+            })
+            if (isAgentSidebarTriggerValue(nextValue) && shouldShowAgentActionUi(label)) {
+              showAgentSidebar(
+                createAgentSidebarPayload(
+                  label,
+                  consultTrigger ?? `Agent Z is gathering more details for ${label}.`,
+                  {
+                    requestType: "ask-agent",
+                    responseMode: shouldAutoApplyYesNoResponse(options) ? "yes-no" : "info",
+                  }
+                )
               )
-            )
-          }
-        }}
-        className={`mt-1 w-full rounded-xl border px-4 py-2 text-sm transition-shadow focus:outline-none focus:ring-2 ${
-          isAgentValue
-            ? "border-blue-600 bg-blue-100 text-blue-900 focus:ring-blue-300"
-            : "focus:ring-blue-200"
-        }`}
-      >
-        <option value="">Select...</option>
-        {options.map(o => <option key={o}>{o}</option>)}
-      </select>
+            }
+          }}
+          className={`w-full rounded-xl border px-4 py-2 text-sm transition-shadow focus:outline-none focus:ring-2 ${
+            isAgentValue
+              ? "relative z-10 border-blue-900/60 bg-gradient-to-r from-slate-800/92 via-[#1f3d9a]/86 to-blue-800/84 text-white shadow-[0_12px_28px_rgba(29,56,143,0.32)] focus:ring-blue-300/40"
+              : "focus:ring-blue-200"
+          }`}
+        >
+          <option value="" style={{ color: "#0f172a", backgroundColor: "#ffffff" }}>
+            Select...
+          </option>
+          {options.map(o => (
+            <option
+              key={o}
+              value={o}
+              style={getNativeSelectOptionStyle(o)}
+            >
+              {o}
+            </option>
+          ))}
+        </select>
+        {isAgentValue && <EligibilityAgentMovingBorder size={58} />}
+      </div>
       {showAgentButton && consultTrigger && shouldShowAgentActionUi(label) && (
         <ConsultationTrigger message={consultTrigger} />
       )}
@@ -3651,17 +5596,20 @@ function RadioGroupField({
                   )
                 }
               }}
-              className={`flex-1 min-w-fit rounded-xl border px-4 py-2 text-sm transition-all ${
+              className={`${
+                isAgentOption ? "eligibility-agent-button" : ""
+              } flex-1 min-w-fit rounded-xl border px-4 py-2 text-sm transition-all ${
                 selected === o
                   ? isAgentOption
-                    ? "border-blue-700 bg-blue-600 text-white"
+                    ? "border-blue-900/60 bg-gradient-to-r from-slate-800/92 via-[#1f3d9a]/86 to-blue-800/84 text-white"
                     : "bg-blue-600 text-white border-blue-600"
                   : isAgentOption
-                    ? "border-blue-500 bg-blue-100 text-blue-900 hover:bg-blue-200"
+                    ? "border-blue-900/60 bg-gradient-to-r from-slate-800/84 via-[#1f3d9a]/78 to-blue-800/76 text-white hover:from-slate-800/92 hover:via-[#1d388f]/86 hover:to-blue-800/84"
                     : "hover:bg-blue-50 border-slate-200"
               }`}
             >
-              {renderAgentOptionLabel(o)}
+              <span className="relative z-10">{renderAgentOptionLabel(o)}</span>
+              {isAgentOption && <EligibilityAgentMovingBorder size={58} />}
             </button>
           )
         })}
@@ -3689,8 +5637,8 @@ function VerificationCalendar({ disabled = false }: { disabled?: boolean }) {
   return (
     <div className="rounded-2xl overflow-hidden border bg-white shadow-lg">
       <div className="bg-gradient-to-r from-blue-600 to-blue-500 p-5 text-white">
-        <h3 className="text-sm font-semibold">Verification Session</h3>
-        <p className="text-xs text-blue-100">15 min video call · Senior Planner</p>
+        <h3 className="text-sm font-semibold">Consultation Calendar</h3>
+        <p className="text-xs text-blue-100">15 min planning review with our expert team</p>
       </div>
       <div className="p-5 space-y-6">
         <div className="flex justify-between items-center">
@@ -3727,7 +5675,7 @@ function VerificationCalendar({ disabled = false }: { disabled?: boolean }) {
           onClick={() => router.push("/dashboard?stage=consultant")}
           className="w-full rounded-xl bg-blue-600 text-white py-2.5 font-semibold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
         >
-          Confirm Consultation Booking
+          Confirm Expert Consultation
         </button>
       </div>
     </div>
@@ -3816,5 +5764,8 @@ function RoadmapStep({ label, status, icon: Icon, onClick }: {
 function RoadmapLine() {
   return <div className="flex-1 h-[2px] bg-slate-200 mx-2 min-w-[120px]" />
 }
+
+
+
 
 

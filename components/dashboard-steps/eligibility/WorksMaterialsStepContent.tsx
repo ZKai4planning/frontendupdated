@@ -1,5 +1,4 @@
-import React from "react"
-import { EligibilityStepContentProps } from "./types"
+import { EligibilityFormValues, EligibilityStepContentProps } from "./types"
 
 export function WorksMaterialsStepContent({
   savedFormData,
@@ -16,8 +15,7 @@ export function WorksMaterialsStepContent({
     AgentActionButton,
     FileUploadArea,
     StructuredFileUploadArea,
-  } =
-    components
+  } = components
 
   if (
     !SectionHeading ||
@@ -32,19 +30,31 @@ export function WorksMaterialsStepContent({
     return null
   }
 
-  const proposedWorksDescription = asStringValue(savedFormData["Description of Proposed Works"]).trim()
-
+  const proposedWorksRawValue = asStringValue(savedFormData["Description of Proposed Works"])
+  const dimensionsSupportFieldLabel = "Need help with dimensions?"
+  const totalInternalFloorAreaLabel = "Total internal floor area (m\u00C2\u00B2)"
+  const propertyFootprintLabel = "Property footprint (approx length \u00C3\u00D7 width in metres)"
+  const isDimensionsSupportAdded = asStringValue(savedFormData[dimensionsSupportFieldLabel]) === "Yes"
   const summarizeProposedWorks = (value: string) => {
     const normalized = value.replace(/\s+/g, " ").trim()
     if (!normalized) return ""
 
-    const sentences = normalized
+    const sentenceLikeParts = normalized
       .split(/(?<=[.!?])\s+/)
       .map(sentence => sentence.trim())
       .filter(Boolean)
 
-    if (sentences.length >= 2) {
-      return sentences.slice(0, 2).join(" ")
+    if (sentenceLikeParts.length > 0) {
+      const sentenceSummary = sentenceLikeParts
+        .slice(0, 2)
+        .join(" ")
+        .split(/\s+/)
+        .slice(0, 28)
+        .join(" ")
+
+      if (sentenceSummary) {
+        return sentenceSummary.replace(/\s+([,.!?;:])/g, "$1").trim()
+      }
     }
 
     const clauses = normalized
@@ -53,41 +63,86 @@ export function WorksMaterialsStepContent({
       .filter(Boolean)
 
     if (clauses.length > 1) {
-      return clauses.slice(0, 3).join(", ")
+      return clauses
+        .slice(0, 3)
+        .join(", ")
+        .split(/\s+/)
+        .slice(0, 24)
+        .join(" ")
+        .replace(/\s+([,.!?;:])/g, "$1")
+        .trim()
     }
 
-    return normalized.length > 180 ? `${normalized.slice(0, 177).trim()}...` : normalized
+    const words = normalized.split(/\s+/)
+    if (words.length > 24) {
+      return `${words.slice(0, 24).join(" ").trim()}...`
+    }
+
+    return normalized.length > 140 ? `${normalized.slice(0, 137).trim()}...` : normalized
   }
 
   const handleSummarizeProposedWorks = () => {
-    if (!proposedWorksDescription) return
+    if (!proposedWorksRawValue.trim()) return
+
+    const summary = summarizeProposedWorks(proposedWorksRawValue)
+    if (!summary) return
 
     updateSection("eligibility", {
       formData: {
         ...savedFormData,
-        "Description of Proposed Works": summarizeProposedWorks(proposedWorksDescription),
+        "Description of Proposed Works": summary,
       },
+    })
+  }
+
+  const updateDimensionsSupport = (value: "Yes" | "No") => {
+    const nextFormData: EligibilityFormValues = {
+      ...savedFormData,
+      [dimensionsSupportFieldLabel]: value,
+    }
+
+    if (value === "No") {
+      delete nextFormData["Dimension Survey Booking Prompt Visible"]
+      delete nextFormData["Dimension Survey Booking Calendar Open"]
+      delete nextFormData["Dimension Survey Booking Date"]
+      delete nextFormData["Dimension Survey Booking Time"]
+    }
+
+    updateSection("eligibility", {
+      formData: nextFormData,
     })
   }
 
   return (
     <>
+      <SectionHeading>Current Layout</SectionHeading>
+      <div className="mb-6 grid grid-cols-2 gap-6">
+        <Input
+          label="Number of bedrooms available?"
+          placeholder="Enter number of bedrooms"
+        />
+        <Input
+          label="Number of bathrooms / shower rooms?"
+          placeholder="Enter number of bathrooms or shower rooms"
+        />
+      </div>
+
       <SectionHeading>Description of Works</SectionHeading>
-      <div className="grid grid-cols-2 gap-6 mb-6">
+      <div className="mb-6 grid grid-cols-2 gap-6">
         <div className="col-span-2">
           <div className="mb-1 flex items-center justify-between gap-3">
             <FieldLabel label="Description of Proposed Works" wrapperClassName="mb-0" />
             <AgentActionButton
-              label="Summarize"
+              label="Ask Agent Z to Summarize"
               onClick={handleSummarizeProposedWorks}
-              disabled={!proposedWorksDescription}
+              disabled={!proposedWorksRawValue.trim()}
               className="mt-0 shrink-0"
             />
           </div>
           <textarea
             rows={3}
             placeholder="Summarise the proposal, including size, number of storeys and position... Ask Agent Z to help to concise"
-            className="w-full rounded-xl border px-4 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
+            className="w-full resize-none rounded-xl border px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
             value={asStringValue(savedFormData["Description of Proposed Works"])}
             onChange={e =>
               updateSection("eligibility", {
@@ -99,17 +154,138 @@ export function WorksMaterialsStepContent({
       </div>
 
       <SectionHeading>Dimensions</SectionHeading>
-      <div className="grid grid-cols-2 gap-6 mb-6">
+      <div className="mb-6 grid grid-cols-2 gap-6">
+        <div className="col-span-2 flex flex-wrap items-center justify-end gap-3">
+          {isDimensionsSupportAdded && (
+            <p className="text-xs font-medium text-emerald-700">
+              Dimensions survey support is in your cart.
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={() => updateDimensionsSupport("No")}
+            disabled={!isDimensionsSupportAdded}
+            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Remove from cart
+          </button>
+          <AgentActionButton
+            label={
+              isDimensionsSupportAdded
+                ? "Dimensions survey added - Ask Agent Z"
+                : "Add dimensions survey with Agent Z"
+            }
+            onClick={() => updateDimensionsSupport("Yes")}
+            agentFieldLabel={dimensionsSupportFieldLabel}
+            agentRequestType="ask-agent"
+            className="mt-0"
+          />
+        </div>
+
+        <Input
+          label="Total internal floor area"
+          placeholder="Enter total internal floor area (m²)"
+        />
+        <Input
+          label="Number of floors"
+          placeholder="For example: G + 1st + Loft"
+        />
         <Input label="Existing Property Width (m)" />
         <Input label="Existing Property Depth (m)" />
         <Input label="Proposed Extension Width (m)" />
         <Input label="Proposed Extension Depth (m)" />
+        <Input
+          label="Garden depth (metres)"
+          placeholder="Enter garden depth"
+        />
         <Input label="Ridge / Eaves Height (m)" />
         <Input label="Distance from Boundary (m)" />
+        <div className="col-span-2">
+          <FieldLabel label="Kitchen Room Dimensions (metres)" />
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <p className="mb-2 text-sm font-medium text-slate-700">Length</p>
+              <input
+                value={asStringValue(savedFormData["Kitchen Room Length (metres)"])}
+                placeholder="Enter kitchen room length"
+                onChange={e =>
+                  updateSection("eligibility", {
+                    formData: {
+                      ...savedFormData,
+                      "Kitchen Room Length (metres)": e.target.value,
+                    },
+                  })
+                }
+                className="w-full rounded-xl border px-4 py-2 text-sm transition-shadow focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+            </div>
+            <div>
+              <p className="mb-2 text-sm font-medium text-slate-700">Width</p>
+              <input
+                value={asStringValue(savedFormData["Kitchen Room Width (metres)"])}
+                placeholder="Enter kitchen room width"
+                onChange={e =>
+                  updateSection("eligibility", {
+                    formData: {
+                      ...savedFormData,
+                      "Kitchen Room Width (metres)": e.target.value,
+                    },
+                  })
+                }
+                className="w-full rounded-xl border px-4 py-2 text-sm transition-shadow focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+            </div>
+          </div>
+        </div>
+        <div className="col-span-2">
+          <FieldLabel label="Bathroom Room Dimensions (metres)" />
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <p className="mb-2 text-sm font-medium text-slate-700">Length</p>
+              <input
+                value={asStringValue(savedFormData["Bathroom Room Length (metres)"])}
+                placeholder="Enter bathroom room length"
+                onChange={e =>
+                  updateSection("eligibility", {
+                    formData: {
+                      ...savedFormData,
+                      "Bathroom Room Length (metres)": e.target.value,
+                    },
+                  })
+                }
+                className="w-full rounded-xl border px-4 py-2 text-sm transition-shadow focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+            </div>
+            <div>
+              <p className="mb-2 text-sm font-medium text-slate-700">Width</p>
+              <input
+                value={asStringValue(savedFormData["Bathroom Room Width (metres)"])}
+                placeholder="Enter bathroom room width"
+                onChange={e =>
+                  updateSection("eligibility", {
+                    formData: {
+                      ...savedFormData,
+                      "Bathroom Room Width (metres)": e.target.value,
+                    },
+                  })
+                }
+                className="w-full rounded-xl border px-4 py-2 text-sm transition-shadow focus:outline-none focus:ring-2 focus:ring-blue-200"
+              />
+            </div>
+          </div>
+        </div>
+        <div className="col-span-2">
+          <div className="space-y-4">
+            <RadioGroupField
+              label="Approx smallest bedroom size?"
+              options={["Under 6.5 mÂ²", "6.5-10 mÂ²", "10+ mÂ²"]}
+            />
+          </div>
+        </div>
       </div>
 
-      <SectionHeading>Materials</SectionHeading>
-      <div className="grid grid-cols-2 gap-6 mb-6">
+      <SectionHeading>Current Materials Used</SectionHeading>
+      <div className="mb-6 grid grid-cols-2 gap-6">
         <SelectField
           label="Wall Materials"
           options={[
@@ -142,28 +318,58 @@ export function WorksMaterialsStepContent({
       </div>
 
       <SectionHeading>Plans, Drawings & Photographs</SectionHeading>
-      <div className="grid grid-cols-2 gap-4 mb-2">
+      <div className="mb-2 grid grid-cols-2 gap-4">
         <FileUploadArea
           label="Location Plan (1:1250 or 1:2500)"
           accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf"
           multiple={false}
           hint="Ordnance Survey based plan showing site in context"
-          onMissingTrigger="No location plan uploaded — we offer professional drawing services (CAD, surveys). Book a consultation."
+          onMissingTrigger={{
+            message: "No location plan uploaded - we offer professional drawing services and surveys.",
+            decision: {
+              fieldLabel: "Need help with location plan?",
+              prompt: "Would you like Agent Z to help arrange or prepare your location plan?",
+              yesMessage:
+                "Agent Z is preparing support options for your missing location plan, including drawing and survey help.",
+              noMessage:
+                "Agent Z has noted that you do not need help with the location plan right now.",
+            },
+          }}
         />
         <FileUploadArea
           label="Site Plan (1:200 or 1:500)"
           accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf"
           multiple={false}
           hint="Block plan of the site showing proposed development"
-          onMissingTrigger="No site plan uploaded — our CAD team can prepare this for you."
+          onMissingTrigger={{
+            message: "No site plan uploaded - our CAD team can prepare this for you.",
+            decision: {
+              fieldLabel: "Need help with site plan?",
+              prompt: "Would you like Agent Z to help prepare your site plan?",
+              yesMessage:
+                "Agent Z is preparing support for your missing site plan and can guide the next steps.",
+              noMessage:
+                "Agent Z has noted that you do not need help with the site plan right now.",
+            },
+          }}
         />
         <StructuredFileUploadArea
-          label="Existing & Proposed Elevations"
+          label="Existing & Proposed Plans"
           accept=".pdf,.jpg,.jpeg,.png,.dwg,.dxf"
           hint="All affected elevations at 1:50 or 1:100"
           slotLabels={["Existing elevation", "Proposed elevation"]}
           showDescriptionInput={false}
-          onMissingTrigger="No elevations uploaded — our architects can prepare these drawings."
+          onMissingTrigger={{
+            message: "No elevations uploaded - our architects can prepare these drawings.",
+            decision: {
+              fieldLabel: "Need help with elevations?",
+              prompt: "Would you like Agent Z to help prepare the existing and Proposed Plans?",
+              yesMessage:
+                "Agent Z is preparing guidance and support for the missing existing and Proposed Plans.",
+              noMessage:
+                "Agent Z has noted that you do not need help with elevations right now.",
+            },
+          }}
         />
         <StructuredFileUploadArea
           label="Photographs of Site"
@@ -173,7 +379,17 @@ export function WorksMaterialsStepContent({
           singleRow
           allowAddMore
           descriptionPlaceholder="For example: front view, rear garden, side boundary"
-          onMissingTrigger="No photographs uploaded — please add photos of the existing property."
+          onMissingTrigger={{
+            message: "No photographs uploaded - we can help coordinate the site photography needed for your application.",
+            decision: {
+              fieldLabel: "Need help with site photographs?",
+              prompt: "Would you like Agent Z to help with site photographs?",
+              yesMessage:
+                "Agent Z is preparing support for the site photographs needed for your application.",
+              noMessage:
+                "Agent Z has noted that you do not need help with site photographs right now.",
+            },
+          }}
         />
         <StructuredFileUploadArea
           label="Additional Drawings (floor plans, sections etc.)"
@@ -183,7 +399,13 @@ export function WorksMaterialsStepContent({
           singleRow
           allowAddMore
           descriptionPlaceholder="For example: ground floor plan, roof plan, section A-A"
-          onMissingTrigger="Consider uploading floor plans or sections to support your application."
+          onMissingTrigger={{
+            message: "Consider uploading floor plans or sections to support your application.",
+            decision: {
+              fieldLabel: "Need help with additional drawings?",
+              prompt: "Do you want help with additional drawings such as floor plans or sections?",
+            },
+          }}
         />
       </div>
     </>

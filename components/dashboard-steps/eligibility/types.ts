@@ -2,12 +2,30 @@ import React from "react"
 
 export type EligibilityFormValue = string | string[] | undefined
 export type EligibilityFormValues = Record<string, EligibilityFormValue>
-export type EligibilityUpdateSection = (section: "eligibility", value: any) => void
+export type EligibilityUpdateSection = (section: "eligibility", value: unknown) => void
 
 type BaseFieldProps = {
   label: string
   tooltip?: string
   questionNumber?: number
+}
+
+export type MissingUploadTrigger =
+  | string
+  | {
+      message: string
+      decision?: {
+        fieldLabel: string
+        prompt: string
+        yesMessage?: string
+        noMessage?: string
+        triggerAgent?: boolean
+      }
+    }
+
+export type EligibilityOptionStyleOverride = {
+  hideIndicator?: boolean
+  centerLabel?: boolean
 }
 
 export type EligibilitySharedComponents = {
@@ -18,9 +36,10 @@ export type EligibilitySharedComponents = {
       autocompleteKind?: "postcode"
       fieldIdOverride?: string
       actionLabel?: string
-      onAction?: () => void
+      onAction?: () => void | Promise<void>
       actionDisabled?: boolean
       actionMessage?: string
+      actionOpensAgentSidebar?: boolean
     }
   >
   PhoneNumberField?: React.ComponentType<{
@@ -51,13 +70,17 @@ export type EligibilitySharedComponents = {
     onClick: () => void
     disabled?: boolean
     className?: string
+    agentFieldLabel?: string
+    agentMessage?: string
+    agentRequestType?: "ask-agent" | "action"
+    agentResponseMode?: "info" | "yes-no"
   }>
   FileUploadArea?: React.ComponentType<{
     label: string
     accept: string
     multiple?: boolean
     hint?: string
-    onMissingTrigger?: string
+    onMissingTrigger?: MissingUploadTrigger
   }>
   StructuredFileUploadArea?: React.ComponentType<{
     label: string
@@ -69,12 +92,13 @@ export type EligibilitySharedComponents = {
     singleRow?: boolean
     allowAddMore?: boolean
     descriptionPlaceholder?: string
-    onMissingTrigger?: string
+    onMissingTrigger?: MissingUploadTrigger
   }>
   CheckboxGroup?: React.ComponentType<
     BaseFieldProps & {
       options: string[]
       consultTrigger?: string
+      optionStyleOverrides?: Record<string, EligibilityOptionStyleOverride>
     }
   >
   DeclarationCheckbox?: React.ComponentType<BaseFieldProps & { fieldKey: string }>

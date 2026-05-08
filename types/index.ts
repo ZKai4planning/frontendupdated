@@ -3,6 +3,7 @@ export interface Feature {
   header?: string;
   description?: string;
   subServiceId?: string;
+  status?: boolean;
 }
 
 export interface Service {

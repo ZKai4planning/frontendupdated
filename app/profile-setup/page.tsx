@@ -269,8 +269,8 @@
 //         const { latitude, longitude } = position.coords;
         
 //         try {
-//           // OpenStreetMap Nominatim
-//           const reverseGeoUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`;
+//           // OpenSTreetMap Nominatim
+//           const reverseGeoUrl = `https://nominatim.opensTreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`;
           
 //           // FIX: Removed 'User-Agent' header which is forbidden by browsers
 //           const geoRes = await axios.get(reverseGeoUrl);
@@ -284,8 +284,8 @@
 //               ...prev.address,
 //               // OSM 'house_number' -> doorNo
 //               doorNo: addr.house_number || prev.address.doorNo,
-//               // OSM 'road' -> street
-//               street: addr.road || prev.address.street,
+//               // OSM 'road' -> sTreet
+//               sTreet: addr.road || prev.address.sTreet,
 //               // OSM 'suburb' or 'neighbourhood' -> locality
 //               locality: addr.suburb || addr.neighbourhood || prev.address.locality,
 //               // OSM 'city' or 'town' or 'village' -> city
@@ -573,7 +573,7 @@
               
 //               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 //                 <InputField label="Door / House No." value={formProfile.address.doorNo} onChange={(e) => handleAddressChange("doorNo", e.target.value)} placeholder="12-B" className="md:col-span-1" />
-//                 <InputField label="Street" value={formProfile.address.street} onChange={(e) => handleAddressChange("street", e.target.value)} placeholder="Baker Street" className="md:col-span-2" autoComplete="address-line1" />
+//                 <InputField label="STreet" value={formProfile.address.sTreet} onChange={(e) => handleAddressChange("sTreet", e.target.value)} placeholder="Baker STreet" className="md:col-span-2" autoComplete="address-line1" />
 //                 <InputField label="Locality" value={formProfile.address.locality} onChange={(e) => handleAddressChange("locality", e.target.value)} placeholder="Central" />
 //                 <InputField label="City" value={formProfile.address.city} onChange={(e) => handleAddressChange("city", e.target.value)} error={fieldErrors["address.city"]} autoComplete="address-level2" />
 //                 <InputField label="State" value={formProfile.address.state} onChange={(e) => handleAddressChange("state", e.target.value)} autoComplete="address-level1" />
@@ -613,16 +613,26 @@ import { FormEvent, ChangeEvent, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import axiosInstance from "@/lib/axiosinstance";
-import { COUNTRY_CODES, MOBILE_NUMBER_LENGTH } from "@/lib/profile-validation";
+import {
+  COUNTRY_CODES,
+  getPhoneNumberHelperText,
+  getPhoneNumberMaxLength,
+  getPhoneNumberPlaceholder,
+  validateMobilePhone,
+} from "@/lib/profile-validation";
 import { PROFILE_COMPLETION_UPDATED_EVENT } from "@/lib/use-profile-completion-status";
-import { USER_IDENTITY_UPDATED_EVENT } from "@/lib/use-user-identity";
+import {
+  USER_IDENTITY_UPDATED_EVENT,
+  useUserIdentity,
+} from "@/lib/use-user-identity";
 import { useAuthStore } from "@/lib/zustand";
 import { Card, CardContent } from "@/components/ui/card";
-import { User, Phone, Loader2 } from "lucide-react";
+import { User, Phone, Loader2, Mail } from "lucide-react";
 
 export default function ProfileSetupPage() {
   const router = useRouter();
   const storeUserId = useAuthStore((state) => state.userId);
+  const { email } = useUserIdentity();
 
   const [fullName, setFullName] = useState("");
   const [phoneCountryCode, setPhoneCountryCode] = useState("+44");
@@ -647,9 +657,20 @@ export default function ProfileSetupPage() {
   }, [storeUserId]);
 
   const handlePhoneNumberChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const digitsOnly = event.target.value.replace(/\D/g, "").slice(0, MOBILE_NUMBER_LENGTH);
+    const digitsOnly = event.target.value
+      .replace(/\D/g, "")
+      .slice(0, getPhoneNumberMaxLength(phoneCountryCode));
     setPhoneNumber(digitsOnly);
   };
+
+  const handlePhoneCountryCodeChange = (value: string) => {
+    setPhoneCountryCode(value);
+    setPhoneNumber((current) => current.slice(0, getPhoneNumberMaxLength(value)));
+  };
+
+  const selectedPhoneMaxLength = getPhoneNumberMaxLength(phoneCountryCode);
+  const selectedPhonePlaceholder = getPhoneNumberPlaceholder(phoneCountryCode);
+  const selectedPhoneHelperText = getPhoneNumberHelperText(phoneCountryCode);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -659,18 +680,16 @@ export default function ProfileSetupPage() {
       return;
     }
 
-    if (!phoneNumber.trim()) {
-      toast.error("Phone number is required");
-      return;
-    }
+    const phoneValidation = validateMobilePhone(phoneCountryCode, phoneNumber, {
+      label: "Phone number",
+    });
 
-    if (phoneNumber.length !== MOBILE_NUMBER_LENGTH) {
-      toast.error(`Phone number must be exactly ${MOBILE_NUMBER_LENGTH} digits`);
-      return;
-    }
-
-    if (!phoneCountryCode.trim()) {
-      toast.error("Country code is required");
+    if (!phoneValidation.isValid) {
+      toast.error(
+        phoneValidation.numberError ||
+          phoneValidation.countryCodeError ||
+          "Please enter a valid phone number"
+      );
       return;
     }
 
@@ -685,8 +704,8 @@ export default function ProfileSetupPage() {
       await axiosInstance.put(`/profile/${resolvedUserId}`, {
         fullName,
         phone: {
-          countryCode: phoneCountryCode,
-          number: phoneNumber,
+          countryCode: phoneValidation.sanitizedCountryCode,
+          number: phoneValidation.sanitizedNumber,
         },
       });
 
@@ -726,11 +745,10 @@ export default function ProfileSetupPage() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
-
-            {/* Name */}
+            {/* Full Name */}
             <div className="space-y-1">
               <label className="text-sm font-medium text-gray-700">
-                 Name
+                Full Name <span className="text-red-500">*</span>
               </label>
 
               <div className="relative">
@@ -741,6 +759,7 @@ export default function ProfileSetupPage() {
                   onChange={(e: ChangeEvent<HTMLInputElement>) =>
                     setFullName(e.target.value)
                   }
+                  required
                   placeholder="John Doe"
                   className="w-full pl-10 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ring-blue-100 focus:border-blue-500 transition"
                 />
@@ -757,7 +776,7 @@ export default function ProfileSetupPage() {
                 <select
                   value={phoneCountryCode}
                   onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-                    setPhoneCountryCode(e.target.value)
+                    handlePhoneCountryCodeChange(e.target.value)
                   }
                   className="w-28 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ring-blue-100 focus:border-blue-500 transition bg-white"
                 >
@@ -777,18 +796,36 @@ export default function ProfileSetupPage() {
                   <input
                     value={phoneNumber}
                     onChange={handlePhoneNumberChange}
-                    placeholder="7123456789"
+                    placeholder={selectedPhonePlaceholder}
                     type="tel"
                     inputMode="numeric"
-                    maxLength={MOBILE_NUMBER_LENGTH}
-                    pattern={`\\d{${MOBILE_NUMBER_LENGTH}}`}
+                    maxLength={selectedPhoneMaxLength}
                     className="w-full pl-10 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 ring-blue-100 focus:border-blue-500 transition"
                   />
                 </div>
               </div>
               <p className="text-xs text-gray-500">
-                Enter exactly {MOBILE_NUMBER_LENGTH} digits.
+                {selectedPhoneHelperText}
               </p>
+            </div>
+
+            {/* Email */}
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">
+                Email
+              </label>
+
+              <div className="relative">
+                <Mail className="absolute left-3 top-3.5 h-4 w-4 text-gray-400" />
+
+                <input
+                  value={email}
+                  readOnly
+                  disabled
+                  placeholder="Email"
+                  className="w-full cursor-not-allowed rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 pl-10 text-sm text-slate-500"
+                />
+              </div>
             </div>
 
             {/* Save Button */}

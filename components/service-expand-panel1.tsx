@@ -212,6 +212,8 @@ import { motion } from "framer-motion"
 import { ClientLogin } from "@/components/clientloginform"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
+import { useProject } from "@/app/context/ProjectContext"
+import { useServiceSelectionStore } from "@/lib/zustand"
 
 
 /* ================= TYPES ================= */
@@ -244,21 +246,6 @@ interface ServiceExpandPanelProps {
   mobile?: boolean
 }
 
-/* ================= GRID UTILS ================= */
-
-type GridCell = {
-  active: boolean
-  delay: number
-  duration: number
-}
-
-const generateGrid = (): GridCell[] =>
-  Array.from({ length: 18 }).map(() => ({
-    active: Math.random() > 0.7,
-    delay: Math.random() * 2,
-    duration: 1.4 + Math.random() * 2,
-  }))
-
 /* ================= COMPONENT ================= */
 
 export default function ServiceExpandPanel({
@@ -271,14 +258,32 @@ export default function ServiceExpandPanel({
 }: ServiceExpandPanelProps) {
   const [showLogin, setShowLogin] = useState(false)
   const router = useRouter()
-  const [gridCells, setGridCells] = useState<GridCell[]>(generateGrid())
+  const { updateSection } = useProject()
+  const setServiceSelection = useServiceSelectionStore((state) => state.setSelection)
   const panelRef = useRef<HTMLDivElement>(null)
 
-  useEffect(() => {
-    if (isExpanded) {
-      setGridCells(generateGrid())
+  const handleSelectAndApply = () => {
+    const nextSelection = {
+      serviceId: service.id,
+      parentServiceId: service.id,
+      subServiceId: undefined,
+      serviceTitle: service.title,
+      plan: service.title,
+      category: service.label,
+      description: service.description,
+      image: service.image,
+      pricingPlan: undefined,
+      pricingPlanDescription: undefined,
+      price: undefined,
+      initialCharge: undefined,
+      subsequentCharge: undefined,
     }
-  }, [isExpanded])
+
+    updateSection("service", nextSelection)
+    setServiceSelection(nextSelection)
+
+    router.push("/dashboard?stage=plans")
+  }
 
   useEffect(() => {
     if (!isExpanded) return
@@ -475,7 +480,7 @@ export default function ServiceExpandPanel({
 
               <div className="mt-auto">
                 <button
-                  onClick={() => router.push("/dashboard?stage=payment")}
+                  onClick={handleSelectAndApply}
                   className={`
     ${service.id === "Service-01" ? "fixed bottom-6 z-50" : ""}
     bg-blue-500 hover:bg-blue-400
