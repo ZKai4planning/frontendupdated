@@ -35,6 +35,7 @@ import { useResolvedServiceSelection } from "@/lib/use-service-selection"
 import { buildServiceCartPayload, postServiceCart } from "@/lib/service-cart"
 import axiosInstance from "@/lib/axiosinstance"
 import { BorderBeam } from "@/components/ui/border-beam"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { ApplicantPropertyStepContent } from "@/components/dashboard-steps/eligibility/ApplicantPropertyStepContent"
 import { WorksMaterialsStepContent } from "@/components/dashboard-steps/eligibility/WorksMaterialsStepContent"
 import { SiteConstraintsStepContent } from "@/components/dashboard-steps/eligibility/SiteConstraintsStepContent"
@@ -64,19 +65,63 @@ type EligibilityAssetsContextValue = {
   setSignaturePreviewUrl: React.Dispatch<React.SetStateAction<string | null>>
 }
 
+type EligibilityAgentRequestType = "ask-agent" | "action" | "completion-review"
+type EligibilityAgentResponseMode = "info" | "yes-no"
+
 type EligibilityAgentSidebarState = {
   id: string
   fieldLabel: string
   message?: string
-  requestType: "ask-agent" | "action" | "completion-review"
-  responseMode: "info" | "yes-no"
+  requestType: EligibilityAgentRequestType
+  responseMode: EligibilityAgentResponseMode
   missingFields?: string[]
+  consumesUsage?: boolean
 } | null
+
+type EligibilityAskAgentUsageRecord = {
+  count: number
+  lastUsedAt: string
+}
+
+type EligibilityAskAgentUsageHistoryEntry = {
+  id: string
+  fieldLabel: string
+  message?: string
+  requestType: Exclude<EligibilityAgentRequestType, "completion-review">
+  usedAt: string
+}
+
+type EligibilityAskAgentUsageState = {
+  usedCount: number
+  questionUsageMap: Record<string, EligibilityAskAgentUsageRecord>
+  history: EligibilityAskAgentUsageHistoryEntry[]
+}
+
+type EligibilityAskAgentNotice = {
+  id: string
+  tone: "info" | "warning"
+  title: string
+  message: string
+  fieldLabel?: string
+}
 
 type EligibilityAgentContextValue = {
   agentSidebar: EligibilityAgentSidebarState
-  showAgentSidebar: (payload: NonNullable<EligibilityAgentSidebarState>) => void
+  showAgentSidebar: (payload: NonNullable<EligibilityAgentSidebarState>) => boolean
   hideAgentSidebar: () => void
+  maxAskAgentUses: number
+  usedAskAgentCount: number
+  remainingAskAgentUses: number
+  hasRemainingAskAgentUses: boolean
+  totalAskAgentTouchpoints: number
+  askAgentHistory: EligibilityAskAgentUsageHistoryEntry[]
+  registerAskAgentTouchpoint: (fieldLabel: string) => void
+  getAskAgentUsageForQuestion: (fieldLabel: string) => EligibilityAskAgentUsageRecord | undefined
+  recordAskAgentUsage: (
+    entry: Omit<EligibilityAskAgentUsageHistoryEntry, "id" | "usedAt">
+  ) => boolean
+  notifyAskAgentLimitReached: (fieldLabel?: string) => void
+  askAgentUsageNotice: EligibilityAskAgentNotice | null
 }
 
 const DEFAULT_ELIGIBILITY_TOOLTIP = ""
@@ -98,6 +143,12 @@ const SELECTED_PROJECT_STAGE_STORAGE_KEY = "selectedProjectStageId"
 const DASHBOARD_ELIGIBILITY_SUMMARY_STORAGE_PREFIX = "dashboardEligibilitySummary:"
 const MAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024
 const MAX_UPLOAD_FILE_SIZE_LABEL = "10 MB"
+const ASK_AGENT_USAGE_LIMIT = Number.parseInt(
+  process.env.NEXT_PUBLIC_ASK_AGENT_USAGE_LIMIT ?? "10",
+  10
+)
+const ASK_AGENT_USAGE_STORAGE_PREFIX = "eligibilityAskAgentUsage:"
+const ASK_AGENT_HISTORY_LIMIT = 12
 const POSTCODE_AUTOCOMPLETE_ENDPOINT =
   process.env.NEXT_PUBLIC_POSTCODE_AUTOCOMPLETE_ENDPOINT ??
   "http://localhost:8000/api/v1/ds02/address/autocomplete"
@@ -109,6 +160,43 @@ const POSTCODE_LOOKUP_ENDPOINT =
 const POSTCODE_LOOKUP_QUERY_PARAM =
   process.env.NEXT_PUBLIC_POSTCODE_LOOKUP_QUERY_PARAM ?? "q"
 const FULL_UK_POSTCODE_PATTERN = /^([A-Z]{1,2}\d[A-Z\d]?|GIR)\s*\d[A-Z]{2}$/i
+
+const KNOWN_ELIGIBILITY_AGENT_TOUCHPOINTS = [
+  "Planning Reference Number *",
+  "Property Type",
+  "Ownership Status",
+  "Are you planning any building works?",
+  "Has the property already been extended before?",
+  "Will occupants share kitchen/bathroom?",
+  "Will rooms be rented individually?",
+  "Is there a communal kitchen?",
+  "Description of Proposed Works",
+  "Need help with dimensions?",
+  "Wall Materials",
+  "Roof Materials",
+  "Materials match existing?",
+  "Need help with location plan?",
+  "Need help with site plan?",
+  "Need help with elevations?",
+  "Need help with site photographs?",
+  "Need help with additional drawings?",
+  "Conservation Area or Near Listed Building?",
+  "Trees within falling distance of works?",
+  "Need help with Tree report?",
+  "Is the site in Flood Zone 2 or 3?",
+  "Any known contamination on site?",
+  "Need help with flood risk assessment?",
+  "Do you currently have smoke alarms installed?",
+  "Do you have a valid Gas Safety Certificate?",
+  "Do you have a valid Electrical Report (EICR)?",
+  "Energy Performance Certificate (EPC) available?",
+  "Water Supply",
+  "Sewage / Drainage",
+  "Surface Water Drainage",
+  "Existing Waste Arrangements",
+  "Renewable energy installations proposed?",
+  "Additional Consents",
+] as const
 
 const EligibilityStepContext = React.createContext<Step>(1)
 const EligibilityAssetsContext = React.createContext<EligibilityAssetsContextValue | null>(null)
@@ -214,8 +302,9 @@ const createAgentSidebarPayload = (
   fieldLabel: string,
   message?: string,
   config?: {
-    requestType?: "ask-agent" | "action"
-    responseMode?: "info" | "yes-no"
+    requestType?: EligibilityAgentRequestType
+    responseMode?: EligibilityAgentResponseMode
+    consumesUsage?: boolean
   }
 ) => ({
   id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -223,6 +312,9 @@ const createAgentSidebarPayload = (
   message,
   requestType: config?.requestType ?? "ask-agent",
   responseMode: config?.responseMode ?? "info",
+  consumesUsage:
+    config?.consumesUsage ??
+    ((config?.requestType ?? "ask-agent") === "completion-review" ? false : true),
 })
 
 const shouldShowAgentActionUi = (label: string) =>
@@ -508,6 +600,102 @@ const extractProjectId = (payload: unknown): string | null => {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value)
+
+const createEmptyAskAgentUsageState = (): EligibilityAskAgentUsageState => ({
+  usedCount: 0,
+  questionUsageMap: {},
+  history: [],
+})
+
+const normalizeAskAgentUsageState = (value: unknown): EligibilityAskAgentUsageState => {
+  if (!isRecord(value)) {
+    return createEmptyAskAgentUsageState()
+  }
+
+  const usedCount = typeof value.usedCount === "number" && value.usedCount >= 0
+    ? value.usedCount
+    : 0
+
+  const questionUsageMap = isRecord(value.questionUsageMap)
+    ? Object.entries(value.questionUsageMap).reduce<Record<string, EligibilityAskAgentUsageRecord>>(
+        (accumulator, [fieldLabel, entry]) => {
+          if (!isRecord(entry)) return accumulator
+
+          const count = typeof entry.count === "number" && entry.count >= 0 ? entry.count : 0
+          const lastUsedAt = typeof entry.lastUsedAt === "string" ? entry.lastUsedAt : ""
+
+          if (!fieldLabel.trim() || count < 1 || !lastUsedAt.trim()) {
+            return accumulator
+          }
+
+          accumulator[fieldLabel] = {
+            count,
+            lastUsedAt,
+          }
+          return accumulator
+        },
+        {}
+      )
+    : {}
+
+  const history = Array.isArray(value.history)
+    ? value.history.reduce<EligibilityAskAgentUsageHistoryEntry[]>((accumulator, entry) => {
+        if (!isRecord(entry)) return accumulator
+
+        const fieldLabel = typeof entry.fieldLabel === "string" ? entry.fieldLabel : ""
+        const usedAt = typeof entry.usedAt === "string" ? entry.usedAt : ""
+        const requestType =
+          entry.requestType === "ask-agent" || entry.requestType === "action"
+            ? entry.requestType
+            : null
+
+        if (!fieldLabel.trim() || !usedAt.trim() || !requestType) {
+          return accumulator
+        }
+
+        accumulator.push({
+          id:
+            typeof entry.id === "string" && entry.id.trim()
+              ? entry.id
+              : `${usedAt}-${fieldLabel}`,
+          fieldLabel,
+          message: typeof entry.message === "string" ? entry.message : undefined,
+          requestType,
+          usedAt,
+        })
+        return accumulator
+      }, [])
+    : []
+
+  return {
+    usedCount,
+    questionUsageMap,
+    history,
+  }
+}
+
+const formatAskAgentRelativeTime = (value: string) => {
+  const timestamp = new Date(value)
+  if (Number.isNaN(timestamp.getTime())) return "just now"
+
+  const diffMs = timestamp.getTime() - Date.now()
+  const diffMinutes = Math.round(diffMs / (1000 * 60))
+
+  if (Math.abs(diffMinutes) < 1) return "just now"
+
+  const formatter = new Intl.RelativeTimeFormat("en", { numeric: "auto" })
+  if (Math.abs(diffMinutes) < 60) {
+    return formatter.format(diffMinutes, "minute")
+  }
+
+  const diffHours = Math.round(diffMinutes / 60)
+  if (Math.abs(diffHours) < 24) {
+    return formatter.format(diffHours, "hour")
+  }
+
+  const diffDays = Math.round(diffHours / 24)
+  return formatter.format(diffDays, "day")
+}
 
 const unwrapEligibilityRecord = (payload: unknown): Record<string, unknown> | null => {
   if (Array.isArray(payload)) {
@@ -2658,6 +2846,180 @@ function ConsultationTrigger({
   )
 }
 
+
+function AskAgentUsageSummaryButton({
+  maxAskAgentUses,
+  usedAskAgentCount,
+  remainingAskAgentUses,
+  totalAskAgentTouchpoints,
+  askAgentHistory,
+}: {
+  maxAskAgentUses: number
+  usedAskAgentCount: number
+  remainingAskAgentUses: number
+  totalAskAgentTouchpoints: number
+  askAgentHistory: EligibilityAskAgentUsageHistoryEntry[]
+}) {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            className="flex items-center gap-3 rounded-2xl border border-white/10 bg-[#16213a]/95 px-4 py-2 text-white shadow-[0_18px_45px_rgba(5,10,25,0.28)] backdrop-blur-sm transition hover:border-cyan-400/40 hover:bg-[#1a2744]"
+            aria-label="Ask Agent Z usage summary"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#0e1830] text-cyan-100 ring-1 ring-white/10">
+              <Bot className="h-5 w-5" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-semibold text-white">
+                Ask Agent Z {usedAskAgentCount}/{maxAskAgentUses}
+              </p>
+              <p className="text-[11px] text-slate-300">
+                {remainingAskAgentUses} remaining / {totalAskAgentTouchpoints} available
+              </p>
+            </div>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent
+          side="bottom"
+          align="end"
+          sideOffset={10}
+          className="w-[320px] rounded-[24px] border border-white/10 bg-[linear-gradient(180deg,rgba(20,28,49,0.98),rgba(12,18,34,0.98))] p-0 text-white shadow-[0_30px_70px_rgba(4,8,20,0.55)] backdrop-blur-xl"
+        >
+          <div className="p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">
+              Ask Agent Z
+            </p>
+            <h3 className="mt-2 text-lg font-semibold text-white">
+              {usedAskAgentCount} / {maxAskAgentUses} used
+            </h3>
+            <p className="mt-1 text-sm text-slate-300">
+              {remainingAskAgentUses > 0
+                ? `${remainingAskAgentUses} assists remaining for this project`
+                : "Limit reached for this project"}
+            </p>
+
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-white/8 bg-[#0f1a32] px-3 py-3 text-white shadow-inner shadow-black/20">
+                <p className="text-2xl font-semibold">{totalAskAgentTouchpoints}</p>
+                <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-slate-300">Available</p>
+              </div>
+              <div className="rounded-2xl border border-white/10 bg-white/6 px-3 py-3">
+                <p className="text-2xl font-semibold text-white">{remainingAskAgentUses}</p>
+                <p className="mt-1 text-[11px] uppercase tracking-[0.12em] text-slate-300">Remaining</p>
+              </div>
+            </div>
+
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/10">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  remainingAskAgentUses === 0
+                    ? "bg-red-400"
+                    : remainingAskAgentUses <= 2
+                      ? "bg-amber-400"
+                      : "bg-gradient-to-r from-cyan-400 to-blue-500"
+                }`}
+                style={{ width: `${Math.min(100, (usedAskAgentCount / Math.max(maxAskAgentUses, 1)) * 100)}%` }}
+              />
+            </div>
+
+            <div className="mt-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-white">Recent usage</p>
+                <p className="text-xs text-slate-400">
+                  {askAgentHistory.length === 0 ? "No questions used yet" : "Latest questions"}
+                </p>
+              </div>
+              <div className="mt-3 max-h-56 space-y-2 overflow-y-auto pr-1">
+                {askAgentHistory.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 px-3 py-3 text-sm text-slate-300">
+                    Usage history will appear here after the customer clicks Ask Agent Z.
+                  </div>
+                ) : (
+                  askAgentHistory.slice(0, 5).map((entry, index) => (
+                    <div
+                      key={entry.id}
+                      className="rounded-2xl border border-white/10 bg-white/6 px-3 py-3"
+                    >
+                      <p className="text-sm font-medium text-white">
+                        {index + 1}. {entry.fieldLabel}
+                      </p>
+                      <p className="mt-1 text-xs text-slate-300">
+                        {entry.requestType === "action" ? "Action assist" : "Question assist"} /{" "}
+                        {formatAskAgentRelativeTime(entry.usedAt)}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
+
+function InlineAskAgentUsageNotice({
+  fieldLabel,
+  className = "absolute -top-3 right-0 z-20",
+}: {
+  fieldLabel: string
+  className?: string
+}) {
+  const { askAgentUsageNotice } = useEligibilityAgent()
+  const notice =
+    askAgentUsageNotice && askAgentUsageNotice.fieldLabel === fieldLabel
+      ? askAgentUsageNotice
+      : null
+
+  if (!notice) return null
+
+  return (
+    <div className={className}>
+      <TooltipProvider>
+        <Tooltip open>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              className={`pointer-events-auto inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold shadow-lg ${
+                notice.tone === "warning"
+                  ? "border-amber-300 bg-amber-50 text-amber-900"
+                  : "border-blue-200 bg-white text-blue-700"
+              }`}
+              aria-label={notice.title}
+            >
+              {notice.tone === "warning" ? (
+                <AlertCircle className="h-3.5 w-3.5" />
+              ) : (
+                <Info className="h-3.5 w-3.5" />
+              )}
+              <span>{notice.title.replace("Ask Agent Z used: ", "")}</span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent
+            side="top"
+            align="end"
+            sideOffset={10}
+            className={`max-w-xs rounded-2xl border px-4 py-3 text-xs shadow-2xl ${
+              notice.tone === "warning"
+                ? "border-amber-300 bg-amber-50 text-amber-950"
+                : "border-blue-200 bg-slate-950 text-white"
+            }`}
+          >
+            <div className="space-y-1">
+              <p className="font-semibold">{notice.title}</p>
+              <p>{notice.message}</p>
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    </div>
+  )
+}
+
 function MissingUploadDecision({
   fieldLabel,
   prompt,
@@ -2674,10 +3036,25 @@ function MissingUploadDecision({
   embedded?: boolean
 }) {
   const { data, updateSection } = useProject()
-  const { showAgentSidebar } = useEligibilityAgent()
+  const {
+    showAgentSidebar,
+    hasRemainingAskAgentUses,
+    notifyAskAgentLimitReached,
+    registerAskAgentTouchpoint,
+  } = useEligibilityAgent()
   const selectedValue = asStringValue(data.eligibility?.formData?.[fieldLabel])
 
+  useEffect(() => {
+    if (!triggerAgent) return
+    registerAskAgentTouchpoint(fieldLabel)
+  }, [fieldLabel, registerAskAgentTouchpoint, triggerAgent])
+
   const handleSelect = (value: "Yes" | "No") => {
+    if (value === "Yes" && triggerAgent && !hasRemainingAskAgentUses) {
+      notifyAskAgentLimitReached(fieldLabel)
+      return
+    }
+
     updateSection("eligibility", {
       formData: {
         ...(data.eligibility?.formData || {}),
@@ -2695,6 +3072,7 @@ function MissingUploadDecision({
         createAgentSidebarPayload(fieldLabel, message, {
           requestType: "ask-agent",
           responseMode: "info",
+          consumesUsage: value === "Yes",
         })
       )
     }
@@ -2704,10 +3082,11 @@ function MissingUploadDecision({
     <div
       className={
         embedded
-          ? ""
-          : "mt-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3"
+          ? "relative"
+          : "relative mt-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3"
       }
     >
+      <InlineAskAgentUsageNotice fieldLabel={fieldLabel} />
       <p className={`text-xs font-medium ${embedded ? "text-amber-900" : "text-blue-900"}`}>
         {prompt}
       </p>
@@ -2717,6 +3096,7 @@ function MissingUploadDecision({
             key={option}
             type="button"
             onClick={() => handleSelect(option)}
+            disabled={option === "Yes" && triggerAgent && !hasRemainingAskAgentUses}
             className={`rounded-xl border px-4 py-2 text-sm font-medium transition-all ${
               selectedValue === option
                 ? embedded
@@ -2817,6 +3197,7 @@ function AgentActionButton({
   agentMessage,
   agentRequestType = "action",
   agentResponseMode = "info",
+  agentUsageHandledExternally = false,
 }: {
   label: string
   onClick: () => void
@@ -2824,32 +3205,72 @@ function AgentActionButton({
   className?: string
   agentFieldLabel?: string
   agentMessage?: string
-  agentRequestType?: "ask-agent" | "action"
-  agentResponseMode?: "info" | "yes-no"
+  agentRequestType?: Exclude<EligibilityAgentRequestType, "completion-review">
+  agentResponseMode?: EligibilityAgentResponseMode
+  agentUsageHandledExternally?: boolean
 }) {
-  const { showAgentSidebar } = useEligibilityAgent()
+  const {
+    showAgentSidebar,
+    hasRemainingAskAgentUses,
+    recordAskAgentUsage,
+    notifyAskAgentLimitReached,
+    registerAskAgentTouchpoint,
+  } = useEligibilityAgent()
+  const isCountableAgentAction =
+    !agentUsageHandledExternally &&
+    (
+      Boolean(agentFieldLabel) ||
+      label.trim().toLowerCase().includes("agent z") ||
+      Boolean(agentMessage?.toLowerCase().includes("agent z"))
+    )
+
+  useEffect(() => {
+    if (!isCountableAgentAction) return
+    registerAskAgentTouchpoint(agentFieldLabel ?? label)
+  }, [agentFieldLabel, isCountableAgentAction, label, registerAskAgentTouchpoint])
 
   return (
-    <button
-      type="button"
-      onClick={() => {
-        onClick()
+    <div className={className === "mt-3" ? "relative mt-3" : "relative"}>
+      {isCountableAgentAction && (
+        <InlineAskAgentUsageNotice fieldLabel={agentFieldLabel ?? label} />
+      )}
+      <button
+        type="button"
+        onClick={() => {
+          if (isCountableAgentAction && !hasRemainingAskAgentUses) {
+            notifyAskAgentLimitReached(agentFieldLabel ?? label)
+            return
+          }
 
-        if (agentFieldLabel) {
-          showAgentSidebar(
-            createAgentSidebarPayload(agentFieldLabel, agentMessage, {
+          onClick()
+
+          if (agentFieldLabel) {
+            showAgentSidebar(
+              createAgentSidebarPayload(agentFieldLabel, agentMessage, {
+                requestType: agentRequestType,
+                responseMode: agentResponseMode,
+              })
+            )
+            return
+          }
+
+          if (isCountableAgentAction) {
+            recordAskAgentUsage({
+              fieldLabel: label,
+              message: agentMessage,
               requestType: agentRequestType,
-              responseMode: agentResponseMode,
             })
-          )
-        }
-      }}
-      disabled={disabled}
-      className={`eligibility-agent-button inline-flex items-center justify-center rounded-xl border border-blue-900/60 bg-gradient-to-r from-slate-800/92 via-[#1f3d9a]/86 to-blue-800/84 px-3 py-2 text-xs font-semibold text-white transition-all hover:from-slate-800 hover:via-[#1d388f]/92 hover:to-blue-800/90 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-none disabled:bg-slate-100 disabled:text-slate-400 ${className}`}
-    >
-      <span className="relative z-10">{label}</span>
-      {!disabled && <EligibilityAgentMovingBorder size={54} />}
-    </button>
+          }
+        }}
+        disabled={disabled || (isCountableAgentAction && !hasRemainingAskAgentUses)}
+        className={`eligibility-agent-button inline-flex items-center justify-center rounded-xl border border-blue-900/60 bg-gradient-to-r from-slate-800/92 via-[#1f3d9a]/86 to-blue-800/84 px-3 py-2 text-xs font-semibold text-white transition-all hover:from-slate-800 hover:via-[#1d388f]/92 hover:to-blue-800/90 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-none disabled:bg-slate-100 disabled:text-slate-400 ${className}`}
+      >
+        <span className="relative z-10">{label}</span>
+        {!disabled && (!isCountableAgentAction || hasRemainingAskAgentUses) && (
+          <EligibilityAgentMovingBorder size={54} />
+        )}
+      </button>
+    </div>
   )
 }
 
@@ -3658,14 +4079,32 @@ function CheckboxGroup({
   >
 }) {
   const { data, updateSection } = useProject()
-  const { showAgentSidebar } = useEligibilityAgent()
+  const {
+    showAgentSidebar,
+    hasRemainingAskAgentUses,
+    notifyAskAgentLimitReached,
+    registerAskAgentTouchpoint,
+  } = useEligibilityAgent()
   const selected: string[] = Array.isArray(data.eligibility?.formData?.[label])
   ? data.eligibility?.formData?.[label]
   : []
   const fieldId = getFieldId(label)
+  const hasAskAgentOption = options.some(isAgentOptionLabel)
+
+  useEffect(() => {
+    if (!hasAskAgentOption) return
+    registerAskAgentTouchpoint(label)
+  }, [hasAskAgentOption, label, registerAskAgentTouchpoint])
 
 
   const toggle = (option: string) => {
+    const isAgentOption = isAgentOptionLabel(option)
+    const isAlreadySelected = selected.includes(option)
+    if (isAgentOption && !isAlreadySelected && !hasRemainingAskAgentUses) {
+      notifyAskAgentLimitReached(label)
+      return
+    }
+
     const next = selected.includes(option)
       ? selected.filter(o => o !== option)
       : [...selected, option]
@@ -3683,6 +4122,7 @@ function CheckboxGroup({
           {
             requestType: "ask-agent",
             responseMode: shouldAutoApplyYesNoResponse(options) ? "yes-no" : "info",
+            consumesUsage: next.some(isAgentOptionLabel),
           }
         )
       )
@@ -3693,7 +4133,8 @@ function CheckboxGroup({
 
 
   return (
-    <div className="col-span-2" id={fieldId}>
+    <div className="relative col-span-2" id={fieldId}>
+      {hasAskAgentOption && <InlineAskAgentUsageNotice fieldLabel={label} />}
       <FieldLabel
         label={label}
         tooltip={tooltip}
@@ -3713,6 +4154,7 @@ function CheckboxGroup({
               key={o}
               type="button"
               onClick={() => toggle(o)}
+              disabled={isAgentOption && !hasRemainingAskAgentUses && !isSelected}
               className={`${
                 isAgentOption ? "eligibility-agent-button" : ""
               } flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm transition-all ${
@@ -3858,10 +4300,19 @@ function EligibilityCheckPage() {
   const [uploadedFiles, setUploadedFiles] = useState<EligibilityFileMap>({})
   const [signatureFile, setSignatureFile] = useState<File | null>(null)
   const [signaturePreviewUrl, setSignaturePreviewUrl] = useState<string | null>(null)
+  const [askAgentUsage, setAskAgentUsage] = useState<EligibilityAskAgentUsageState>(
+    createEmptyAskAgentUsageState()
+  )
+  const [askAgentUsageNotice, setAskAgentUsageNotice] = useState<EligibilityAskAgentNotice | null>(null)
+  const [registeredAgentTouchpoints, setRegisteredAgentTouchpoints] = useState<string[]>([
+    ...KNOWN_ELIGIBILITY_AGENT_TOUCHPOINTS,
+  ])
   const fetchedEligibilityProjectRef = useRef<string | null>(null)
   const profileAutofillKeyRef = useRef<string | null>(null)
   const latestEligibilityFormDataRef = useRef(savedFormData)
   const formCardRef = useRef<HTMLDivElement | null>(null)
+  const askAgentUsageRef = useRef(askAgentUsage)
+  const previousAskAgentUsageStorageKeyRef = useRef<string | null>(null)
 
   const TOTAL_STEPS = 5
   const declarationCompletionLabels = [
@@ -3884,6 +4335,23 @@ function EligibilityCheckPage() {
     })
   ))
   const isDeclarationsComplete = missingDeclarationFields.length === 0
+  const maxAskAgentUses = Number.isFinite(ASK_AGENT_USAGE_LIMIT) && ASK_AGENT_USAGE_LIMIT > 0
+    ? ASK_AGENT_USAGE_LIMIT
+    : 10
+  const askAgentUsageStorageKey = useMemo(() => {
+    const userScope = userId?.trim() || "anonymous"
+    const projectScope =
+      existingProjectId?.trim() ||
+      existingProjectStageId?.trim() ||
+      routeProjectStageId?.trim() ||
+      "eligibility-draft"
+
+    return `${ASK_AGENT_USAGE_STORAGE_PREFIX}${userScope}:${projectScope}`
+  }, [existingProjectId, existingProjectStageId, routeProjectStageId, userId])
+  const usedAskAgentCount = askAgentUsage.usedCount
+  const remainingAskAgentUses = Math.max(0, maxAskAgentUses - usedAskAgentCount)
+  const hasRemainingAskAgentUses = remainingAskAgentUses > 0
+  const totalAskAgentTouchpoints = registeredAgentTouchpoints.length
 
   const nextStep = () => setStep(prev => (prev < TOTAL_STEPS ? ((prev + 1) as Step) : prev))
   const prevStep = () => setStep(prev => (prev > 1 ? ((prev - 1) as Step) : prev))
@@ -3901,6 +4369,158 @@ function EligibilityCheckPage() {
   useEffect(() => {
     latestEligibilityFormDataRef.current = savedFormData
   }, [savedFormData])
+
+  useEffect(() => {
+    askAgentUsageRef.current = askAgentUsage
+  }, [askAgentUsage])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const previousStorageKey = previousAskAgentUsageStorageKeyRef.current
+    if (
+      previousStorageKey &&
+      previousStorageKey !== askAgentUsageStorageKey &&
+      !window.localStorage.getItem(askAgentUsageStorageKey) &&
+      !window.sessionStorage.getItem(askAgentUsageStorageKey)
+    ) {
+      const serializedCurrentState = JSON.stringify(askAgentUsageRef.current)
+      window.localStorage.setItem(askAgentUsageStorageKey, serializedCurrentState)
+      window.sessionStorage.setItem(askAgentUsageStorageKey, serializedCurrentState)
+    }
+
+    const storedUsageState =
+      window.localStorage.getItem(askAgentUsageStorageKey) ||
+      window.sessionStorage.getItem(askAgentUsageStorageKey)
+
+    if (!storedUsageState) {
+      setAskAgentUsage(createEmptyAskAgentUsageState())
+      previousAskAgentUsageStorageKeyRef.current = askAgentUsageStorageKey
+      return
+    }
+
+    try {
+      setAskAgentUsage(normalizeAskAgentUsageState(JSON.parse(storedUsageState)))
+    } catch {
+      setAskAgentUsage(createEmptyAskAgentUsageState())
+    }
+    previousAskAgentUsageStorageKeyRef.current = askAgentUsageStorageKey
+  }, [askAgentUsageStorageKey])
+
+  useEffect(() => {
+    if (typeof window === "undefined") return
+
+    const serializedUsageState = JSON.stringify(askAgentUsage)
+    window.localStorage.setItem(askAgentUsageStorageKey, serializedUsageState)
+    window.sessionStorage.setItem(askAgentUsageStorageKey, serializedUsageState)
+  }, [askAgentUsage, askAgentUsageStorageKey])
+
+  useEffect(() => {
+    if (!askAgentUsageNotice) return
+
+    const timeoutId = window.setTimeout(() => {
+      setAskAgentUsageNotice((currentNotice) => (
+        currentNotice?.id === askAgentUsageNotice.id ? null : currentNotice
+      ))
+    }, 3000)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [askAgentUsageNotice])
+
+  const notifyAskAgentLimitReached = React.useCallback((fieldLabel?: string) => {
+    setSubmitError(
+      `Ask Agent Z limit reached for this project (${usedAskAgentCount}/${maxAskAgentUses}).`
+    )
+    setAskAgentUsageNotice({
+      id: `limit-${Date.now()}`,
+      tone: "warning",
+      title: "Ask Agent Z limit reached",
+      message: `${usedAskAgentCount}/${maxAskAgentUses} assists used. No assists remaining for this project.`,
+      fieldLabel,
+    })
+  }, [maxAskAgentUses, usedAskAgentCount])
+
+  const registerAskAgentTouchpoint = React.useCallback((fieldLabel: string) => {
+    const normalizedLabel = fieldLabel.trim()
+    if (!normalizedLabel) return
+
+    setRegisteredAgentTouchpoints((currentLabels) => (
+      currentLabels.includes(normalizedLabel)
+        ? currentLabels
+        : [...currentLabels, normalizedLabel]
+    ))
+  }, [])
+
+  const recordAskAgentUsage = React.useCallback((
+    entry: Omit<EligibilityAskAgentUsageHistoryEntry, "id" | "usedAt">
+  ) => {
+    if (askAgentUsageRef.current.usedCount >= maxAskAgentUses) {
+      notifyAskAgentLimitReached(entry.fieldLabel)
+      return false
+    }
+
+    const fieldLabel = entry.fieldLabel.trim()
+    if (!fieldLabel) {
+      return false
+    }
+
+    const usedAt = new Date().toISOString()
+    const historyEntry: EligibilityAskAgentUsageHistoryEntry = {
+      id: `${usedAt}-${Math.random().toString(36).slice(2, 8)}`,
+      fieldLabel,
+      message: entry.message,
+      requestType: entry.requestType,
+      usedAt,
+    }
+
+    const nextUsageState: EligibilityAskAgentUsageState = {
+      usedCount: askAgentUsageRef.current.usedCount + 1,
+      questionUsageMap: {
+        ...askAgentUsageRef.current.questionUsageMap,
+        [fieldLabel]: {
+          count: (askAgentUsageRef.current.questionUsageMap[fieldLabel]?.count ?? 0) + 1,
+          lastUsedAt: usedAt,
+        },
+      },
+      history: [historyEntry, ...askAgentUsageRef.current.history].slice(0, ASK_AGENT_HISTORY_LIMIT),
+    }
+
+    askAgentUsageRef.current = nextUsageState
+    setAskAgentUsage(nextUsageState)
+    setSubmitError(null)
+    const remainingUses = Math.max(0, maxAskAgentUses - nextUsageState.usedCount)
+    setAskAgentUsageNotice({
+      id: historyEntry.id,
+      tone: "info",
+      title: `Ask Agent Z used: ${nextUsageState.usedCount}/${maxAskAgentUses}`,
+      message: `${remainingUses} assist${remainingUses === 1 ? "" : "s"} remaining for this project.`,
+      fieldLabel,
+    })
+    return true
+  }, [maxAskAgentUses, notifyAskAgentLimitReached])
+
+  const openAgentSidebar = React.useCallback((payload: NonNullable<EligibilityAgentSidebarState>) => {
+    if (payload.consumesUsage) {
+      const didRecordUsage = recordAskAgentUsage({
+        fieldLabel: payload.fieldLabel,
+        message: payload.message,
+        requestType: payload.requestType === "completion-review" ? "ask-agent" : payload.requestType,
+      })
+
+      if (!didRecordUsage) {
+        return false
+      }
+    }
+
+    setSubmitError(null)
+    setAgentSidebar(payload)
+    return true
+  }, [recordAskAgentUsage])
+
+  const getAskAgentUsageForQuestion = React.useCallback(
+    (fieldLabel: string) => askAgentUsage.questionUsageMap[fieldLabel],
+    [askAgentUsage.questionUsageMap]
+  )
 
   useEffect(() => {
     if (hasSubmittedEligibility || isReadOnly || hasPersistedEligibilityProgress) {
@@ -4302,7 +4922,7 @@ function EligibilityCheckPage() {
   return (
     <main className="min-h-screen bg-slate-50 px-5 py-8">
       {/* HEADER */}
-      <div className="flex items-start justify-between mb-8">
+      <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Welcome back, {displayName}</h1>
           <p className="text-xl text-slate-600 mt-2">
@@ -4321,19 +4941,29 @@ function EligibilityCheckPage() {
             </span>
           </p>
         </div>
-        <div className="flex items-center gap-3 bg-white rounded-xl border px-4 py-2 shadow-sm">
-          <svg width="40" height="40" viewBox="0 0 40 40" className="-rotate-90">
-            <circle cx="20" cy="20" r="16" fill="none" stroke="#e2e8f0" strokeWidth="4" />
-            <circle
-              cx="20" cy="20" r="16" fill="none" stroke="#2563eb" strokeWidth="4"
-              strokeDasharray={`${2 * Math.PI * 16}`}
-              strokeDashoffset={`${2 * Math.PI * 16 * (1 - progress / 100)}`}
-              strokeLinecap="round"
-            />
-          </svg>
-          <div>
-            <p className="text-xl font-bold text-slate-900 leading-none">{progress}%</p>
-            <p className="text-[10px] text-slate-400 mt-0.5">Journey Progress</p>
+        <div className="flex flex-wrap items-center justify-start gap-3 lg:justify-end">
+          <AskAgentUsageSummaryButton
+            maxAskAgentUses={maxAskAgentUses}
+            usedAskAgentCount={usedAskAgentCount}
+            remainingAskAgentUses={remainingAskAgentUses}
+            totalAskAgentTouchpoints={totalAskAgentTouchpoints}
+            askAgentHistory={askAgentUsage.history}
+          />
+
+          <div className="flex items-center gap-3 rounded-xl border bg-white px-4 py-2 shadow-sm">
+            <svg width="40" height="40" viewBox="0 0 40 40" className="-rotate-90">
+              <circle cx="20" cy="20" r="16" fill="none" stroke="#e2e8f0" strokeWidth="4" />
+              <circle
+                cx="20" cy="20" r="16" fill="none" stroke="#2563eb" strokeWidth="4"
+                strokeDasharray={`${2 * Math.PI * 16}`}
+                strokeDashoffset={`${2 * Math.PI * 16 * (1 - progress / 100)}`}
+                strokeLinecap="round"
+              />
+            </svg>
+            <div>
+              <p className="text-xl font-bold leading-none text-slate-900">{progress}%</p>
+              <p className="mt-0.5 text-[10px] text-slate-400">Journey Progress</p>
+            </div>
           </div>
         </div>
       </div>
@@ -4410,11 +5040,22 @@ function EligibilityCheckPage() {
 
       {/* FORM */}
       <EligibilityStepContext.Provider value={step}>
-        <EligibilityAgentContext.Provider
+      <EligibilityAgentContext.Provider
           value={{
             agentSidebar,
-            showAgentSidebar: (payload) => setAgentSidebar(payload),
+            showAgentSidebar: openAgentSidebar,
             hideAgentSidebar: () => setAgentSidebar(null),
+            maxAskAgentUses,
+            usedAskAgentCount,
+            remainingAskAgentUses,
+            hasRemainingAskAgentUses,
+            totalAskAgentTouchpoints,
+            askAgentHistory: askAgentUsage.history,
+            registerAskAgentTouchpoint,
+            getAskAgentUsageForQuestion,
+            recordAskAgentUsage,
+            notifyAskAgentLimitReached,
+            askAgentUsageNotice,
           }}
         >
         <EligibilityAssetsContext.Provider
@@ -4736,7 +5377,7 @@ function EligibilityEntryCard({
       </h2>
       <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
         Thank you for choosing AI4Planning. Your selected <b>Bronze</b> plan includes
-        10 Agent Z buttons, and you can use them throughout the application.
+        {" "}{ASK_AGENT_USAGE_LIMIT} Agent Z assists, and you can use them throughout the application.
       </p>
       <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
         Your selected service is <span className="font-bold text-slate-800 ">{serviceName}</span>.
@@ -4856,7 +5497,7 @@ function AgenticAssistantCard({
   const quickPointTwo = "Tailored to your council area"
   const quickPointThree = "Helps avoid delays or errors"
   const aiSupportText =
-    "Your subscription includes 15 smart AI buttons designed to support you through every stage of your application journey."
+    `Your subscription includes ${ASK_AGENT_USAGE_LIMIT} Agent Z assists designed to support you through every stage of your application journey.`
   const exploreText =
     "Explore each feature and enjoy your personalised AI experience."
   const beginText = "Click Eligibility Check  to begin."
@@ -5214,10 +5855,20 @@ function Input({
   actionOpensAgentSidebar?: boolean
 }) {
   const { data, updateSection } = useProject()
-  const { showAgentSidebar } = useEligibilityAgent()
+  const {
+    showAgentSidebar,
+    hasRemainingAskAgentUses,
+    recordAskAgentUsage,
+    notifyAskAgentLimitReached,
+    registerAskAgentTouchpoint,
+  } = useEligibilityAgent()
   const value = asStringValue(data.eligibility?.formData?.[label])
   const fieldId = fieldIdOverride ?? getFieldId(label)
   const isPostcodeAutocomplete = autocompleteKind === "postcode"
+  const isAgentAction =
+    Boolean(actionLabel && actionOpensAgentSidebar) ||
+    Boolean(actionLabel?.toLowerCase().includes("agent z")) ||
+    Boolean(actionMessage?.toLowerCase().includes("agent z"))
   const [suggestions, setSuggestions] = useState<AutocompleteSuggestion[]>([])
   const [isAutocompleteOpen, setIsAutocompleteOpen] = useState(false)
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false)
@@ -5382,6 +6033,11 @@ function Input({
   }, [data.eligibility?.location, isPostcodeAutocomplete, updateSection, value])
 
   useEffect(() => {
+    if (!isAgentAction) return
+    registerAskAgentTouchpoint(label)
+  }, [isAgentAction, label, registerAskAgentTouchpoint])
+
+  useEffect(() => {
     if (!isPostcodeAutocomplete) return
 
     const handlePointerDown = (event: MouseEvent) => {
@@ -5425,9 +6081,22 @@ function Input({
   const handleActionClick = () => {
     if (!onAction) return
 
+    if (isAgentAction && !hasRemainingAskAgentUses) {
+      notifyAskAgentLimitReached(label)
+      return
+    }
+
     void (async () => {
       try {
         await onAction()
+
+        if (isAgentAction) {
+          recordAskAgentUsage({
+            fieldLabel: label,
+            message: actionMessage ?? `${actionLabel} requested for ${label}.`,
+            requestType: "action",
+          })
+        }
 
         if (!actionOpensAgentSidebar) {
           return
@@ -5440,6 +6109,7 @@ function Input({
             {
               requestType: "action",
               responseMode: "info",
+              consumesUsage: false,
             }
           )
         )
@@ -5450,7 +6120,8 @@ function Input({
   }
 
   return (
-    <div id={fieldId}>
+    <div className="relative" id={fieldId}>
+      {isAgentAction && <InlineAskAgentUsageNotice fieldLabel={label} />}
       <FieldLabel
         label={label}
         tooltip={tooltip}
@@ -5522,9 +6193,10 @@ function Input({
         {actionLabel && onAction && (
           <AgentActionButton
             label={actionLabel}
-            disabled={actionDisabled}
+            disabled={actionDisabled || (isAgentAction && !hasRemainingAskAgentUses)}
             className="w-full xl:mt-0 xl:w-auto xl:min-w-[110px]"
             onClick={handleActionClick}
+            agentUsageHandledExternally
           />
         )}
       </div>
@@ -5593,14 +6265,26 @@ function SelectField({
   questionNumber?: number
 }) {
   const { data, updateSection } = useProject()
-  const { showAgentSidebar } = useEligibilityAgent()
+  const {
+    showAgentSidebar,
+    hasRemainingAskAgentUses,
+    notifyAskAgentLimitReached,
+    registerAskAgentTouchpoint,
+  } = useEligibilityAgent()
   const value = asStringValue(data.eligibility?.formData?.[label])
   const showAgentButton = isAgentSidebarTriggerValue(value)
   const isAgentValue = isAgentOptionLabel(value)
   const fieldId = getFieldId(label)
+  const hasAskAgentOption = options.some(isAgentOptionLabel)
+
+  useEffect(() => {
+    if (!hasAskAgentOption) return
+    registerAskAgentTouchpoint(label)
+  }, [hasAskAgentOption, label, registerAskAgentTouchpoint])
 
   return (
-    <div id={fieldId}>
+    <div className="relative" id={fieldId}>
+      {hasAskAgentOption && <InlineAskAgentUsageNotice fieldLabel={label} />}
       <FieldLabel
         label={label}
         tooltip={tooltip}
@@ -5612,6 +6296,13 @@ function SelectField({
           value={value}
           onChange={e => {
             const nextValue = e.target.value
+            const nextValueConsumesUsage = isAgentOptionLabel(nextValue)
+
+            if (nextValueConsumesUsage && !hasRemainingAskAgentUses) {
+              notifyAskAgentLimitReached(label)
+              return
+            }
+
             updateSection("eligibility", {
               formData: { ...(data.eligibility?.formData || {}), [label]: nextValue },
             })
@@ -5623,6 +6314,7 @@ function SelectField({
                   {
                     requestType: "ask-agent",
                     responseMode: shouldAutoApplyYesNoResponse(options) ? "yes-no" : "info",
+                    consumesUsage: nextValueConsumesUsage,
                   }
                 )
               )
@@ -5642,6 +6334,7 @@ function SelectField({
               key={o}
               value={o}
               style={getNativeSelectOptionStyle(o)}
+              disabled={isAgentOptionLabel(o) && !hasRemainingAskAgentUses && value !== o}
             >
               {o}
             </option>
@@ -5670,15 +6363,27 @@ function RadioGroupField({
   questionNumber?: number
 }) {
   const { data, updateSection } = useProject()
-  const { showAgentSidebar } = useEligibilityAgent()
+  const {
+    showAgentSidebar,
+    hasRemainingAskAgentUses,
+    notifyAskAgentLimitReached,
+    registerAskAgentTouchpoint,
+  } = useEligibilityAgent()
 
   const selectedRaw = data.eligibility?.formData?.[label]
   const selected = asStringValue(selectedRaw)
   const fieldId = getFieldId(label)
   const showAgentButton = isAgentSidebarTriggerValue(selected)
+  const hasAskAgentOption = options.some(isAgentOptionLabel)
+
+  useEffect(() => {
+    if (!hasAskAgentOption) return
+    registerAskAgentTouchpoint(label)
+  }, [hasAskAgentOption, label, registerAskAgentTouchpoint])
 
   return (
-    <div id={fieldId}>
+    <div className="relative" id={fieldId}>
+      {hasAskAgentOption && <InlineAskAgentUsageNotice fieldLabel={label} />}
       <FieldLabel label={label} tooltip={tooltip} questionNumber={questionNumber} />
 
       <div className="flex flex-wrap gap-2">
@@ -5690,6 +6395,11 @@ function RadioGroupField({
               key={o}
               type="button"
               onClick={() => {
+                if (isAgentOption && !hasRemainingAskAgentUses && selected !== o) {
+                  notifyAskAgentLimitReached(label)
+                  return
+                }
+
                 updateSection("eligibility", {
                   ...(data.eligibility || {}),
                   formData: { ...(data.eligibility?.formData || {}), [label]: o },
@@ -5702,11 +6412,13 @@ function RadioGroupField({
                       {
                         requestType: "ask-agent",
                         responseMode: shouldAutoApplyYesNoResponse(options) ? "yes-no" : "info",
+                        consumesUsage: isAgentOption,
                       }
                     )
                   )
                 }
               }}
+              disabled={isAgentOption && !hasRemainingAskAgentUses && selected !== o}
               className={`${
                 isAgentOption ? "eligibility-agent-button" : ""
               } flex-1 min-w-fit rounded-xl border px-4 py-2 text-sm transition-all ${

@@ -74,6 +74,7 @@ export type EligibilitySharedComponents = {
     agentMessage?: string
     agentRequestType?: "ask-agent" | "action"
     agentResponseMode?: "info" | "yes-no"
+    agentUsageHandledExternally?: boolean
   }>
   FileUploadArea?: React.ComponentType<{
     label: string
