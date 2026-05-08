@@ -1,5 +1,6 @@
 import { LoginHeader } from "@/components/login-header"
 import Footer from "@/components/landingpagefooter"
+import { BackButton } from "@/components/back-button"
 
 const lastUpdated = "March 9, 2026"
 
@@ -10,6 +11,7 @@ export default function CookiePolicyPage() {
 
       <main className="max-w-5xl mx-auto px-6 md:px-10 py-16 space-y-10">
         <section className="space-y-4">
+          <BackButton label="Return" />
           <h1 className="text-4xl md:text-5xl font-bold">Cookie Policy</h1>
           <p className="text-white/70 text-sm">Last updated: {lastUpdated}</p>
           <p className="text-white/75 leading-relaxed">

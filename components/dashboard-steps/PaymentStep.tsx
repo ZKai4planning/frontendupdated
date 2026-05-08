@@ -817,7 +817,7 @@ export default function PaymentUI() {
               </Link>{" "}
               and{" "}
               <Link
-                href="/terms#refund-policy"
+                href="/refund"
                 className="font-medium text-blue-600 hover:text-blue-700"
               >
                 Refund Policy

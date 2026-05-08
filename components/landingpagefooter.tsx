@@ -19,7 +19,7 @@ export default function Footer() {
                 alt="AI4Planning Logo"
                 width={90}
                 height={36}
-                className="rounded-sm"
+                className="rounded-sm h-auto"
                 priority
               />
               <h3 className="text-xl font-semibold tracking-tight">
@@ -133,11 +133,14 @@ export default function Footer() {
             <Link href="/cookie" className="hover:text-white">
               Cookies Policy
             </Link>
-            <Link href="#" className="hover:text-white">
+            <Link href="/privacy" className="hover:text-white">
               Privacy
             </Link>
-            <Link href="#" className="hover:text-white">
+            <Link href="/terms" className="hover:text-white">
               Terms
+            </Link>
+            <Link href="/refund" className="hover:text-white">
+              Refund Policy
             </Link>
             <Link href="/contact" className="hover:text-white">
               Support

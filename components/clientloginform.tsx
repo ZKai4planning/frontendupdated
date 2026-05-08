@@ -193,8 +193,10 @@ export function ClientLogin() {
 
     // const localPart = identifier.slice(0, atIndex)
     const localPart = normalizedEmail.slice(0, atIndex)
-    if (!/^[a-z0-9.]+$/i.test(localPart)) {
-      toast.error("Before @, use only letters, numbers, and periods (.)")
+    if (!/^[a-z0-9._-]+$/i.test(localPart)) {
+      toast.error(
+        "Before @, use only letters, numbers, periods (.), underscores (_), and hyphens (-)"
+      )
       return
     }
 
