@@ -3,6 +3,7 @@
 import { useProject } from "@/app/context/ProjectContext"
 
 import React, { Suspense, useEffect, useMemo, useState, useRef } from "react"
+import { createPortal } from "react-dom"
 import { useRouter, usePathname, useSearchParams, useParams } from "next/navigation"
 import {
   Info,
@@ -160,6 +161,7 @@ const POSTCODE_LOOKUP_ENDPOINT =
 const POSTCODE_LOOKUP_QUERY_PARAM =
   process.env.NEXT_PUBLIC_POSTCODE_LOOKUP_QUERY_PARAM ?? "q"
 const FULL_UK_POSTCODE_PATTERN = /^([A-Z]{1,2}\d[A-Z\d]?|GIR)\s*\d[A-Z]{2}$/i
+const ELIGIBILITY_CONSULTATION_CALENDAR_ID = "eligibility-consultation-calendar"
 
 const ASK_AGENT_USAGE_EXCLUDED_FIELD_LABELS = new Set<string>([
   "Planning Reference Number *",
@@ -185,6 +187,7 @@ const KNOWN_ELIGIBILITY_AGENT_TOUCHPOINTS = [
   "Wall Materials",
   "Roof Materials",
   "Materials match existing?",
+  "How many occupants do you plan to accommodate?",
   "Conservation Area or Near Listed Building?",
   "Trees within falling distance of works?",
   "Is the site in Flood Zone 2 or 3?",
@@ -4970,13 +4973,72 @@ function EligibilityCheckPage() {
         isEligible: true,
         completedAt,
       })
-      window.scrollTo({ top: 0, behavior: "smooth" })
+      window.scrollTo({ top: 0, behavior: "auto" })
     } catch (error) {
       setSubmitError(getEligibilityActionErrorMessage(error, "Unable to submit the eligibility form."))
     } finally {
       setIsAnalyzing(false)
     }
   }
+
+  const scrollToConsultationCalendar = React.useCallback(() => {
+    if (typeof window === "undefined") return
+
+    const scrollToTarget = (attemptsLeft: number) => {
+      const target = document.getElementById(ELIGIBILITY_CONSULTATION_CALENDAR_ID)
+      if (!target) {
+        if (attemptsLeft > 0) {
+          window.setTimeout(() => scrollToTarget(attemptsLeft - 1), 120)
+        }
+        return
+      }
+
+      const scrollRoot = document.getElementById("dashboard-scroll-root")
+      if (scrollRoot) {
+        const rootRect = scrollRoot.getBoundingClientRect()
+        const targetRect = target.getBoundingClientRect()
+        const nextTop = scrollRoot.scrollTop + (targetRect.top - rootRect.top) - 24
+
+        scrollRoot.scrollTo({
+          top: Math.max(0, nextTop),
+          behavior: "smooth",
+        })
+        return
+      }
+
+      target.scrollIntoView({ behavior: "smooth", block: "start" })
+    }
+
+    scrollToTarget(10)
+  }, [])
+
+  useEffect(() => {
+    if (!showEligibilitySuccessModal) return
+
+    const previousBodyOverflow = document.body.style.overflow
+    const previousHtmlOverflow = document.documentElement.style.overflow
+
+    document.body.style.overflow = "hidden"
+    document.documentElement.style.overflow = "hidden"
+    window.scrollTo({ top: 0, behavior: "auto" })
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow
+      document.documentElement.style.overflow = previousHtmlOverflow
+    }
+  }, [showEligibilitySuccessModal])
+
+  useEffect(() => {
+    if (!showVerification || showEligibilitySuccessModal) return
+
+    const timer = window.setTimeout(() => {
+      scrollToConsultationCalendar()
+    }, 120)
+
+    return () => {
+      window.clearTimeout(timer)
+    }
+  }, [scrollToConsultationCalendar, showEligibilitySuccessModal, showVerification])
 
   useEffect(() => {
     if (showVerification || hasSubmittedEligibility) {
@@ -5462,7 +5524,10 @@ function EligibilityCheckPage() {
         <EligibilitySubmissionSuccessModal
           serviceName={selectedServiceAppliedName}
           onClose={() => setShowEligibilitySuccessModal(false)}
-          onScheduleConsultation={() => setShowEligibilitySuccessModal(false)}
+          onScheduleConsultation={() => {
+            setShowEligibilitySuccessModal(false)
+            scrollToConsultationCalendar()
+          }}
           onReviewSubmission={() => {
             setShowEligibilitySuccessModal(false)
             setIsEligibilityFormVisible(true)
@@ -5607,16 +5672,28 @@ function EligibilitySubmissionSuccessModal({
   onScheduleConsultation: () => void
   onReviewSubmission: () => void
 }) {
-  return (
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+
+    return () => setIsMounted(false)
+  }, [])
+
+  if (!isMounted) {
+    return null
+  }
+
+  return createPortal(
     <div
-      className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/70 px-4 py-8 backdrop-blur-sm"
+      className="fixed inset-0 z-[90] flex items-start justify-center overflow-y-auto bg-slate-950/70 px-4 py-4 backdrop-blur-sm sm:items-center sm:py-8"
       onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-label="Eligibility form submitted successfully"
     >
       <div
-        className="relative w-full max-w-2xl overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,26,46,0.98),rgba(10,16,30,0.98))] p-6 text-white shadow-[0_36px_90px_rgba(2,8,20,0.58)] sm:p-8"
+        className="relative my-auto w-full max-w-2xl overflow-y-auto rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,rgba(18,26,46,0.98),rgba(10,16,30,0.98))] p-6 text-white shadow-[0_36px_90px_rgba(2,8,20,0.58)] max-h-[calc(100vh-2rem)] sm:max-h-[calc(100vh-4rem)] sm:p-8"
         onClick={(event) => event.stopPropagation()}
       >
         <button
@@ -5691,7 +5768,8 @@ function EligibilitySubmissionSuccessModal({
           </button> */}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -6722,7 +6800,10 @@ function VerificationCalendar({ disabled = false }: { disabled?: boolean }) {
   const days = [...Array(firstDay - 1).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)]
 
   return (
-    <div className="rounded-2xl overflow-hidden border bg-white shadow-lg">
+    <div
+      id={ELIGIBILITY_CONSULTATION_CALENDAR_ID}
+      className="rounded-2xl overflow-hidden border bg-white shadow-lg"
+    >
       <div className="bg-gradient-to-r from-blue-600 to-blue-500 p-5 text-white">
         <h3 className="text-sm font-semibold">Consultation Calendar</h3>
         <p className="text-xs text-blue-100">15 min planning review with our expert team</p>

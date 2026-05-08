@@ -63,6 +63,7 @@ const DEFAULT_ELIGIBILITY_AGENT_Z_INTRO =
   "No problem, I can help you identify this \u{1F44D}"
 const ELIGIBILITY_AGENT_Z_STANDALONE_RESPONSE_FIELDS = new Set([
   "Has the property already been extended before?",
+  "How many occupants do you plan to accommodate?",
   "Will occupants share kitchen/bathroom?",
   "Will occupants share kitchen and/or bathroom?",
   "Will rooms be rented individually?",
@@ -289,6 +290,9 @@ Party Wall Agreements Required if works affect shared walls or boundaries.
 Conservation Area Consent If the property is in a conservation area.
 Listed Building Consent If the property is listed.
 Environmental Health Approval For large HMOs or properties with previous enforcement history.`,
+  "How many occupants do you plan to accommodate?": `This question asks for the total number of people expected to live in the property once the HMO is occupied.
+Choose the most realistic occupancy level based on the number of bedrooms, the layout, and whether facilities will be shared.
+This helps confirm space standards, shared amenity needs, and whether HMO licensing requirements may apply.`,
 }
 const getEligibilityAgentZDocumentResponse = (fieldLabel: string) =>
   ELIGIBILITY_AGENT_Z_DOCUMENT_RESPONSES[fieldLabel]
@@ -1538,9 +1542,9 @@ export function FloatingAgentWidget({
             status: "done",
           },
         ]
-        const documentResponse = getEligibilityAgentZDocumentResponse(fieldLabel)
-        const finalInsights: AgentInsight[] = documentResponse
-          ? getMessageDrivenAgentInsights(documentResponse)
+        const responseText = getEligibilityAgentZDocumentResponse(fieldLabel)
+        const finalInsights: AgentInsight[] = responseText
+          ? getMessageDrivenAgentInsights(responseText)
           : CONVERSATIONAL_AGENT_RELATED_ANSWERS[fieldLabel] ?? []
 
         setTasks(shouldHideAgentActivity ? [] : finalTasks)

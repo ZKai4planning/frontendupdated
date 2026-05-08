@@ -960,7 +960,8 @@ function DashboardOverview() {
     }
     setStoredSelectedProjectId(null)
 
-    router.push(preservedServiceSelection ? PLANS_STAGE_ROUTE : "/services")
+    // router.push(preservedServiceSelection ? PLANS_STAGE_ROUTE : "/services")
+    router.push("/services")
   }, [clearServiceSelection, router, serviceSelection, setServiceSelection, updateSection])
 
   const selectedProject = useMemo(

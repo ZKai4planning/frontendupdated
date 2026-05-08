@@ -56,16 +56,21 @@ export function UtilitiesConsentsStepContent({
     },
   ] as const
 
+  const responsiveGridClassName = "mb-6 grid grid-cols-1 gap-6 xl:grid-cols-2"
+
   return (
-    <>
+    <div className="min-w-0">
       <SectionHeading>Safety & Compliance</SectionHeading>
       <p className="mb-4 text-sm text-slate-500">
         Selecting <span className="font-semibold text-slate-700">No</span> adds the related support
         item to your cart automatically.
       </p>
-      <div className="mb-6 grid grid-cols-2 gap-6">
+      <div className={responsiveGridClassName}>
         {safetyComplianceFields.map((field) => (
-          <div key={field.label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div
+            key={field.label}
+            className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 p-4"
+          >
             <RadioGroupField
               label={field.label}
               options={["Yes", "No", "Ask Agent Z"]}
@@ -91,7 +96,6 @@ export function UtilitiesConsentsStepContent({
           ]}
           showDescriptionInput={false}
           allowAddMore
-          singleRow
           // onMissingTrigger={{
           //   message:
           //     "No safety or compliance documents uploaded - we can help you confirm which certificates are needed for this property.",
@@ -109,7 +113,7 @@ export function UtilitiesConsentsStepContent({
       </div>
 
       <SectionHeading>Utilities & Waste</SectionHeading>
-      <div className="grid grid-cols-2 gap-6 mb-6">
+      <div className={responsiveGridClassName}>
         <SelectField
           label="Water Supply"
           options={[
@@ -154,7 +158,7 @@ export function UtilitiesConsentsStepContent({
       </div>
 
       <SectionHeading>Additional Consents Required</SectionHeading>
-      <div className="grid grid-cols-2 gap-6 mb-2">
+      <div className="mb-2 grid grid-cols-1 gap-6 xl:grid-cols-2">
         <CheckboxGroup
           label="Additional Consents"
           options={[
@@ -175,7 +179,7 @@ export function UtilitiesConsentsStepContent({
             },
           }}
         />
-        <div className="col-span-2">
+        <div className="xl:col-span-2">
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
             Community Consultation / Neighbours Notified?
           </p>
@@ -186,6 +190,6 @@ export function UtilitiesConsentsStepContent({
           />
         </div>
       </div>
-    </>
+    </div>
   )
 }
