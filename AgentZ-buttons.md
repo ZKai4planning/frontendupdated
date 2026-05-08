@@ -11,7 +11,7 @@
 
 ## Pre-Application Check
 
-16. Planning Reference Number --> Get details
+16. Planning Reference Number --> Get details  
 
 ## Property & Ownership
 
