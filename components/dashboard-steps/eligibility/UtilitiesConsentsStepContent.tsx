@@ -116,8 +116,7 @@ export function UtilitiesConsentsStepContent({
             "Mains connected",
             "Borehole / private supply",
             "Not applicable",
-            "Don't know",
-            "Ask Agent Z",
+            "Don't know / Ask Agent Z",
           ]}
           consultTrigger="We can provide an infrastructure assessment."
         />
@@ -128,8 +127,7 @@ export function UtilitiesConsentsStepContent({
             "Septic tank",
             "Package treatment plant",
             "Not applicable",
-            "Don't know",
-            "Ask Agent Z",
+            "Don't know / Ask Agent Z",
           ]}
           consultTrigger="We can provide a drainage strategy."
         />
@@ -140,14 +138,13 @@ export function UtilitiesConsentsStepContent({
             "Soakaway",
             "Watercourse",
             "SuDS proposed",
-            "Don't know",
-            "Ask Agent Z",
+            "Don't know / Ask Agent Z",
           ]}
           consultTrigger="We can provide a Surface Water Drainage Strategy."
         />
         <SelectField
           label="Existing Waste Arrangements"
-          options={["Kerbside collection", "Communal bins", "Other", "Don't know", "Ask Agent Z"]}
+          options={["Kerbside collection", "Communal bins", "Other", "Don't know / Ask Agent Z"]}
         />
         <RadioGroupField
           label="Renewable energy installations proposed?"

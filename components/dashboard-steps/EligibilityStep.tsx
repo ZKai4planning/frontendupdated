@@ -4267,8 +4267,8 @@ function CheckboxGroup({
                     className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
                       isSelected
                         ? isAgentOption
-                          ? "bg-white border-white"
-                          : "bg-white border-white"
+                          ? "bg-transparent border-white"
+                          : "bg-transparent border-white"
                         : isAgentOption
                           ? "border-blue-500"
                           : "border-slate-300"
@@ -4276,7 +4276,7 @@ function CheckboxGroup({
                   >
                     {isSelected && (
                       <svg
-                        className="w-3 h-3 text-blue-600"
+                        className="w-3 h-3 text-white"
                         viewBox="0 0 12 12"
                         fill="none"
                       >
@@ -4511,7 +4511,7 @@ function EligibilityCheckPage() {
       setAskAgentUsageNotice((currentNotice) => (
         currentNotice?.id === askAgentUsageNotice.id ? null : currentNotice
       ))
-    }, 3000)
+    }, 5000)
 
     return () => window.clearTimeout(timeoutId)
   }, [askAgentUsageNotice])
@@ -5494,7 +5494,11 @@ function EligibilityEntryCard({
       </h2>
       <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
         Thank you for choosing AI4Planning. Your selected <b>Bronze</b> plan includes
-        {" "}{ASK_AGENT_USAGE_LIMIT} Agent Z assists, and you can use them throughout the application.
+        {" "}
+        <span className="text-white font-semibold">
+  {ASK_AGENT_USAGE_LIMIT} Agent Z assists
+</span>
+        , and you can use them throughout the application.
       </p>
       <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
         Your selected service is <span className="font-bold text-slate-800 ">{serviceName}</span>.
@@ -5581,13 +5585,13 @@ function EligibilitySubmittedCard({
         </div>
       </div>
 
-      <button
+      {/* <button
         type="button"
         onClick={onReviewSubmission}
         className="mt-6 rounded-2xl border border-slate-200 px-6 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
       >
         Review Submitted Form
-      </button>
+      </button> */}
     </div>
   )
 }
@@ -5678,13 +5682,13 @@ function EligibilitySubmissionSuccessModal({
           >
             Schedule Consultation
           </button>
-          <button
+          {/* <button
             type="button"
             onClick={onReviewSubmission}
             className="rounded-2xl border border-white/12 bg-white/5 px-6 py-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10"
           >
             Review Submitted Form
-          </button>
+          </button> */}
         </div>
       </div>
     </div>
@@ -5712,8 +5716,9 @@ function AgenticAssistantCard({
   const quickPointOne = "Takes only a few minutes"
   const quickPointTwo = "Tailored to your council area"
   const quickPointThree = "Helps avoid delays or errors"
-  const aiSupportText =
-    `Your subscription includes ${ASK_AGENT_USAGE_LIMIT} Agent Z assists designed to support you through every stage of your application journey.`
+  const aiSupportPrefix = "Your subscription includes "
+  const aiSupportHighlight = `${ASK_AGENT_USAGE_LIMIT} Agent Z assists`
+  const aiSupportSuffix = " designed to support you through every stage of your application journey."
   const exploreText =
     "Explore each feature and enjoy your personalised AI experience."
   const beginText = "Click Eligibility Check  to begin."
@@ -5726,7 +5731,10 @@ function AgenticAssistantCard({
   const pointTwoDelay = pointOneDelay + quickPointOne.length * typeSpeed + pauseBetweenLines
   const pointThreeDelay = pointTwoDelay + quickPointTwo.length * typeSpeed + pauseBetweenLines
   const aiSupportDelay = pointThreeDelay + quickPointThree.length * typeSpeed + pauseBetweenLines
-  const exploreDelay = aiSupportDelay + aiSupportText.length * typeSpeed + pauseBetweenLines
+  const aiSupportHighlightDelay = aiSupportDelay + aiSupportPrefix.length * typeSpeed
+  const aiSupportSuffixDelay =
+    aiSupportHighlightDelay + aiSupportHighlight.length * typeSpeed
+  const exploreDelay = aiSupportSuffixDelay + aiSupportSuffix.length * typeSpeed + pauseBetweenLines
   const beginDelay = exploreDelay + exploreText.length * typeSpeed + pauseBetweenLines
 
   return (
@@ -5827,12 +5835,29 @@ function AgenticAssistantCard({
         <div className="rounded-2xl border border-cyan-400/20 bg-cyan-400/5 p-4 text-sm text-cyan-100">
           <div className="flex items-start gap-2">
             <Bot className="mt-0.5 h-4 w-4 shrink-0 text-cyan-200" />
-            <TypewriterText
-              text={aiSupportText}
-              className="text-sm text-cyan-100"
-              speed={typeSpeed}
-              startDelay={aiSupportDelay}
-            />
+            <div className="flex flex-wrap items-center gap-1.5 leading-6">
+              <TypewriterText
+                text={aiSupportPrefix}
+                as="span"
+                className="text-sm text-cyan-100"
+                speed={typeSpeed}
+                startDelay={aiSupportDelay}
+              />
+              <TypewriterText
+                text={aiSupportHighlight}
+                as="span"
+                className="font-bold text-white"
+                speed={typeSpeed}
+                startDelay={aiSupportHighlightDelay}
+              />
+              <TypewriterText
+                text={aiSupportSuffix}
+                as="span"
+                className="text-sm text-cyan-100"
+                speed={typeSpeed}
+                startDelay={aiSupportSuffixDelay}
+              />
+            </div>
           </div>
           <TypewriterText
             text={exploreText}
@@ -5864,11 +5889,13 @@ function TypewriterText({
   className,
   speed = 16,
   startDelay = 0,
+  as = "p",
 }: {
   text: string
   className?: string
   speed?: number
   startDelay?: number
+  as?: "p" | "span"
 }) {
   const [visibleLength, setVisibleLength] = useState(0)
 
@@ -5899,7 +5926,7 @@ function TypewriterText({
     }
   }, [speed, startDelay, text])
 
-  return <p className={className}>{text.slice(0, visibleLength)}</p>
+  return React.createElement(as, { className }, text.slice(0, visibleLength))
 }
 
 export default function Page() {

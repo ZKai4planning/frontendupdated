@@ -50,6 +50,7 @@ export type EligibilitySharedComponents = {
     BaseFieldProps & {
       options: string[]
       consultTrigger?: string
+      className?: string
     }
   >
   SelectField?: React.ComponentType<
@@ -100,6 +101,7 @@ export type EligibilitySharedComponents = {
       options: string[]
       consultTrigger?: string
       optionStyleOverrides?: Record<string, EligibilityOptionStyleOverride>
+      className?: string
     }
   >
   DeclarationCheckbox?: React.ComponentType<BaseFieldProps & { fieldKey: string }>

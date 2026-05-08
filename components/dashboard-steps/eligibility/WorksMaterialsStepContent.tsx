@@ -174,7 +174,7 @@ export function WorksMaterialsStepContent({
             label={
               isDimensionsSupportAdded
                 ? "Dimensions survey added - Ask Agent Z"
-                : "Add dimensions survey with Agent Z"
+                : "Need help with dimensions? Ask Agent Z"
             }
             onClick={() => updateDimensionsSupport("Yes")}
             agentFieldLabel={dimensionsSupportFieldLabel}
@@ -279,7 +279,7 @@ export function WorksMaterialsStepContent({
           <div className="space-y-4">
             <RadioGroupField
               label="Approx smallest bedroom size?"
-              options={["Under 6.5 mÂ²", "6.5-10 mÂ²", "10+ mÂ²"]}
+              options={["Under 6.5 m²", "6.5 - 10 m²", "10+ m²"]}
             />
           </div>
         </div>

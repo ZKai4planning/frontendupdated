@@ -78,7 +78,7 @@ A flat or maisonette is part of a building with shared or separate access.`,
 If you own the property but not the land (usually in flats), you are a leaseholder.
 If the property is owned by a company, select company-owned.
 If you're renting or managing on behalf of someone else, select tenant or acting on behalf of owner.`,
-  "Are you planning any building works?": `Agent Z Smart Response (Conversational)
+  "Are you planning any building works?": `Agent Z Smart Response
 Building works include any physical changes to your property such as:
 Extending the property (rear or side)
 Converting loft or garage
@@ -119,29 +119,29 @@ London Zones 1-4: £180 - £250
 Greater London / M25 Ring: £220 - £300
 Home Counties (Essex, Kent, Surrey, Herts, Berkshire): £250 - £350
 (Prices vary based on property size and travel distance.)`,
-  "Wall Materials": `Agent Z Smart Response (Conversational)
+  "Wall Materials": `Agent Z Smart Response
 The type of wall you choose is important for fire safety, sound insulation, and HMO compliance.
 Brick/Block walls -> Strong and durable, but less flexible
 Stud walls (plasterboard) -> Common for internal layouts, quicker to install
 Fire-rated walls -> Required in HMOs for safety and compliance`,
-  "Roof Materials": `Agent Z Smart Response (Conversational)
+  "Roof Materials": `Agent Z Smart Response
 The choice of roof material depends on the type of work you're planning:
 Tiles or slate -> Common for pitched roofs and maintaining the look of the property
 Flat roofs (felt/GRP) -> Typically used for rear extensions
 GRP/Fibreglass -> Durable and low maintenance for modern extensions`,
-  "Materials match existing?": `Agent Z Smart Response (Conversational)
+  "Materials match existing?": `Agent Z Smart Response
 In most cases, councils prefer new work to match the existing property, especially for:
 Brickwork
 Roof tiles
 External finishes
 
 This helps the extension or alteration blend in with the original building.`,
-  "Conservation Area or Near Listed Building?": `Agent Z Smart Response (Conversational)
+  "Conservation Area or Near Listed Building?": `Agent Z Smart Response
 A conservation area is a location where the council protects the character and appearance of buildings.
 A listed building is officially recognised as historically important and has strict rules for any changes.
 
 If your property is in one of these areas, even small changes may require planning permission.`,
-  "Trees with TPO (Tree Preservation Order) on or near site?": `Agent Z Smart Response (Conversational)
+  "Trees with TPO (Tree Preservation Order) on or near site?": `Agent Z Smart Response
 Trees are important in planning, especially if they are:
 Large or mature
 Close to your proposed extension
@@ -149,7 +149,7 @@ Protected by a Tree Preservation Order (TPO)
 
 A simple way to think about it:
 If a tree is tall enough to potentially fall onto your proposed structure, it may be relevant.`,
-  "Trees within falling distance of works?": `Agent Z Smart Response (Conversational)
+  "Trees within falling distance of works?": `Agent Z Smart Response
 Trees are important in planning, especially if they are:
 Large or mature
 Close to your proposed extension
@@ -157,14 +157,14 @@ Protected by a Tree Preservation Order (TPO)
 
 A simple way to think about it:
 If a tree is tall enough to potentially fall onto your proposed structure, it may be relevant.`,
-  "Is the site in Flood Zone 2 or 3?": `Agent Z Smart Response (Conversational)
+  "Is the site in Flood Zone 2 or 3?": `Agent Z Smart Response
 Flood Zones are defined as:
 Zone 1 -> Low risk
 Zone 2 -> Medium risk
 Zone 3 -> High risk
 
 If your property is in Zone 2 or 3, the council may require a Flood Risk Assessment (FRA) before approval.`,
-  "Any known contamination on site?": `Agent Z Smart Response (Conversational)
+  "Any known contamination on site?": `Agent Z Smart Response
 Contamination usually relates to past uses of the land that may have left harmful substances in the ground, such as:
 Old industrial or factory use
 Petrol stations or garages
