@@ -196,7 +196,7 @@ With a strong focus on customer outcomes, Ritesh ensures that every interaction 
       "Riyadh is a results‑driven marketing professional with experience delivering high‑impact digital and advertising campaigns for leading UK brands. He specialises in translating complex propositions into clear, compelling customer journeys that drive engagement, lead generation, and commercial impact. Riyadh supports end‑to‑end campaign delivery across hospitality and connectivity products, owning content distribution, landing‑page optimisation, and direct client communications. He works closely with sales, creative, and external partners to define priorities, brief assets, and ensure messaging is consistent, timely, and relevant across channels. With a strong foundation in performance monitoring and ad‑tech platforms, Riyadh applies data‑driven insight to optimise digital journeys, improve delivery accuracy, and maximise campaign effectiveness. His experience spans CRM management, stakeholder engagement, and cross‑functional collaboration, enabling him to bridge commercial objectives with customer needs. Riyadh brings a product‑marketing mindset to his work—supporting product lifecycle communications, shaping value propositions, and helping users understand how products solve real problems. Fluent in Spanish and highly analytical, he thrives in fast‑paced environments where clarity, execution, and continuous improvement are critical to growth.",
     name: "Riyadh",
     designation: "Product & Digital Marketing Executive",
-    src: "/riyad1.png",
+    src: "/Placeholder.png",
     roleSummary:
       "Leads brand growth, digital campaigns, and customer acquisition strategies.",
     focusAreas: [
