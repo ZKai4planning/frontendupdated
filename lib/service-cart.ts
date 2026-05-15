@@ -138,21 +138,26 @@ const SERVICE_CART_SUPPORT_CONFIG: readonly CartSupportConfigItem[] = [
   },
 ] as const
 
-// Replace these placeholder values with the approved commercial prices for each add-on service.
+const BASE_SUPPORT_SERVICE_PAYMENT = 120
+
+// The attached pricing document clearly lists London starting prices for the
+// survey and compliance services below. The remaining support add-ons did not
+// include a fixed amount in the document export, so we use a non-zero baseline
+// support fee instead of sending 0 in the cart payload.
 const SERVICE_CART_PAYMENT_BY_NAME: Record<string, number> = {
-  "Site Measurement Survey": 0,
-  "Location Plan": 0,
-  "Site Plan": 0,
-  "Existing & Proposed Plans": 0,
-  "Photographs of Site": 0,
-  "Additional Drawings": 0,
-  "Tree / BS5837 Report": 0,
-  "Flood Risk Assessment": 0,
-  "Safety & Compliance Documents": 0,
-  "Smoke Alarms Compliance": 0,
-  "Gas Safety Certificate": 0,
-  "Electrical Report (EICR)": 0,
-  "Energy Performance Certificate (EPC)": 0,
+  "Site Measurement Survey": 180,
+  "Location Plan": BASE_SUPPORT_SERVICE_PAYMENT,
+  "Site Plan": BASE_SUPPORT_SERVICE_PAYMENT,
+  "Existing & Proposed Plans": BASE_SUPPORT_SERVICE_PAYMENT,
+  "Photographs of Site": BASE_SUPPORT_SERVICE_PAYMENT,
+  "Additional Drawings": BASE_SUPPORT_SERVICE_PAYMENT,
+  "Tree / BS5837 Report": BASE_SUPPORT_SERVICE_PAYMENT,
+  "Flood Risk Assessment": BASE_SUPPORT_SERVICE_PAYMENT,
+  "Safety & Compliance Documents": BASE_SUPPORT_SERVICE_PAYMENT,
+  "Smoke Alarms Compliance": 180,
+  "Gas Safety Certificate": 80,
+  "Electrical Report (EICR)": 150,
+  "Energy Performance Certificate (EPC)": 60,
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>

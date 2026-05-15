@@ -4911,6 +4911,14 @@ function EligibilityCheckPage() {
     }
   }
 
+  const handleStepJump = (targetStep: Step) => {
+    if (targetStep === step) return
+    if (isSavingStep || isSavingDraft || isAnalyzing || isLoadingEligibility) return
+
+    setSubmitError(null)
+    setStep(targetStep)
+  }
+
   const handleSaveDraft = async () => {
     if (isSavingDraft || isSavingStep || isAnalyzing || isLoadingEligibility) return
 
@@ -5289,8 +5297,17 @@ function EligibilityCheckPage() {
               </div>
               <div className="flex gap-6 border-b pb-4 mb-6 text-sm overflow-x-auto">
                 {STEP_LABELS.map((label, i) => (
-                  <StepLabel key={i} active={step === i + 1}>{label}</StepLabel>
+                  <StepLabel
+                    key={i}
+                    active={step === i + 1}
+                    onClick={() => handleStepJump((i + 1) as Step)}
+                  >
+                    {label}
+                  </StepLabel>
                 ))}
+              </div>
+              <div className="mb-4 rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-slate-700">
+                If you are unsure, please move to the next question. We can discuss it later.
               </div>
               {isReviewOnly && (
                 <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
@@ -6081,17 +6098,28 @@ function SectionHeading({ children }: { children: React.ReactNode }) {
 /* ─────────────────────────────────────────────
    FORM PRIMITIVES
 ───────────────────────────────────────────── */
-function StepLabel({ active, children }: { active: boolean; children: React.ReactNode }) {
+function StepLabel({
+  active,
+  children,
+  onClick,
+}: {
+  active: boolean
+  children: React.ReactNode
+  onClick?: () => void
+}) {
   return (
-    <span
-      className={`pb-2 whitespace-nowrap ${
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? "step" : undefined}
+      className={`pb-2 whitespace-nowrap transition-colors ${
         active
           ? "font-semibold text-blue-600 border-b-2 border-blue-600"
-          : "text-slate-400"
+          : "text-slate-400 hover:text-slate-600"
       }`}
     >
       {children}
-    </span>
+    </button>
   )
 }
 

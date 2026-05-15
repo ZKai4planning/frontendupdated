@@ -242,6 +242,7 @@ export default function PaymentUI() {
     createInitialCustomerDetails(storedPayment?.customerDetails, { fullName, email })
   )
   const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [isSubmittingPayment, setIsSubmittingPayment] = useState(false)
 
   const serviceCategory =
     serviceSelection?.category || "Residential: Homeowners & landlords"
@@ -322,17 +323,12 @@ export default function PaymentUI() {
         fullAddress: effectiveFullAddress,
         addressDetails: customerDetails.addressDetails,
       },
-      transactionRef,
-      proofFileName: file?.name ?? persistedProofFileName,
     })
   }, [
     customerDetails,
     effectiveEmail,
     effectiveFullName,
     effectivePhoneCountryCode,
-    file,
-    persistedProofFileName,
-    transactionRef,
     updateSection,
   ])
 
@@ -421,15 +417,20 @@ export default function PaymentUI() {
     Boolean(userId) &&
     Boolean(isCustomerDetailsComplete) &&
     Boolean(trimmedTransactionRef) &&
-    !isSavingProfile
+    !isSavingProfile &&
+    !isSubmittingPayment
 
   const isClientDetailsSaveEnabled =
     !isReadOnly &&
     Boolean(userId) &&
     Boolean(isCustomerDetailsComplete) &&
-    !isSavingProfile
+    !isSavingProfile &&
+    !isSubmittingPayment
 
-  const saveClientDetails = async (showSuccessToast = true) => {
+  const saveClientDetails = async (
+    showSuccessToast = true,
+    useProfileSavingState = true
+  ) => {
     if (!userId) {
       toast.error("User not found")
       return false
@@ -463,7 +464,9 @@ export default function PaymentUI() {
       return false
     }
 
-    setIsSavingProfile(true)
+    if (useProfileSavingState) {
+      setIsSavingProfile(true)
+    }
 
     try {
       let existingProfile: Partial<ProfileModel> | null = null
@@ -533,7 +536,7 @@ export default function PaymentUI() {
       }
 
       if (showSuccessToast) {
-        toast.success("Client details saved successfully")
+        toast.success("Your details have been saved successfully")
       }
 
       return true
@@ -541,39 +544,48 @@ export default function PaymentUI() {
       toast.error(getProfileErrorMessage(error, "Failed to save client details"))
       return false
     } finally {
-      setIsSavingProfile(false)
+      if (useProfileSavingState) {
+        setIsSavingProfile(false)
+      }
     }
   }
 
   const handleSubmit = async () => {
+    if (isSubmittingPayment || isSavingProfile) return
     if (!trimmedTransactionRef) {
       toast.error("Transaction reference is required")
       return
     }
 
-    const isSaved = await saveClientDetails(false)
-    if (!isSaved) return
+    setIsSubmittingPayment(true)
 
-    updateSection("payment", {
-      customerDetails: {
-        ...customerDetails,
-        fullName: effectiveFullName.trim(),
-        phoneCountryCode: effectivePhoneCountryCode.trim(),
-        phoneNumber: effectivePhoneNumber.trim(),
-        email: effectiveEmail.trim(),
-        fullAddress: effectiveFullAddress.trim(),
-        postalCode: effectivePostCode.trim(),
-        serviceLocationType: effectiveServiceLocationType,
-        servicePostalCode: effectiveServicePostCode.trim(),
-      },
-      transactionRef: trimmedTransactionRef,
-      proofFileName: file?.name ?? persistedProofFileName,
-      status: "submitted",
-      submittedAt: new Date().toISOString(),
-    })
+    try {
+      const isSaved = await saveClientDetails(false, false)
+      if (!isSaved) return
 
-    toast.success("Client details saved successfully")
-    router.push("/dashboard?stage=eligibility")
+      updateSection("payment", {
+        customerDetails: {
+          ...customerDetails,
+          fullName: effectiveFullName.trim(),
+          phoneCountryCode: effectivePhoneCountryCode.trim(),
+          phoneNumber: effectivePhoneNumber.trim(),
+          email: effectiveEmail.trim(),
+          fullAddress: effectiveFullAddress.trim(),
+          postalCode: effectivePostCode.trim(),
+          serviceLocationType: effectiveServiceLocationType,
+          servicePostalCode: effectiveServicePostCode.trim(),
+        },
+        transactionRef: trimmedTransactionRef,
+        proofFileName: file?.name ?? persistedProofFileName,
+        status: "submitted",
+        submittedAt: new Date().toISOString(),
+      })
+
+      toast.success("Payment details submitted successfully")
+      router.push("/dashboard?stage=eligibility")
+    } finally {
+      setIsSubmittingPayment(false)
+    }
   }
 
   return (
@@ -802,7 +814,7 @@ export default function PaymentUI() {
             }}
             className="w-full cursor-pointer rounded-xl bg-blue-600 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {isSavingProfile ? "Saving..." : "Submit"}
+            {isSubmittingPayment ? "Submitting..." : "Submit"}
           </button>
 
           <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
