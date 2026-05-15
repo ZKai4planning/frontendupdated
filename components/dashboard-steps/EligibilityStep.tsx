@@ -4829,47 +4829,64 @@ function EligibilityCheckPage() {
     userProfile,
   ])
 
-  const upsertEligibilityProject = async (status: EligibilitySaveStatus = "in_progress") => {
-    if (step === 1 && !existingProjectId) {
-      if (!userId) {
-        throw new Error("User ID is missing, so we couldn't create the eligibility project.")
-      }
-      if (!existingProjectStageId) {
-        throw new Error("Project stage is missing, so we couldn't create the eligibility project.")
-      }
-
-      const multipartData = buildEligibilityMultipartFormData({
-        step,
-        status,
-        formValues: savedFormData,
-        uploadedFiles,
-        location: data.eligibility?.location,
-        signatureFile,
-        subServices,
-        userId,
-        projectStageId: existingProjectStageId,
-      })
-
-      const response = await axiosInstance.post(ELIGIBILITY_CREATE_ENDPOINT, multipartData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      })
-
-      const projectId = extractProjectId(response.data)
-      if (!projectId) {
-        throw new Error("The first-step save succeeded, but no projectId was returned.")
-      }
-
-      updateSection("eligibility", {
-        ...(data.eligibility || {}),
-        projectId,
-      })
-      persistSelectedEligibilityProject(projectId, existingProjectStageId)
-
-      return projectId
+  const createEligibilityProjectRecord = async ({
+    step: createStep,
+    status,
+  }: {
+    step: Step
+    status: EligibilitySaveStatus
+  }) => {
+    if (!userId) {
+      throw new Error("User ID is missing, so we couldn't create the eligibility project.")
+    }
+    if (!existingProjectStageId) {
+      throw new Error("Project stage is missing, so we couldn't create the eligibility project.")
     }
 
-    if (!existingProjectId) {
-      throw new Error("Project ID is missing. Please complete the first step first.")
+    const multipartData = buildEligibilityMultipartFormData({
+      step: createStep,
+      status,
+      formValues: savedFormData,
+      uploadedFiles,
+      location: data.eligibility?.location,
+      signatureFile,
+      subServices,
+      userId,
+      projectStageId: existingProjectStageId,
+    })
+
+    const response = await axiosInstance.post(ELIGIBILITY_CREATE_ENDPOINT, multipartData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+
+    const projectId = extractProjectId(response.data)
+    if (!projectId) {
+      throw new Error("The save succeeded, but no projectId was returned.")
+    }
+
+    updateSection("eligibility", {
+      ...(data.eligibility || {}),
+      projectId,
+    })
+    persistSelectedEligibilityProject(projectId, existingProjectStageId)
+
+    return projectId
+  }
+
+  const upsertEligibilityProject = async (status: EligibilitySaveStatus = "in_progress") => {
+    if (step === 1 && !existingProjectId) {
+      return createEligibilityProjectRecord({
+        step: 1,
+        status,
+      })
+    }
+
+    let projectId = existingProjectId
+    if (!projectId) {
+      projectId = await createEligibilityProjectRecord({
+        step: 1,
+        status: "in_progress",
+      })
     }
 
     const multipartData = buildEligibilityMultipartFormData({
@@ -4884,11 +4901,11 @@ function EligibilityCheckPage() {
       projectStageId: existingProjectStageId,
     })
 
-    await axiosInstance.put(`/eligibility/${encodeURIComponent(existingProjectId)}`, multipartData, {
+    await axiosInstance.put(`/eligibility/${encodeURIComponent(projectId)}`, multipartData, {
       headers: { "Content-Type": "multipart/form-data" },
     })
 
-    return existingProjectId
+    return projectId
   }
 
   const handleNextStep = async () => {
@@ -4916,6 +4933,14 @@ function EligibilityCheckPage() {
     if (isSavingStep || isSavingDraft || isAnalyzing || isLoadingEligibility) return
 
     setSubmitError(null)
+    if (!existingProjectId) {
+      void createEligibilityProjectRecord({
+        step: 1,
+        status: "in_progress",
+      }).catch(() => {
+        // Keep jump navigation responsive even if the initial bootstrap save fails.
+      })
+    }
     setStep(targetStep)
   }
 
