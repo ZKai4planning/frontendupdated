@@ -300,6 +300,9 @@ const getDashboardCartItems = (formData: Record<string, string | string[]>) =>
     return matches ? [item.cartLabel] : []
   })
 
+const shouldRouteProjectToEligibility = (summary?: DashboardEligibilitySummary | null) =>
+  Boolean(summary?.projectId && !summary.completedAt)
+
 const formatDashboardDate = (value?: string) => {
   if (!value?.trim()) return "Not scheduled"
 
@@ -855,16 +858,45 @@ function DashboardOverview() {
         const detailedProject = extractProjectFromResponse(response.data) ?? project
         persistSelectedProject(detailedProject)
 
-        const stageRoute =
+        let stageRoute =
           detailedProject.currentStage?.route ||
           resolveStageFromStatus(detailedProject.status) ||
           "overview"
+
+        try {
+          const eligibilityResponse = await axiosInstance.get(
+            `/eligibility/${encodeURIComponent(project.projectId)}`
+          )
+          const eligibilitySummary = normalizeDashboardEligibilitySummary(
+            eligibilityResponse.data,
+            project.projectId
+          )
+
+          if (shouldRouteProjectToEligibility(eligibilitySummary)) {
+            stageRoute = "eligibility"
+          }
+        } catch {
+          // If no eligibility record exists yet, keep the project stage route.
+        }
 
         router.push(
           stageRoute === "overview" ? "/dashboard" : `/dashboard?stage=${stageRoute}`
         )
       } catch {
-        const fallbackStage = resolveStageFromStatus(project.status) || "overview"
+        const fallbackEligibilitySummary =
+          eligibilitySummary?.projectId === project.projectId
+            ? eligibilitySummary
+            : data.eligibility?.projectId === project.projectId && data.eligibility?.formData
+              ? {
+                  projectId: project.projectId,
+                  formData: data.eligibility.formData,
+                  completedAt: data.eligibility.completedAt,
+                  isEligible: data.eligibility.isEligible,
+                }
+              : null
+        const fallbackStage = shouldRouteProjectToEligibility(fallbackEligibilitySummary)
+          ? "eligibility"
+          : resolveStageFromStatus(project.status) || "overview"
         router.push(
           fallbackStage === "overview"
             ? "/dashboard"
@@ -872,7 +904,7 @@ function DashboardOverview() {
         )
       }
     },
-    [persistSelectedProject, router]
+    [data.eligibility, eligibilitySummary, persistSelectedProject, router]
   )
 
   const handleProjectCardSelect = useCallback(
