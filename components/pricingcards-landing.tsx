@@ -17,13 +17,12 @@ export type PricingPlanOption = {
 
 export const plans: PricingPlanOption[] = [
   {
-    name: "Bronze",
-    description: "Essential",
+    name: "Bronze ",
+    description: "Essential - Free service",
     button: "Get Started",
     initialCharge: 40,
     subsequentCharge: 100,
     features: [
-      "~30% Self-Service",
       "15 'Planning Intelligence' buttons",
       "Basic AI guidance",
       "Simple templates & eligibility checks",

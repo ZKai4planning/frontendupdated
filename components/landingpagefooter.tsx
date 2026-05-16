@@ -128,6 +128,9 @@ export default function Footer() {
           <p>
             &copy; {new Date().getFullYear()} AI4Planning. All rights reserved.
           </p>
+          <p>
+            Company Number <span className="font-semibold text-white/80">17123034</span>
+          </p>
 
           <div className="flex items-center gap-6">
             <Link href="/cookie" className="hover:text-white">

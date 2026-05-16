@@ -607,10 +607,19 @@ export const CircularTestimonials = ({
           className="relative w-full aspect-square max-h-96 perspective-[1000px]"
           ref={imageContainerRef}
         >
+          {/* Left / Right click zones over image only */}
+          <div
+            onClick={handlePrev}
+            style={{ position: "absolute", left: 0, top: 0, width: "50%", height: "100%", zIndex: 10, cursor: "pointer" }}
+          />
+          <div
+            onClick={handleNext}
+            style={{ position: "absolute", right: 0, top: 0, width: "50%", height: "100%", zIndex: 10, cursor: "pointer" }}
+          />
           {testimonials.map((testimonial, index) => (
             // Fix #3: Use Next.js Image component
             <Image
-              key={testimonial.src}
+              key={index}
               src={testimonial.src}
               alt={testimonial.name}
               fill // Replaces absolute positioning logic for size

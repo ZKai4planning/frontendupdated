@@ -146,7 +146,7 @@ export default function LandingServicesSection({
         className={`group flex min-h-[18rem] flex-col rounded-3xl border p-5 text-left transition-all sm:min-h-[19rem] sm:p-6 ${
           isActive
             ? "cursor-pointer border-white/10 bg-white/5 backdrop-blur-xl hover:-translate-y-1 hover:border-blue-400/60 hover:shadow-xl hover:shadow-blue-500/15"
-            : "cursor-not-allowed border-white/10 bg-white/5 opacity-60"
+            : "cursor-not-allowed border-white/10 bg-white/5 opacity-65 blur-[3px]"
         }`}
       >
         <div className="mb-3 flex items-center justify-between gap-3">
